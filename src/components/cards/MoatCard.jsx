@@ -41,6 +41,23 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
         switching: 0
     });
     const [aiDescription, setAiDescription] = useState('');
+    const [userNote, setUserNote] = useState('');
+
+    const handleNoteChange = (e) => {
+        setUserNote(e.target.value);
+    };
+
+    const handleNoteBlur = async () => {
+        if (stockData?.overview?.symbol && currentUser) {
+            const newEvaluator = currentUser.displayName || currentUser.email || 'User';
+            await savePrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol, {
+                scores,
+                description: aiDescription,
+                evaluator: newEvaluator,
+                userNote: userNote
+            });
+        }
+    };
 
     // Lazy load charts
     const [isInView, setIsInView] = React.useState(false);
@@ -79,6 +96,7 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                         setScores(privateData.scores);
                         setAiDescription(privateData.description);
                         setEvaluator(privateData.evaluator);
+                        setUserNote(privateData.userNote || ''); // Load user note
                         setHasEvaluated(true);
                         return; // Stop here if private found
                     } else {
@@ -99,6 +117,7 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                     setScores(publicData.scores);
                     setAiDescription(publicData.description);
                     setEvaluator(publicData.evaluator || 'Gemini AI'); // Default to Gemini AI if missing
+                    setUserNote(''); // Clear user note for public data
                     setHasEvaluated(true);
                 }
             } catch (err) {
@@ -140,6 +159,7 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             console.log("Mapped Scores:", newScores); // Debug log
             setScores(newScores);
             setAiDescription(result.description || '');
+            setUserNote(''); // Clear user note on new AI run
             setHasEvaluated(true);
             lastEvaluatedSymbol.current = stockData.overview.symbol;
 
@@ -227,7 +247,8 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             await savePrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol, {
                 scores: newScores,
                 description: aiDescription, // Preserve existing description
-                evaluator: newEvaluator
+                evaluator: newEvaluator,
+                userNote: userNote // Save user note
             });
         }
     };
@@ -385,6 +406,19 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                                     <div className={styles.score}>
                                         <div className={`${styles.scoreValue} ${moatStatus.color}`}>{totalScore} <span className={styles.scoreMax}>/ 5</span></div>
                                         <p className={`${styles.scoreStatus} ${moatStatus.color}`}>{moatStatus.label}</p>
+
+                                        {/* User Note Area - Only visible if evaluated by user or if user wants to add notes */}
+                                        {evaluator && evaluator !== 'Gemini AI' && (
+                                            <textarea
+                                                className={styles.userNoteInput}
+                                                placeholder="Add your notes here..."
+                                                value={userNote}
+                                                onChange={handleNoteChange}
+                                                onBlur={handleNoteBlur}
+                                                rows={3}
+                                            />
+                                        )}
+
                                         {evaluator && (
                                             <p className={styles.evaluatorNote}>Evaluated by {evaluator}</p>
                                         )}
