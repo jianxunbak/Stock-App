@@ -133,8 +133,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: transparent;
     padding: 0 0.6rem;
     /* Smaller padding mobile */
     border-radius: 50%;
@@ -144,11 +143,22 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     margin-left: 0;
     height: 2.8rem;
     width: 2.8rem;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
 }
 
 .logoutButton:hover {
@@ -171,22 +181,31 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: transparent;
     padding: 0 0.6rem;
-    /* Smaller padding mobile */
     border-radius: 50%;
     color: var(--text-primary);
     font-size: 0.8rem;
-    /* Smaller font mobile */
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     margin-left: 0;
     height: 2.8rem;
     width: 2.8rem;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+
 }
 
 @media (min-width: 768px) {
@@ -359,15 +378,26 @@
     padding: 0.8rem 1.2rem 0.8rem 2.5rem;
     /* Left padding for icon */
     font-size: 1rem;
-    background-color: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: transparent;
     border-radius: 9999px;
     color: var(--text-primary);
     transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
     opacity: 1;
     cursor: text;
     position: relative;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
 }
 
 .searchExpanded .searchInput {

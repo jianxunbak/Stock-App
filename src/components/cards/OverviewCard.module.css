@@ -7,41 +7,42 @@
     gap: 1.5rem;
     display: flex;
     flex-direction: column;
-
-    /* Ensure the content is above the pseudo-element */
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow:
         0 15px 35px rgba(0, 0, 0, 0.5),
         inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
         inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
 }
 
-.inView {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+[data-theme="light"] .card {
+    background: transparent;
     box-shadow:
-        0 20px 40px rgba(0, 0, 0, 0.6),
-        inset 5px 3.5px 5px rgba(255, 255, 255, 0.3),
-        inset -2px -2px 5px rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(96, 165, 250, 0.2);
-}
+        /* 1. Main Drop Shadow (Bottom & Right) - The strong one */
+        15px 15px 35px rgba(0, 0, 0, 0.2),
+        /* 2. Tiny Drop Shadow (Top & Left) - The subtle one */
+        -5px -5px 20px rgba(0, 0, 0, 0.1),
+        /* Smaller offset, smaller blur, lower opacity */
 
-/* Specular Highlight / Reflection */
-.card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 100%;
-    background: linear-gradient(105deg,
-            rgba(255, 255, 255, 0.15) 0%,
-            rgba(255, 255, 255, 0.05) 30%,
-            transparent 50%);
-    pointer-events: none;
+        /* 3. Highlight (Inner/Inset) - Keep as is */
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+
+        /* 4. Shadow (Inner/Inset) - Keep as is */
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgb(255, 255, 255);
+    border-left: 1px solid rgb(255, 255, 255);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgb(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    z-index: 1;
 }
 
 /* Ensure content sits above the background effects */
@@ -208,8 +209,7 @@
 
 .viewDetailsBtn:hover {
     transform: translateY(-2px);
-    box-shadow:
-        0 6px 12px rgba(96, 165, 250, 0.5),
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5),
         inset 0 2px 4px rgba(96, 165, 250, 0.5);
 }
 
@@ -285,7 +285,26 @@
     overflow-y: auto;
     max-height: 150px;
     padding-right: 0.5rem;
-    /* Add padding to avoid content overlap with scrollbar */
+    -webkit-mask-image:
+        linear-gradient(to bottom,
+            transparent 0%,
+            /* Start at the top: fully hidden */
+            black 10%,
+            /* Fade in fully by 5% down */
+            black 95%,
+            /* Stay fully visible until 95% down */
+            transparent 100%
+            /* Fade out fully by the bottom */
+        );
+
+    /* Standard CSS property (for future compatibility) */
+    mask-image:
+        linear-gradient(to bottom,
+            transparent 0%,
+            black 5%,
+            black 95%,
+            transparent 100%);
+
 }
 
 /* Custom Scrollbar */
@@ -480,8 +499,7 @@
 .tfButton:hover {
     background: transparent;
     transform: translateY(-2px);
-    box-shadow:
-        0 6px 12px rgba(96, 165, 250, 0.5),
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5),
         inset 0 2px 4px rgba(96, 165, 250, 0.5);
 }
 
@@ -499,8 +517,7 @@
     background: transparent;
     border-bottom: 1px solid rgba(24, 42, 65, 0.5);
     transform: translateY(-2px);
-    box-shadow:
-        0 6px 12px rgba(96, 165, 250, 0.5),
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5),
         inset 0 2px 4px rgba(96, 165, 250, 0.5);
     color: var(--text-primary);
     font-weight: 600;

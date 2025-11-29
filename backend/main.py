@@ -1477,7 +1477,7 @@ async def evaluate_moat(ticker: str):
         }
     }
 
-    models_to_try = ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
+    models_to_try = ["gemini-2.5-flash-preview-09-2025", "gemini-2.5-flash-lite-preview-09-2025"]
     last_exception = None
 
     for model in models_to_try:

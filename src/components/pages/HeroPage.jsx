@@ -185,7 +185,7 @@ const HeroPage = () => {
             </header>
 
             <div className={styles.content}>
-                <div className={styles.heroTextContainer}>
+                <div className={styles.heroTitleContainer}>
                     <h1 className={styles.title}>Stock Analyser</h1>
                 </div>
 

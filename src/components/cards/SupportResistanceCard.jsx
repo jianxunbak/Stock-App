@@ -13,6 +13,7 @@ const SupportResistanceCard = () => {
     if (!support_resistance || !support_resistance.levels || support_resistance.levels.length === 0) {
         return (
             <div className={styles.card}>
+                {/* <LiquidGlassBackground /> */}
                 <h3 className={styles.title}>Major Support Levels</h3>
                 <p className={styles.noDataText}>Insufficient data to determine support levels.</p>
             </div>
@@ -23,6 +24,7 @@ const SupportResistanceCard = () => {
 
     return (
         <div className={styles.card}>
+            {/* <LiquidGlassBackground /> */}
             <h3 className={styles.title}>Support Levels</h3>
 
             <div className={styles.listContainer}>

@@ -10,7 +10,6 @@ import DebtCard from '../cards/DebtCard';
 import ValuationCard from '../cards/ValuationCard';
 import SupportResistanceCard from '../cards/SupportResistanceCard';
 import FinancialTables from '../cards/FinancialTables';
-import NewsEstimates from '../cards/NewsEstimates';
 import Modal from '../ui/Modal';
 import WatchlistModal from '../ui/WatchlistModal';
 import { Search, ArrowLeft, Star, Menu, X, LogOut, TrendingUp } from 'lucide-react';
@@ -19,6 +18,7 @@ import UserProfileModal from '../ui/UserProfileModal';
 import { FluidCard } from '../ui/FluidCard';
 import CascadingHeader from '../CascadingHeader';
 import styles from './DashboardPage.module.css';
+
 
 const DashboardPage = () => {
     const { stockData, loadStockData, error, loading } = useStockData();

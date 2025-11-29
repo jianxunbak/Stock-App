@@ -7,32 +7,42 @@
     gap: 1.5rem;
     display: flex;
     flex-direction: column;
-
-    /* Ensure the content is above the pseudo-element */
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow:
         0 15px 35px rgba(0, 0, 0, 0.5),
         inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
         inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
 }
 
-/* Specular Highlight / Reflection */
-.card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 100%;
-    background: linear-gradient(105deg,
-            rgba(255, 255, 255, 0.15) 0%,
-            rgba(255, 255, 255, 0.05) 30%,
-            transparent 50%);
-    pointer-events: none;
+[data-theme="light"] .card {
+    background: transparent;
+    box-shadow:
+        /* 1. Main Drop Shadow (Bottom & Right) - The strong one */
+        15px 15px 35px rgba(0, 0, 0, 0.2),
+        /* 2. Tiny Drop Shadow (Top & Left) - The subtle one */
+        -5px -5px 20px rgba(0, 0, 0, 0.1),
+        /* Smaller offset, smaller blur, lower opacity */
+
+        /* 3. Highlight (Inner/Inset) - Keep as is */
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+
+        /* 4. Shadow (Inner/Inset) - Keep as is */
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgb(255, 255, 255);
+    border-left: 1px solid rgb(255, 255, 255);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgb(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    z-index: 1;
 }
 
 /* Ensure content sits above the background effects */
@@ -61,8 +71,7 @@
     font-size: 1.25rem;
     line-height: 1.75rem;
     font-weight: 700;
-    margin-bottom: 1.5rem;
-    margin-top: 0;
+    margin: 0;
     color: var(--text-primary);
 }
 
@@ -86,7 +95,7 @@
     color: var(--text-secondary);
     margin-bottom: 0;
     box-sizing: border-box;
-    text-align: center;
+    text-align: left;
 }
 
 h4 {
@@ -120,7 +129,7 @@ h4 {
     font-weight: 700;
     color: #4ade80;
     margin: 0;
-    text-align: center;
+    text-align: left;
 
 }
 
@@ -192,13 +201,15 @@ h4 {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: space-evenly;
-    gap: 1.5rem
+    /* justify-content: space-evenly; */
+    align-items: left;
+    gap: 2.5rem
 }
 
 .valuationContainer {
     display: flex;
     flex-direction: column;
+    align-items: left;
     /* flex-grow: 1; */
 }
 
@@ -208,7 +219,7 @@ h4 {
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
-    text-align: center;
+    text-align: left;
 
 }
 
@@ -229,7 +240,7 @@ h4 {
     line-height: 2rem;
     font-weight: 700;
     margin: 0;
-    text-align: center;
+    text-align: left;
 }
 
 .undervalued {

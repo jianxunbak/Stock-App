@@ -14,7 +14,33 @@ const ValuationCard = () => {
 
     return (
         <div className={styles.card}>
+            {/* <LiquidGlassBackground /> */}
             <h3 className={styles.title}>Intrinsic Value</h3>
+            <div className={styles.section}>
+                <div className={styles.valueRow}>
+                    <div className={styles.valuationContainer}>
+                        <h4 className={styles.valuationLabel}>Current Price</h4>
+                        <p className={`${styles.priceValue} ${overview?.price <= valuation.intrinsicValue ? styles.positive : styles.negative}`}>${overview?.price?.toFixed(2)}</p>
+                    </div>
+                    <div className={styles.valuationContainer}>
+                        <h4 className={styles.valuationLabel}>Intrinsic Value</h4>
+                        <p className={styles.intrinsicValue}>${valuation.intrinsicValue ? valuation.intrinsicValue.toFixed(2) : 'N/A'}</p>
+                    </div>
+                    <div className={styles.valuationContainer}>
+                        <h4 className={styles.valuationLabel}>Difference</h4>
+                        <p className={`${styles.differenceValue} ${valuation.differencePercent > 0 ? styles.overvalued : styles.undervalued}`}>
+                            {valuation.differencePercent ? (valuation.differencePercent > 0 ? '+' : '') + (valuation.differencePercent * 100).toFixed(2) : '0.00'}%
+                        </p>
+                    </div>
+                    <div className={styles.valuationContainer}>
+                        <h4 className={styles.valuationLabel}>Valuation</h4>
+                        <div className={`${styles.statusBadge} ${valuation.status === 'Undervalued' ? styles.statusUndervalued : valuation.status === 'Overvalued' ? styles.statusOvervalued : styles.statusFair}`}>
+                            {valuation.status}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
             <div className={styles.metricsContainer}>
                 <div className={styles.section}>
                     <h4 className={styles.label}>Method Used</h4>
@@ -33,31 +59,7 @@ const ValuationCard = () => {
                     </div>
                 </div>
 
-                <div className={styles.section}>
-                    <div className={styles.valueRow}>
-                        <div className={styles.valuationContainer}>
-                            <h4 className={styles.valuationLabel}>Current Price</h4>
-                            <p className={`${styles.priceValue} ${overview?.price <= valuation.intrinsicValue ? styles.positive : styles.negative}`}>${overview?.price?.toFixed(2)}</p>
-                        </div>
-                        <div className={styles.valuationContainer}>
-                            <h4 className={styles.valuationLabel}>Intrinsic Value</h4>
-                            <p className={styles.intrinsicValue}>${valuation.intrinsicValue ? valuation.intrinsicValue.toFixed(2) : 'N/A'}</p>
-                        </div>
-                        <div className={styles.valuationContainer}>
-                            <h4 className={styles.valuationLabel}>Difference</h4>
-                            <p className={`${styles.differenceValue} ${valuation.differencePercent > 0 ? styles.overvalued : styles.undervalued}`}>
-                                {valuation.differencePercent ? (valuation.differencePercent > 0 ? '+' : '') + (valuation.differencePercent * 100).toFixed(2) : '0.00'}%
-                            </p>
-                        </div>
-                        <div className={styles.valuationContainer}>
-                            <h4 className={styles.valuationLabel}>Valuation</h4>
-                            <div className={`${styles.statusBadge} ${valuation.status === 'Undervalued' ? styles.statusUndervalued : valuation.status === 'Overvalued' ? styles.statusOvervalued : styles.statusFair}`}>
-                                {valuation.status}
-                            </div>
-                        </div>
 
-                    </div>
-                </div>
             </div>
 
         </div>

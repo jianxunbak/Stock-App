@@ -10,13 +10,24 @@
     pointer-events: auto;
     /* Allow interaction with header background */
     background: linear-gradient(to bottom, var(--bg-primary), transparent);
-    /* background: var(--bg-primary); */
 
     /* Create the "black space" / cropping effect */
-    backdrop-filter: blur(10px);
-
-
+    backdrop-filter: blur(1.5px);
     transition: all 0.3s ease;
+    -webkit-mask-image:
+        linear-gradient(to bottom,
+            black 90%,
+            /* Opaque (visible) for the top 90% */
+            transparent 100%
+            /* Fade to transparent (hidden) over the last 10% */
+        );
+
+    /* Standard mask property */
+    mask-image:
+        linear-gradient(to bottom,
+            black 90%,
+            transparent 100%);
+
 }
 
 /* Container for the bottom-left sticky element */

@@ -13,6 +13,7 @@ const DebtCard = () => {
 
     return (
         <div className={styles.card}>
+            {/* <LiquidGlassBackground /> */}
             <h3 className={styles.title}>Conservative Debt</h3>
 
             <div className={styles.metricsContainer}>

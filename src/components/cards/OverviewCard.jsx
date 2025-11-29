@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStockData } from '../../hooks/useStockData';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, Legend
@@ -65,38 +65,39 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
         loadChartData();
     }, [timeframe, stockData?.overview?.symbol]);
 
-    const formatXAxis = (tickItem) => {
-        // Show time for intraday intervals (1m, 5m, 30m, 1h)
-        if (tickItem.includes(' ')) {
-            return tickItem.split(' ')[1]; // Extract time portion
-        }
-        return tickItem;
-    };
     const [chartHeight, setChartHeight] = useState(400); // Default height
 
     useEffect(() => {
+        let timeoutId;
         const handleResize = () => {
-            setChartHeight(window.innerWidth < 768 ? 300 : 400);
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                setChartHeight(window.innerWidth < 768 ? 300 : 400);
+            }, 100);
         };
         handleResize();
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(timeoutId);
+        };
     }, []);
 
-    // --- Intersection Observer for "Light Up" Effect ---
+    // --- Intersection Observer for "Light Up" Effect & Lazy Chart Loading ---
     const cardRef = React.useRef(null);
     const [isInView, setIsInView] = useState(false);
+    const [shouldRenderChart, setShouldRenderChart] = useState(false);
 
     useEffect(() => {
         const observer = new IntersectionObserver(
             ([entry]) => {
-                // Set to true if intersecting, but don't toggle back to false immediately to keep it lit while viewing?
-                // Or strictly based on intersection. User said "when the card gets scroll into view".
-                // Let's stick to simple intersection state.
                 setIsInView(entry.isIntersecting);
+                if (entry.isIntersecting) {
+                    setShouldRenderChart(true);
+                }
             },
             {
-                threshold: 0.3, // Trigger when 30% of the card is visible
+                threshold: 0.1, // Trigger earlier for chart loading
                 rootMargin: "0px"
             }
         );
@@ -110,7 +111,7 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                 observer.unobserve(cardRef.current);
             }
         };
-    }, []);
+    }, [loading]);
 
     // --- Score Logic ---
     // Recalculate criteria with overrides
@@ -291,6 +292,213 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
         }
     };
 
+    // Downsample data for performance
+    const processedChartData = useMemo(() => {
+        if (!chartData || chartData.length === 0) return [];
+
+        // For 5Y and ALL, downsample significantly to reduce rendering cost
+        if (timeframe === '5Y') {
+            return chartData.filter((_, i) => i % 5 === 0 || i === chartData.length - 1); // ~Weekly
+        }
+        if (timeframe === 'All') {
+            return chartData.filter((_, i) => i % 20 === 0 || i === chartData.length - 1); // ~Monthly
+        }
+        // For 1D, if too many points (e.g. 1min data), downsample to ~5min
+        if (timeframe === '1D' && chartData.length > 100) {
+            return chartData.filter((_, i) => i % 5 === 0 || i === chartData.length - 1);
+        }
+
+        return chartData;
+    }, [chartData, timeframe]);
+
+    // Generate Custom Ticks based on timeframe requirements
+    const customTicks = useMemo(() => {
+        if (!processedChartData || processedChartData.length === 0) return undefined;
+
+        const ticks = [];
+        const data = processedChartData;
+        const ONE_DAY = 1000 * 60 * 60 * 24;
+
+        if (timeframe === '1D') {
+            // 1D: every 15 mins (10:15, 10:30...)
+            data.forEach(item => {
+                const d = new Date(item.date);
+                if (d.getMinutes() % 15 === 0) {
+                    const lastTick = ticks.length > 0 ? new Date(ticks[ticks.length - 1]) : null;
+                    if (!lastTick || lastTick.getMinutes() !== d.getMinutes() || lastTick.getHours() !== d.getHours()) {
+                        ticks.push(item.date);
+                    }
+                }
+            });
+        } else if (timeframe === '5D') {
+            // 5D: Show date (e.g., 1, 2, 3, 4, 5)
+            let lastDate = -1;
+            data.forEach(item => {
+                const d = new Date(item.date);
+                const day = d.getDate();
+                if (day !== lastDate) {
+                    ticks.push(item.date);
+                    lastDate = day;
+                }
+            });
+        } else if (timeframe === '1M' || timeframe === '3M') {
+            // 1M/3M: Start of month (for month name) AND approximately end of week (for date).
+            let lastMonth = -1;
+            let lastTickTime = 0; // Last timestamp added
+
+            data.forEach(item => {
+                const d = new Date(item.date);
+                const month = d.getMonth();
+                const day = d.getDate();
+                const time = d.getTime();
+
+                // 1. Add if it's the start of a new month (day 1, 2, or 3)
+                if (month !== lastMonth && day <= 5) { // Check day <= 5 to catch the earliest data point near the 1st
+                    ticks.push(item.date);
+                    lastMonth = month;
+                    lastTickTime = time;
+                }
+                // 2. Add if it's been approximately 7 days since the last added tick
+                else if (time - lastTickTime >= 7 * ONE_DAY) {
+                    ticks.push(item.date);
+                    lastTickTime = time;
+                }
+            });
+        } else if (timeframe === '6M' || timeframe === '1Y' || timeframe === 'YTD') {
+            // 1Y/YTD: Month in short form
+            let lastMonth = -1;
+            data.forEach(item => {
+                const d = new Date(item.date);
+                if (d.getMonth() !== lastMonth) {
+                    ticks.push(item.date);
+                    lastMonth = d.getMonth();
+                }
+            });
+        } else if (timeframe === '5Y') {
+            // 5Y: Year at start, then Jul
+            let lastYear = -1;
+            let hasAddedJul = false;
+            data.forEach(item => {
+                const d = new Date(item.date);
+                const year = d.getFullYear();
+                const month = d.getMonth();
+
+                if (year !== lastYear) {
+                    ticks.push(item.date);
+                    lastYear = year;
+                    hasAddedJul = false;
+                } else if (month === 6 && !hasAddedJul) {
+                    ticks.push(item.date);
+                    hasAddedJul = true;
+                }
+            });
+        } else if (timeframe === 'All') {
+            // ALL: Years only
+            let lastYear = -1;
+            data.forEach(item => {
+                const d = new Date(item.date);
+                const year = d.getFullYear();
+                if (year !== lastYear) {
+                    ticks.push(item.date);
+                    lastYear = year;
+                }
+            });
+        }
+
+        return ticks.length > 0 ? ticks : undefined;
+    }, [processedChartData, timeframe]);
+
+
+    const formatXAxis = useCallback((tickItem) => {
+        if (!tickItem) return '';
+        const date = new Date(tickItem);
+        if (isNaN(date.getTime())) return tickItem;
+
+        // Define formatting options
+        const shortMonth = { month: 'short' };
+        const numericDay = { day: 'numeric' };
+        const numericYear = { year: 'numeric' };
+        const timeFormat = { hour: '2-digit', minute: '2-digit', hour12: false };
+
+        if (timeframe === '1D') {
+            // Time (e.g., 09:30)
+            return date.toLocaleTimeString([], timeFormat);
+        }
+        if (timeframe === '5D') {
+            // Day of the month (e.g., 25)
+            return date.toLocaleDateString([], numericDay);
+        }
+
+        if (timeframe === '1M' || timeframe === '3M') {
+            // Start of month: show month name (Nov)
+            // Mid-month: show day (7)
+            if (date.getDate() <= 3) { // Check if it's the 1st, 2nd, or 3rd (start of month cluster)
+                return date.toLocaleDateString('default', shortMonth);
+            }
+            return date.toLocaleDateString('default', numericDay);
+        }
+
+        if (timeframe === '6M' || timeframe === '1Y' || timeframe === 'YTD') {
+            // Month abbreviation (Nov)
+            return date.toLocaleDateString('default', shortMonth);
+        }
+
+        if (timeframe === '5Y') {
+            // Year (2023) or Jul
+            const month = date.getMonth();
+            if (month === 0 || month === 11) { // Jan or Dec (Start/End of year)
+                return date.toLocaleDateString('default', numericYear);
+            }
+            if (month === 6) { // July
+                return 'Jul';
+            }
+            return ''; // Hide other ticks
+
+        }
+        if (timeframe === 'All') {
+            // Year only (2023)
+            return date.toLocaleDateString('default', numericYear);
+        }
+
+        return tickItem;
+    }, [timeframe]);
+
+    // const formatXAxis = useCallback((tickItem) => {
+    //     if (!tickItem) return '';
+    //     const date = new Date(tickItem);
+    //     if (isNaN(date.getTime())) return tickItem;
+
+    //     if (timeframe === '1D') {
+    //         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    //     }
+    //     if (timeframe === '5D') {
+    //         return date.getDate();
+    //     }
+    //     if (timeframe === '1M') {
+    //         return date.toLocaleTimeString([],);
+    //     }
+    //     if (timeframe === '3M') {
+    //         if (date.getDate() <= 4) {
+    //             return date.toLocaleString('default', { month: 'short' });
+    //         }
+    //         return date.getDate();
+    //     }
+    //     if (timeframe === '6M' || timeframe === '1Y' || timeframe === 'YTD') {
+    //         return date.toLocaleString('default', { month: 'short' });
+    //     }
+    //     if (timeframe === '5Y') {
+    //         const month = date.getMonth();
+    //         if (month <= 1) return date.getFullYear();
+    //         if (month === 6) return 'Jul';
+    //         return '';
+    //     }
+    //     if (timeframe === 'All') {
+    //         return date.getFullYear();
+    //     }
+
+    //     return tickItem;
+    // }, [timeframe]);
+
     // Early returns AFTER all hooks
     if (loading) return <div className={styles.loading}></div>;
     if (!stockData) return null;
@@ -301,6 +509,7 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
 
     return (
         <div ref={cardRef} className={`${styles.card} ${isInView ? styles.inView : ''}`}>
+            {/* <LiquidGlassBackground /> */}
             {/* Top Zone: Split into Left (Details) and Right (Score) */}
             <div className={styles.topZone}>
                 {/* Left: Stock Details */}
@@ -432,20 +641,6 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
 
             {/* Bottom Zone: Chart */}
             <div className={styles.bottomZone}>
-                {/* <div className={styles.chartHeader}>
-                    <h3 className={styles.chartTitle}>Price History</h3>
-                    <div className={styles.timeframeControls}>
-                        {['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', '5Y', 'All'].map(tf => (
-                            <button
-                                key={tf}
-                                className={`${styles.tfButton} ${timeframe === tf ? styles.activeTf : ''}`}
-                                onClick={() => setTimeframe(tf)}
-                            >
-                                {tf}
-                            </button>
-                        ))}
-                    </div>
-                </div> */}
                 <div className={styles.chartContainer}>
                     <div className={styles.chartHeader}>
                         <h3 className={styles.chartTitle}>Price History</h3>
@@ -461,7 +656,7 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                             ))}
                         </div>
                     </div>
-                    {chartLoading || chartData.length === 0 ? (
+                    {chartLoading || processedChartData.length === 0 ? (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                             <p>
                                 {chartLoading ? 'Loading chart...' : 'Chart data not available.'}
@@ -469,56 +664,76 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                         </div>
                     ) : (
                         <div className={styles.chartWrapper}>
-                            <ResponsiveContainer width="100%" height={chartHeight}>
-                                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -30, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                                    <XAxis
-                                        dataKey="date"
-                                        stroke={chartColors.text}
-                                        tickFormatter={formatXAxis}
-                                        minTickGap={30}
-                                        tick={{ fontSize: 10, fill: chartColors.text }}
-                                    />
-                                    <YAxis
-                                        domain={['auto', 'auto']}
-                                        stroke={chartColors.text}
-                                        tick={{ fontSize: 10, fill: chartColors.text }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                                            borderRadius: '15px',
-                                            boxShadow: '0 15px 35px rgba(0, 0, 0, 0.5)',
-                                            color: chartColors.tooltipColor,
-                                            fontSize: '12px',
-                                            backdropFilter: 'blur(20px) saturate(150%)',
-                                            WebkitBackdropFilter: 'blur(20px) saturate(150%)',
-                                        }}
-                                        formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]}
-                                        itemStyle={{ margin: '0', padding: '0' }}
-                                        labelStyle={{
-                                            margin: '0 0 3px 0', // Collapse top/bottom margin, but leave a small gap (3px) below the label
-                                            padding: '0',
-                                            fontWeight: 'bold' // Optional, to make the label stand out
-                                        }}
-                                    />
+                            {shouldRenderChart ? (
+                                <ResponsiveContainer width="100%" height={chartHeight}>
+                                    <ComposedChart data={processedChartData} margin={{ top: 10, right: 10, left: -30, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke={chartColors.text}
+                                            tickFormatter={formatXAxis}
+                                            ticks={customTicks}
+                                            tick={{ fontSize: 10, fill: chartColors.text }}
+                                        />
+                                        <YAxis
+                                            domain={['auto', 'auto']}
+                                            stroke={chartColors.text}
+                                            tick={{ fontSize: 10, fill: chartColors.text }}
+                                        />
+                                        <Tooltip
+                                            wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
+                                            contentStyle={{
+                                                // 1. BACKGROUND (Increased Opacity for Readability and Blur Function)
+                                                backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.7)' : 'rgba(255, 255, 255, 0.7)', // Fix 1
 
-                                    <Legend wrapperStyle={{ width: '100%', display: 'flex', justifyContent: 'center', paddingTop: 10, paddingLeft: 35, fontSize: '12px', alignItems: 'center' }} />
-                                    <Area type="monotone" dataKey="close" stroke="#3B82F6" fillOpacity={1} fill="url(#colorPrice)" name="Price" />
-                                    {/* SMAs - Show on all timeframes - Order: 50, 100, 150, 200 */}
-                                    <Line type="monotone" dataKey="SMA_50" stroke="#3B82F6" strokeDasharray="5 5" dot={false} name="50 SMA" strokeWidth={2} />
-                                    <Line type="monotone" dataKey="SMA_100" stroke="#F59E0B" strokeDasharray="5 5" dot={false} name="100 SMA" strokeWidth={2} />
-                                    <Line type="monotone" dataKey="SMA_150" stroke="#10B981" strokeDasharray="5 5" dot={false} name="150 SMA" strokeWidth={2} />
-                                    <Line type="monotone" dataKey="SMA_200" stroke="#EF4444" strokeDasharray="5 5" dot={false} name="200 SMA" strokeWidth={2} />
-                                </ComposedChart>
-                            </ResponsiveContainer>
+                                                // 2. BORDER RADIUS
+                                                borderRadius: '15px',
+
+                                                // 3. BACKDROP FILTER (Use a noticeable blur like 10px-20px)
+                                                backdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+                                                WebkitBackdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+
+                                                // 4. BORDERS (Keep your aesthetic borders)
+                                                borderTop: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                                borderLeft: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                                borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+                                                borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+
+                                                // 5. BOX SHADOW (Keep)
+                                                boxShadow: theme === 'dark'
+                                                    ? '0 10px 20px rgba(0, 0, 0, 0.5), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)'
+                                                    : '10px 10px 20px rgba(0, 0, 0, 0.2), -3px -3px 10px rgba(0, 0, 0, 0.1), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)',
+
+                                                // 6. FONT/TEXT STYLES
+                                                color: chartColors.tooltipColor,
+                                                fontSize: '12px',
+                                                padding: '8px 10px'
+                                            }}
+                                            formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]}
+                                            itemStyle={{ margin: '0', padding: '0' }}
+                                            labelStyle={{
+                                                margin: '0 0 3px 0',
+                                                padding: '0',
+                                                fontWeight: 'bold'
+                                            }}
+                                        />
+
+                                        <Legend wrapperStyle={{ width: '100%', display: 'flex', justifyContent: 'center', paddingTop: 10, paddingLeft: 35, fontSize: '12px', alignItems: 'center' }} />
+                                        <Area type="monotone" dataKey="close" stroke="#3B82F6" fillOpacity={1} fill="url(#colorPrice)" name="Price" isAnimationActive={false} />
+                                        {/* SMAs - Show on all timeframes - Order: 50, 100, 150, 200 */}
+                                        <Line type="monotone" dataKey="SMA_50" stroke="#3B82F6" strokeDasharray="5 5" dot={false} name="50 SMA" strokeWidth={2} isAnimationActive={false} />
+                                        <Line type="monotone" dataKey="SMA_100" stroke="#F59E0B" strokeDasharray="5 5" dot={false} name="100 SMA" strokeWidth={2} isAnimationActive={false} />
+                                        <Line type="monotone" dataKey="SMA_150" stroke="#10B981" strokeDasharray="5 5" dot={false} name="150 SMA" strokeWidth={2} isAnimationActive={false} />
+                                        <Line type="monotone" dataKey="SMA_200" stroke="#EF4444" strokeDasharray="5 5" dot={false} name="200 SMA" strokeWidth={2} isAnimationActive={false} />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            ) : <div style={{ height: chartHeight }} />}
                         </div>
                     )}
                 </div>

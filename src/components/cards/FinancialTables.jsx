@@ -3,6 +3,7 @@ import { useStockData } from '../../hooks/useStockData';
 import styles from './FinancialTables.module.css';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
+
 const FinancialTables = () => {
     const { stockData, loading } = useStockData();
     const [activeTab, setActiveTab] = useState('income_statement');
@@ -82,6 +83,7 @@ const FinancialTables = () => {
 
     return (
         <div className={styles.card}>
+            {/* <LiquidGlassBackground /> */}
             <div className={styles.header} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
                 <h3 className={styles.title}>Financial Statements</h3>
                 <button
