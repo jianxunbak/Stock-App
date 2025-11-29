@@ -280,17 +280,12 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
     const processedChartData = useMemo(() => {
         if (!chartData || chartData.length === 0) return [];
 
-        // For 5Y and ALL, downsample significantly to reduce rendering cost
-        if (timeframe === '5Y') {
-            return chartData.filter((_, i) => i % 5 === 0 || i === chartData.length - 1); // ~Weekly
-        }
-        if (timeframe === 'All') {
-            return chartData.filter((_, i) => i % 20 === 0 || i === chartData.length - 1); // ~Monthly
-        }
-        // For 1D, if too many points (e.g. 1min data), downsample to ~5min
-        if (timeframe === '1D' && chartData.length > 100) {
-            return chartData.filter((_, i) => i % 5 === 0 || i === chartData.length - 1);
-        }
+        // Backend already provides correct intervals:
+        // 1D: 1m
+        // 5Y: 1wk
+        // All: 1mo
+        // So we don't need to downsample these further unless performance is critical.
+        // User explicitly requested these frequencies.
 
         return chartData;
     }, [chartData, timeframe]);

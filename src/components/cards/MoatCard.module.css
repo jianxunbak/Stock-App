@@ -479,3 +479,10 @@
     top: 10px;
     right: 10px
 }
+
+.evaluatorNote {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.25rem;
+}

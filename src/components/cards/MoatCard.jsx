@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStockData } from '../../hooks/useStockData';
 import { evaluateMoat } from '../../services/gemini';
+import { saveMoatAnalysis, getMoatAnalysis } from '../../services/moatFirestore';
 import { Sparkles, Loader2 } from 'lucide-react';
 import {
     Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
@@ -10,10 +11,16 @@ import Modal from '../ui/Modal';
 import styles from './MoatCard.module.css';
 import { useTheme } from '../../context/ThemeContext';
 
+import { useAuth } from '../../context/AuthContext';
+
 const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
     const { stockData, loading } = useStockData();
     const { theme } = useTheme();
+    const { currentUser } = useAuth();
     const [chartHeight, setChartHeight] = React.useState(300);
+    // ... existing refs ...
+    const [evaluator, setEvaluator] = useState(null);
+
     const prevMoatStatusLabel = React.useRef();
     const lastEvaluatedSymbol = React.useRef(null);
     const [comparisonTicker, setComparisonTicker] = useState('');
@@ -24,27 +31,49 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [hasEvaluated, setHasEvaluated] = useState(false);
 
+    // State for the 5 moat categories
+    // Values: 1 (High), 0.5 (Low), 0 (None)
+    const [scores, setScores] = useState({
+        brand: 0,
+        barriers: 0,
+        scale: 0,
+        network: 0,
+        switching: 0
+    });
+    const [aiDescription, setAiDescription] = useState('');
+
     // Lazy load charts
     const [isInView, setIsInView] = React.useState(false);
     const cardRef = React.useRef(null);
 
+    // ... existing useEffects ...
+
+    // Check Firestore for cached analysis when symbol changes
     React.useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setIsInView(true);
-                    observer.disconnect();
+        const checkCache = async () => {
+            if (!stockData?.overview?.symbol) return;
+
+            // Reset state first
+            // ... existing reset logic ...
+            setEvaluator(null); // Reset evaluator
+
+            // Try to fetch from Firestore
+            try {
+                const cachedData = await getMoatAnalysis(stockData.overview.symbol);
+                if (cachedData) {
+                    console.log("Found cached moat analysis:", cachedData);
+                    setScores(cachedData.scores);
+                    setAiDescription(cachedData.description);
+                    setEvaluator(cachedData.evaluator); // Load evaluator
+                    setHasEvaluated(true);
                 }
-            },
-            { threshold: 0.1 }
-        );
+            } catch (err) {
+                console.error("Error checking moat cache:", err);
+            }
+        };
 
-        if (cardRef.current) {
-            observer.observe(cardRef.current);
-        }
-
-        return () => observer.disconnect();
-    }, [loading]);
+        checkCache();
+    }, [stockData?.overview?.symbol]);
 
     const handleAiEvaluation = async () => {
         if (!stockData?.overview?.symbol) return;
@@ -79,6 +108,17 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             setAiDescription(result.description || '');
             setHasEvaluated(true);
             lastEvaluatedSymbol.current = stockData.overview.symbol;
+
+            const newEvaluator = 'Gemini AI';
+            setEvaluator(newEvaluator);
+
+            // Save to Firestore
+            await saveMoatAnalysis(stockData.overview.symbol, {
+                scores: newScores,
+                description: result.description || '',
+                evaluator: newEvaluator
+            });
+
             console.log("State updated: Scores, Description, HasEvaluated");
         } catch (err) {
             console.error("AI Evaluation failed:", err);
@@ -107,23 +147,6 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
         };
     }, []);
 
-    React.useEffect(() => {
-        // Reset state when symbol changes
-        console.log("Resetting MoatCard state for symbol:", stockData?.overview?.symbol);
-        setScores({
-            brand: 0,
-            barriers: 0,
-            scale: 0,
-            network: 0,
-            switching: 0
-        });
-        setAiDescription('');
-        setIsEvaluating(false);
-        setHasEvaluated(false);
-        prevMoatStatusLabel.current = undefined;
-        if (onIsEvaluatingChange) onIsEvaluatingChange(false);
-    }, [stockData?.overview?.symbol]);
-
     // Define chart colors based on theme
     const chartColors = useMemo(() => {
         const isDark = theme === 'dark';
@@ -135,17 +158,6 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             tooltipBorder: isDark ? "none" : "1px solid #e5e7eb"
         };
     }, [theme]);
-
-    // State for the 5 moat categories
-    // Values: 1 (High), 0.5 (Low), 0 (None)
-    const [scores, setScores] = useState({
-        brand: 0,
-        barriers: 0,
-        scale: 0,
-        network: 0,
-        switching: 0
-    });
-    const [aiDescription, setAiDescription] = useState('');
 
     // Comparison & Error State
 
@@ -160,12 +172,24 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
         { id: 'switching', label: 'High Switching Cost' }
     ];
 
-    const handleScoreChange = (category, value) => {
-        setScores(prev => ({
-            ...prev,
+    const handleScoreChange = async (category, value) => {
+        const newScores = {
+            ...scores,
             [category]: parseFloat(value)
-        }));
+        };
+        setScores(newScores);
         setHasEvaluated(true);
+
+        const newEvaluator = currentUser ? (currentUser.displayName || currentUser.email) : 'User';
+        setEvaluator(newEvaluator);
+
+        if (stockData?.overview?.symbol) {
+            await saveMoatAnalysis(stockData.overview.symbol, {
+                scores: newScores,
+                description: aiDescription, // Preserve existing description
+                evaluator: newEvaluator
+            });
+        }
     };
 
     const totalScore = useMemo(() => {
@@ -307,7 +331,7 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                 <div className={styles.scoreSection}>
                     <div className={styles.scoreCard}>
 
-                        <Sparkles size={16} className={styles.aiIcon} />
+                        {/* <Sparkles size={16} className={styles.aiIcon} /> */}
 
                         {/* <p className={styles.scoreLabel}>Total Moat Score</p> */}
                         {isEvaluating ? (
@@ -321,17 +345,18 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                                     <div className={styles.score}>
                                         <div className={`${styles.scoreValue} ${moatStatus.color}`}>{totalScore} <span className={styles.scoreMax}>/ 5</span></div>
                                         <p className={`${styles.scoreStatus} ${moatStatus.color}`}>{moatStatus.label}</p>
+                                        {evaluator && (
+                                            <p className={styles.evaluatorNote}>Evaluated by {evaluator}</p>
+                                        )}
                                     </div>
                                 )}
 
                                 {aiDescription && <p className={styles.description}>{aiDescription}</p>}
 
-                                {!aiDescription && (
-                                    <button onClick={handleAiEvaluation} className={styles.aiButton}>
-                                        <Sparkles size={14} />
-                                        Ask AI to Evaluate
-                                    </button>
-                                )}
+                                <button onClick={handleAiEvaluation} className={styles.aiButton}>
+                                    <Sparkles size={14} />
+                                    {aiDescription ? "Re-evaluate with AI" : "Ask AI to Evaluate"}
+                                </button>
                             </>
                         )}
                     </div>
@@ -407,86 +432,84 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                     )}
 
                     <div className={styles.chartWrapper}>
-                        {isInView ? (
-                            <ResponsiveContainer width="100%" height={chartHeight}>
-                                <AreaChart data={mergedChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorPriceMoat" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                                    <XAxis
-                                        dataKey="date"
-                                        stroke={chartColors.text}
-                                        tick={{ fontSize: 10, fill: chartColors.text }}
-                                        tickFormatter={(val) => val.substring(0, 4)} // Show Year only
-                                        minTickGap={50}
+                        <ResponsiveContainer width="100%" height={chartHeight}>
+                            <AreaChart data={mergedChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorPriceMoat" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                                <XAxis
+                                    dataKey="date"
+                                    stroke={chartColors.text}
+                                    tick={{ fontSize: 10, fill: chartColors.text }}
+                                    tickFormatter={(val) => val.substring(0, 4)} // Show Year only
+                                    minTickGap={50}
+                                />
+                                <YAxis
+                                    stroke={chartColors.text}
+                                    tick={{ fontSize: 10, fill: chartColors.text, angle: -60 }}
+                                    // tickFormatter={(val) => `${val.toFixed(0)}%`}
+                                    width={50}
+                                    tickFormatter={(val) => {
+                                        // Ensure val is treated as a percentage (0-100) and display divided by 100
+                                        return `${(val / 100).toFixed(1)}%`;
+                                    }}
+
+                                />
+                                <Tooltip
+                                    wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
+                                    contentStyle={{
+                                        // 1. BACKGROUND
+                                        backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+
+                                        // 2. BORDER RADIUS
+                                        borderRadius: '15px',
+
+                                        // 3. BACKDROP FILTER
+                                        backdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+                                        WebkitBackdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+
+                                        // 4. BORDERS
+                                        borderTop: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                        borderLeft: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                        borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+                                        borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+
+                                        // 5. BOX SHADOW
+                                        boxShadow: theme === 'dark'
+                                            ? '0 10px 20px rgba(0, 0, 0, 0.5), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)'
+                                            : '10px 10px 20px rgba(0, 0, 0, 0.2), -3px -3px 10px rgba(0, 0, 0, 0.1), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)',
+
+                                        // 6. FONT/TEXT STYLES
+                                        color: chartColors.tooltipColor,
+                                        fontSize: '12px',
+                                        padding: '8px 10px'
+                                    }}
+                                    formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]}
+                                    itemStyle={{ margin: '0', padding: '0' }}
+                                    labelStyle={{
+                                        margin: '0 0 3px 0',
+                                        padding: '0',
+                                        fontWeight: 'bold'
+                                    }}
+                                />
+                                <Area type="monotone" dataKey="value" name={stockData.overview?.symbol || 'Stock'} stroke="#F59E0B" fillOpacity={1} fill="url(#colorPriceMoat)" />
+                                {comparisonStocks.map((stock, index) => (
+                                    <Area
+                                        key={stock.ticker}
+                                        type="monotone"
+                                        dataKey={`value_${stock.ticker}`}
+                                        name={stock.ticker}
+                                        stroke={stock.color}
+                                        fillOpacity={0}
+                                        strokeWidth={2}
                                     />
-                                    <YAxis
-                                        stroke={chartColors.text}
-                                        tick={{ fontSize: 10, fill: chartColors.text, angle: -60 }}
-                                        // tickFormatter={(val) => `${val.toFixed(0)}%`}
-                                        width={50}
-                                        tickFormatter={(val) => {
-                                            // Ensure val is treated as a percentage (0-100) and display divided by 100
-                                            return `${(val / 100).toFixed(1)}%`;
-                                        }}
-
-                                    />
-                                    <Tooltip
-                                        wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
-                                        contentStyle={{
-                                            // 1. BACKGROUND
-                                            backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.7)' : 'rgba(255, 255, 255, 0.7)',
-
-                                            // 2. BORDER RADIUS
-                                            borderRadius: '15px',
-
-                                            // 3. BACKDROP FILTER
-                                            backdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
-                                            WebkitBackdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
-
-                                            // 4. BORDERS
-                                            borderTop: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
-                                            borderLeft: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
-                                            borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
-                                            borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
-
-                                            // 5. BOX SHADOW
-                                            boxShadow: theme === 'dark'
-                                                ? '0 10px 20px rgba(0, 0, 0, 0.5), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)'
-                                                : '10px 10px 20px rgba(0, 0, 0, 0.2), -3px -3px 10px rgba(0, 0, 0, 0.1), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)',
-
-                                            // 6. FONT/TEXT STYLES
-                                            color: chartColors.tooltipColor,
-                                            fontSize: '12px',
-                                            padding: '8px 10px'
-                                        }}
-                                        formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]}
-                                        itemStyle={{ margin: '0', padding: '0' }}
-                                        labelStyle={{
-                                            margin: '0 0 3px 0',
-                                            padding: '0',
-                                            fontWeight: 'bold'
-                                        }}
-                                    />
-                                    <Area type="monotone" dataKey="value" name={stockData.overview?.symbol || 'Stock'} stroke="#F59E0B" fillOpacity={1} fill="url(#colorPriceMoat)" />
-                                    {comparisonStocks.map((stock, index) => (
-                                        <Area
-                                            key={stock.ticker}
-                                            type="monotone"
-                                            dataKey={`value_${stock.ticker}`}
-                                            name={stock.ticker}
-                                            stroke={stock.color}
-                                            fillOpacity={0}
-                                            strokeWidth={2}
-                                        />
-                                    ))}
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        ) : <div style={{ height: chartHeight }} />}
+                                ))}
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
             </div>
