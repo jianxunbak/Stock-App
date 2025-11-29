@@ -1,13 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write ONLY their own document
-    match /users/{userId} {
+    
+    // User Data & Subcollections
+    // Using recursive wildcard to match any document under users/{userId}
+    match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Allow ANYONE to read moat analysis (public cache)
-    // Allow ONLY authenticated users to write/update it
+
+    // Public Moat Analysis
+    match /moat_analysis_public/{ticker} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Legacy Moat Analysis
     match /moat_analysis/{ticker} {
       allow read: if true;
       allow write: if request.auth != null;

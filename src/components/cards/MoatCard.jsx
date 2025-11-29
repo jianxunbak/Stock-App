@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useStockData } from '../../hooks/useStockData';
 import { evaluateMoat } from '../../services/gemini';
-import { saveMoatAnalysis, getMoatAnalysis } from '../../services/moatFirestore';
+import { savePublicMoatAnalysis, getPublicMoatAnalysis, savePrivateMoatAnalysis, getPrivateMoatAnalysis, deletePrivateMoatAnalysis } from '../../services/moatFirestore';
 import { Sparkles, Loader2 } from 'lucide-react';
 import {
     Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
@@ -54,26 +54,60 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             if (!stockData?.overview?.symbol) return;
 
             // Reset state first
-            // ... existing reset logic ...
+            console.log("Resetting MoatCard state for symbol:", stockData.overview.symbol);
+            setScores({
+                brand: 0,
+                barriers: 0,
+                scale: 0,
+                network: 0,
+                switching: 0
+            });
+            setAiDescription('');
+            setIsEvaluating(false);
+            setHasEvaluated(false);
+            prevMoatStatusLabel.current = undefined;
+            if (onIsEvaluatingChange) onIsEvaluatingChange(false);
             setEvaluator(null); // Reset evaluator
 
-            // Try to fetch from Firestore
+            // 1. Try Private Cache (User's own evaluation)
+            if (currentUser) {
+                console.log(`[checkCache] Checking private cache for User UID: ${currentUser.uid}, Ticker: ${stockData.overview.symbol}`);
+                try {
+                    const privateData = await getPrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol);
+                    if (privateData) {
+                        console.log("[checkCache] Found PRIVATE moat analysis:", privateData);
+                        setScores(privateData.scores);
+                        setAiDescription(privateData.description);
+                        setEvaluator(privateData.evaluator);
+                        setHasEvaluated(true);
+                        return; // Stop here if private found
+                    } else {
+                        console.log("[checkCache] No private analysis found.");
+                    }
+                } catch (err) {
+                    console.error("[checkCache] Error checking private moat cache:", err);
+                }
+            } else {
+                console.log("[checkCache] No currentUser, skipping private cache check.");
+            }
+
+            // 2. Try Public Cache (AI evaluation)
             try {
-                const cachedData = await getMoatAnalysis(stockData.overview.symbol);
-                if (cachedData) {
-                    console.log("Found cached moat analysis:", cachedData);
-                    setScores(cachedData.scores);
-                    setAiDescription(cachedData.description);
-                    setEvaluator(cachedData.evaluator); // Load evaluator
+                const publicData = await getPublicMoatAnalysis(stockData.overview.symbol);
+                if (publicData) {
+                    console.log("Found PUBLIC moat analysis:", publicData);
+                    setScores(publicData.scores);
+                    setAiDescription(publicData.description);
+                    setEvaluator(publicData.evaluator || 'Gemini AI'); // Default to Gemini AI if missing
                     setHasEvaluated(true);
                 }
             } catch (err) {
-                console.error("Error checking moat cache:", err);
+                console.error("Error checking public moat cache:", err);
             }
         };
 
         checkCache();
-    }, [stockData?.overview?.symbol]);
+    }, [stockData?.overview?.symbol, currentUser]); // Added currentUser dependency
 
     const handleAiEvaluation = async () => {
         if (!stockData?.overview?.symbol) return;
@@ -112,12 +146,17 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             const newEvaluator = 'Gemini AI';
             setEvaluator(newEvaluator);
 
-            // Save to Firestore
-            await saveMoatAnalysis(stockData.overview.symbol, {
+            // Save to PUBLIC Firestore
+            await savePublicMoatAnalysis(stockData.overview.symbol, {
                 scores: newScores,
                 description: result.description || '',
                 evaluator: newEvaluator
             });
+
+            // If user has a private override, delete it so they see the new AI result
+            if (currentUser) {
+                await deletePrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol);
+            }
 
             console.log("State updated: Scores, Description, HasEvaluated");
         } catch (err) {
@@ -183,8 +222,9 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
         const newEvaluator = currentUser ? (currentUser.displayName || currentUser.email) : 'User';
         setEvaluator(newEvaluator);
 
-        if (stockData?.overview?.symbol) {
-            await saveMoatAnalysis(stockData.overview.symbol, {
+        if (stockData?.overview?.symbol && currentUser) {
+            // Save to PRIVATE Firestore
+            await savePrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol, {
                 scores: newScores,
                 description: aiDescription, // Preserve existing description
                 evaluator: newEvaluator
