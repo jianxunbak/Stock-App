@@ -48,7 +48,7 @@ const FinancialTables = () => {
                     </div>
                 )
             }
-            return <p className={styles.noDataText}>No data available.</p>;
+            return <p className={styles.noDataText}>Not Available</p>;
         }
 
         return (

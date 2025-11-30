@@ -71,7 +71,7 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             if (!stockData?.overview?.symbol) return;
 
             // Reset state first
-            console.log("Resetting MoatCard state for symbol:", stockData.overview.symbol);
+            // console.log("Resetting MoatCard state for symbol:", stockData.overview.symbol);
             setScores({
                 brand: 0,
                 barriers: 0,
@@ -88,11 +88,11 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
 
             // 1. Try Private Cache (User's own evaluation)
             if (currentUser) {
-                console.log(`[checkCache] Checking private cache for User UID: ${currentUser.uid}, Ticker: ${stockData.overview.symbol}`);
+                // console.log(`[checkCache] Checking private cache for User UID: ${currentUser.uid}, Ticker: ${stockData.overview.symbol}`);
                 try {
                     const privateData = await getPrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol);
                     if (privateData) {
-                        console.log("[checkCache] Found PRIVATE moat analysis:", privateData);
+                        // console.log("[checkCache] Found PRIVATE moat analysis:", privateData);
                         setScores(privateData.scores);
                         setAiDescription(privateData.description);
                         setEvaluator(privateData.evaluator);
@@ -113,7 +113,7 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
             try {
                 const publicData = await getPublicMoatAnalysis(stockData.overview.symbol);
                 if (publicData) {
-                    console.log("Found PUBLIC moat analysis:", publicData);
+                    // console.log("Found PUBLIC moat analysis:", publicData);
                     setScores(publicData.scores);
                     setAiDescription(publicData.description);
                     setEvaluator(publicData.evaluator || 'Gemini AI'); // Default to Gemini AI if missing
@@ -136,9 +136,6 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
 
         try {
             const result = await evaluateMoat(stockData.overview.symbol);
-
-            console.log("Gemini Result:", result); // Debug log
-
             // Map Gemini response to our score state
             // Gemini returns "High", "Low", "None"
             const mapValue = (val) => {
@@ -155,8 +152,6 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                 network: mapValue(result.networkEffect),
                 switching: mapValue(result.highSwitchingCost)
             };
-
-            console.log("Mapped Scores:", newScores); // Debug log
             setScores(newScores);
             setAiDescription(result.description || '');
             setUserNote(''); // Clear user note on new AI run
@@ -562,7 +557,7 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
                                         fontSize: '12px',
                                         padding: '8px 10px'
                                     }}
-                                    formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]}
+                                    formatter={(value, name) => [`${Number(value).toFixed(2)}%`, name]}
                                     itemStyle={{ margin: '0', padding: '0' }}
                                     labelStyle={{
                                         margin: '0 0 3px 0',

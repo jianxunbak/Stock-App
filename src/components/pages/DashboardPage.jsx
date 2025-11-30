@@ -10,6 +10,7 @@ import DebtCard from '../cards/DebtCard';
 import ValuationCard from '../cards/ValuationCard';
 import SupportResistanceCard from '../cards/SupportResistanceCard';
 import FinancialTables from '../cards/FinancialTables';
+
 import Modal from '../ui/Modal';
 import WatchlistModal from '../ui/WatchlistModal';
 import { Search, ArrowLeft, Star, Menu, X, LogOut, TrendingUp } from 'lucide-react';
@@ -32,6 +33,10 @@ const DashboardPage = () => {
     const navigate = useNavigate();
     const { currentUser, logout, loading: authLoading } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        return !!params.get('ticker');
+    });
 
     // Persistence: Load ticker from localStorage or URL on mount
     useEffect(() => {
@@ -40,11 +45,13 @@ const DashboardPage = () => {
 
         if (urlTicker) {
             setTicker(urlTicker);
-            loadStockData(urlTicker);
+            loadStockData(urlTicker).finally(() => setInitialLoading(false));
             localStorage.setItem('lastTicker', urlTicker);
         } else if (savedTicker) {
             setTicker(savedTicker);
-            loadStockData(savedTicker);
+            loadStockData(savedTicker).finally(() => setInitialLoading(false));
+        } else {
+            setInitialLoading(false);
         }
     }, []); // Only run on mount
 
@@ -153,7 +160,7 @@ const DashboardPage = () => {
                             title="User Profile"
                         >
                             {currentUser.photoURL ? (
-                                <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} />
+                                <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} referrerPolicy="no-referrer" />
                             ) : (
                                 <div className={styles.userAvatarPlaceholder}>
                                     {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
@@ -203,7 +210,7 @@ const DashboardPage = () => {
                                 }}
                             >
                                 {currentUser.photoURL ? (
-                                    <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} />
+                                    <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} referrerPolicy="no-referrer" />
                                 ) : (
                                     <div className={styles.userAvatarPlaceholder}>
                                         {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
@@ -318,6 +325,8 @@ const DashboardPage = () => {
                             <FinancialTables />
                         </FluidCard>
                     </div>
+
+
                 </div>
 
                 {showWatchlist && (
@@ -335,6 +344,14 @@ const DashboardPage = () => {
                     />
                 )}
             </div>
+            {
+                (loading || initialLoading) && (
+                    <div className={styles.loadingOverlay}>
+                        <div className={styles.spinner}></div>
+                        <div className={styles.loadingText}>Loading Data...</div>
+                    </div>
+                )
+            }
         </div>
     );
 };

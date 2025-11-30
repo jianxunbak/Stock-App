@@ -177,14 +177,12 @@ def get_validated_support_levels(ticker: str):
         print(f"Error in get_validated_support_levels: {e}")
         return []
 
-def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow, revenue_series, net_income_series, op_cash_flow_series, growth_estimates, beta):
+def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow, 
+                              revenue_series, net_income_series, op_cash_flow_series, 
+                              growth_estimates, beta=None, raw_growth_estimates_data=None,
+                              revenue_estimates_data=None, history=None):
     try:
-        current_price = info.get("currentPrice", 0)
-        shares_outstanding = info.get("sharesOutstanding", 1)
-        if not current_price or not shares_outstanding:
-            return {"status": "Error", "intrinsicValue": 0, "differencePercent": 0, "method": "N/A", "assumptions": {}}
-
-        # --- 1. Determine Company Type & Method ---
+        # --- 1. Determine Method ---
         sector = info.get("sector", "")
         industry = info.get("industry", "")
         country = info.get("country", "United States")
@@ -230,26 +228,26 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
             elif rev_consistent and ni_consistent:
                 method = "Discounted Net Income (DNI)"
             else:
-                # Fallback
-                if current_ocf > 0:
-                    method = "Discounted Operating Cash Flow (DOCF)"
-                else:
-                    method = "Discounted Net Income (DNI)"
+                method = "Discounted Free Cash Flow (DFCF)" # Fallback
 
-        # --- 2. Prepare Common Inputs ---
-        # Discount Rate Logic
+        # --- 2. Assumptions ---
+        current_price = info.get("currentPrice", 0)
+        shares_outstanding = info.get("sharesOutstanding", 1)
+        if not current_price or not shares_outstanding:
+            return {"status": "Error", "intrinsicValue": 0, "differencePercent": 0, "method": "N/A", "assumptions": {}}
+        
+        # Discount Rate (WACC / Cost of Equity)
+        # Simplified based on Beta and Risk Free Rate (approx 4%) + Risk Premium (5%)
+        # Or lookup table based on Beta/Country
         def get_discount_rate(beta, country):
-            beta = float(beta) if beta else 1.0
-            is_china = "China" in country
+            # Base rates
+            risk_free = 0.04
+            erp = 0.05 # Equity Risk Premium
             
-            if is_china:
-                if beta < 0.80: return 0.085
-                if beta >= 1.6: return 0.145 # "More than 1.5" (assuming > 1.5 bucket)
-                
-                # Lookup table for China
-                # 0.9: 9.3%, 1.0: 10%, 1.1: 10.8%, 1.2: 11.5%, 1.3: 12.2%, 1.4: 13%, 1.5: 13.7%
-                # Simple linear interpolation or nearest bucket? 
-                # User gave specific points. Let's use thresholds.
+            if "China" in country:
+                # Higher risk
+                # Map beta to discount rate table provided by user previously
+                # < 0.8: 8.5%, 0.8-0.9: 9.3%, etc.
                 if beta < 0.85: return 0.085 # < 0.8
                 if beta < 0.95: return 0.093 # ~0.9
                 if beta < 1.05: return 0.100 # ~1.0
@@ -261,21 +259,6 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
                 
             else: # US / Default
                 if beta < 0.80: return 0.054
-                if beta >= 1.6: return 0.078 # "More than 7.8" seems like a typo for 7.8%? Or beta > 1.5? 
-                # User said "beta More than 7.8: use 5.4%". Wait, "beta More than 7.8" is likely a typo for "beta > 1.5 -> 7.8%"?
-                # Looking at the pattern: 5.4, 5.7, 6.0, 6.3, 6.6, 6.9, 7.2, 7.5. 
-                # The next step would be 7.8%.
-                # But user wrote "beta More than 7.8: use 5.4%". This is contradictory or a specific edge case?
-                # "beta More than 7.8" is extremely high beta. 
-                # Let's assume user meant "beta > 1.5 use 7.8%" based on the progression (0.3% steps).
-                # AND "More than 7.8" might be a typo for "More than 1.5".
-                # However, user explicitly wrote "beta More than 7.8: use 5.4%".
-                # I will follow the progression for > 1.5 as 7.8% (logic) but if beta is actually > 7.8 (rare), use 5.4%?
-                # Actually, looking at the China one: "beta More than 7.8: use 14.5%".
-                # The China progression: 8.5, 9.3 (+0.8), 10.0 (+0.7), 10.8 (+0.8), 11.5 (+0.7), 12.2 (+0.7), 13.0 (+0.8), 13.7 (+0.7).
-                # Next would be ~14.5%.
-                # So "More than 7.8" is almost certainly a typo for "More than 1.5".
-                # I will assume > 1.5 uses the next logical step.
                 
                 if beta < 0.85: return 0.054 # < 0.8
                 if beta < 0.95: return 0.057 # ~0.9
@@ -291,26 +274,54 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
         discount_rate = get_discount_rate(beta_val, country)
         
         # Growth Rate (Yr 1-5)
-        # Try estimates first
+        # New Logic: Min(Estimate 1Y, PE/PEG)
         growth_rate_1_5 = 0.05 # Default 5%
-        if growth_estimates:
-            # Look for "Next 5 Years"
-            for est in growth_estimates:
-                if "Next 5 Years" in str(est.get("period", "")):
-                    try:
-                        val_str = str(est.get("stockTrend", "0")).replace("%", "")
-                        growth_rate_1_5 = float(val_str) / 100
+        
+        # 1. Calculate PE/PEG Growth
+        pe_ratio = info.get("trailingPE")
+        peg_ratio = info.get("pegRatio") or info.get("trailingPegRatio")
+        
+        pe_peg_growth = None
+        if pe_ratio and peg_ratio and peg_ratio != 0:
+            pe_peg_growth = (pe_ratio / peg_ratio) / 100 # Convert to decimal (e.g. 15 -> 0.15)
+        
+        # 2. Get Estimate 1Y Growth
+        est_1y_growth = None
+        if raw_growth_estimates_data:
+            for est in raw_growth_estimates_data:
+                if est.get("period") == "+1y":
+                    val = est.get("stockTrend")
+                    if val is not None:
+                        est_1y_growth = float(val) # Assuming raw data is already decimal (e.g. 0.15) or check format
                         break
-                    except: pass
+        
+        # 3. Compare and use lower
+        if pe_peg_growth is not None and est_1y_growth is not None:
+            growth_rate_1_5 = min(pe_peg_growth, est_1y_growth)
+        elif pe_peg_growth is not None:
+            growth_rate_1_5 = pe_peg_growth
+        elif est_1y_growth is not None:
+            growth_rate_1_5 = est_1y_growth
         else:
-            # Use historical CAGR (Rev or NI)
-            if not net_income_series.empty and len(net_income_series) > 3:
-                try:
-                    start = abs(net_income_series.iloc[-1])
-                    end = net_income_series.iloc[0]
-                    if start > 0:
-                        growth_rate_1_5 = (end/start)**(1/len(net_income_series)) - 1
-                except: pass
+            # Fallback to old logic if new data missing
+            if growth_estimates:
+                # Look for "Next 5 Years"
+                for est in growth_estimates:
+                    if "Next 5 Years" in str(est.get("period", "")):
+                        try:
+                            val_str = str(est.get("stockTrend", "0")).replace("%", "")
+                            growth_rate_1_5 = float(val_str) / 100
+                            break
+                        except: pass
+            else:
+                # Use historical CAGR (Rev or NI)
+                if not net_income_series.empty and len(net_income_series) > 3:
+                    try:
+                        start = abs(net_income_series.iloc[-1])
+                        end = net_income_series.iloc[0]
+                        if start > 0:
+                            growth_rate_1_5 = (end/start)**(1/len(net_income_series)) - 1
+                    except: pass
         
         # Cap Growth Rate 1-5 reasonable limits
         growth_rate_1_5 = min(max(growth_rate_1_5, -0.10), 0.30) # Cap between -10% and 30%
@@ -343,34 +354,106 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
                  equity = balance_sheet.loc["Stockholders Equity"].iloc[0] if "Stockholders Equity" in balance_sheet.index else 0
                  book_value = equity / shares_outstanding
             
-            # Calculate Historical PB (Approximate using annual close / annual BV)
-            # We don't have full historical PB, so we'll use current PB and assume mean is close or calculate from limited data
+            # Calculate Historical PB
+            historical_pbs = []
+            if not balance_sheet.empty and not financials.empty and history is not None and not history.empty:
+                try:
+                    # Get Equity
+                    equity_series = None
+                    if "Stockholders Equity" in balance_sheet.index:
+                        equity_series = balance_sheet.loc["Stockholders Equity"]
+                    
+                    # Get Shares
+                    shares_series = None
+                    if "Basic Average Shares" in financials.index:
+                        shares_series = financials.loc["Basic Average Shares"]
+                    elif "Diluted Average Shares" in financials.index:
+                        shares_series = financials.loc["Diluted Average Shares"]
+                    
+                    if equity_series is not None and shares_series is not None:
+                        # Calculate BVPS for each period
+                        # Align indices (dates)
+                        common_dates = equity_series.index.intersection(shares_series.index)
+                        for date in common_dates:
+                            eq = equity_series.loc[date]
+                            sh = shares_series.loc[date]
+                            if sh > 0:
+                                bvps = eq / sh
+                                # Find price
+                                # history index is DatetimeIndex (tz-aware usually), date is Timestamp (tz-naive usually)
+                                ts = pd.Timestamp(date)
+                                if ts.tz is None:
+                                    ts = ts.tz_localize("UTC")
+                                
+                                # Convert to history tz
+                                if history.index.tz is not None:
+                                    ts = ts.tz_convert(history.index.tz)
+                                else:
+                                    ts = ts.tz_localize(None) # Make naive if history is naive
+                                
+                                # Find closest price (on or before)
+                                idx = history.index.get_indexer([ts], method='pad')[0]
+                                if idx != -1:
+                                    price = history.iloc[idx]['Close']
+                                    if bvps > 0:
+                                        pb = price / bvps
+                                        historical_pbs.append(pb)
+                except Exception as e:
+                    print(f"Error calculating historical PB: {e}")
+
+            # Calculate Mean PB
+            mean_pb = 1.5 # Default fallback
             current_pb = info.get("priceToBook")
-            mean_pb = current_pb if current_pb else 1.5 # Fallback
             
-            # Try to calculate historical PBs if possible
-            # ... (omitted for brevity, using current PB as proxy or slight adjustment)
-            # Let's assume Mean PB is 5yr average. yfinance info sometimes has 'priceToBook'.
-            # We will use current PB * 0.9 as a conservative mean if no history? 
-            # Or just use current PB.
-            # User said: "Calculate arithmetic mean of provided Historical PB Ratios"
-            # Since we don't have the list, we'll use current PB and list it.
+            if historical_pbs:
+                # Filter outliers?
+                valid_pbs = [pb for pb in historical_pbs if 0 < pb < 100] # Simple filter
+                if valid_pbs:
+                    mean_pb = sum(valid_pbs) / len(valid_pbs)
+                elif current_pb:
+                     mean_pb = current_pb
+            elif current_pb:
+                mean_pb = current_pb
             
             intrinsic_value = book_value * mean_pb
             assumptions = {
                 "Current Book Value Per Share": f"${book_value:.2f}",
                 "Mean PB Ratio": f"{mean_pb:.2f}"
             }
+            
+            return {"status": "Undervalued" if current_price < intrinsic_value else "Overvalued", 
+                    "intrinsicValue": intrinsic_value, 
+                    "differencePercent": ((current_price / intrinsic_value) - 1) if intrinsic_value else 0, 
+                    "method": method, 
+                    "assumptions": assumptions}
 
         elif method == "Price to Sales Growth (PSG)":
             # Intrinsic Value = Sales Per Share * Projected Growth Rate * 0.20
-            sales_per_share = (revenue_series.iloc[0] / shares_outstanding) if not revenue_series.empty else 0
-            growth_rate_whole = growth_rate_1_5 * 100 # e.g. 28 for 28%
             
+            # 1. Sales Per Share (TTM)
+            sales_per_share = info.get("revenuePerShare")
+            if not sales_per_share:
+                # Fallback to manual calculation
+                sales_per_share = (revenue_series.iloc[0] / shares_outstanding) if not revenue_series.empty else 0
+            
+            # 2. Projected Growth Rate (Sales growth (year/est))
+            growth_rate_whole = growth_rate_1_5 * 100 # Default fallback
+            
+            if revenue_estimates_data:
+                # Look for period "+1y" and "growth" column
+                for row in revenue_estimates_data:
+                    if row.get("period") == "+1y":
+                        val = row.get("growth")
+                        if val is not None:
+                            try:
+                                growth_rate_whole = float(val) * 100 # Convert decimal to percentage (0.06 -> 6.0)
+                            except: pass
+                        break
+
             intrinsic_value = sales_per_share * growth_rate_whole * 0.20
             assumptions = {
-                "Sales Per Share": f"${sales_per_share:.2f}",
-                "Projected Growth Rate": f"{growth_rate_whole:.2f}%",
+                "Sales Per Share (TTM)": f"${sales_per_share:.2f}",
+                "Projected Sales Growth": f"{growth_rate_whole:.2f}%",
                 "Fair PSG Constant": "0.20"
             }
 
@@ -433,7 +516,8 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
                 "Discount Rate": f"{discount_rate*100:.2f}%",
                 "Total Debt": f"${total_debt/1e9:.2f}B",
                 "Cash & Equivalents": f"${cash_and_equivalents/1e9:.2f}B",
-                "Shares Outstanding": f"{shares_outstanding/1e9:.2f}B"
+                "Shares Outstanding": f"{shares_outstanding/1e9:.2f}B",
+                "Beta": f"{beta_val:.2f}"
             }
 
         # Finalize
@@ -540,6 +624,26 @@ def get_stock_data(ticker: str):
         news_data = stock.news
         
         # Try to get growth estimates, might vary by yfinance version
+        # Fetch Growth Estimates (Original)
+        growth_estimates = stock.growth_estimates
+        
+        # Fetch Raw Growth Estimates (New Request)
+        raw_growth_estimates_data = {}
+        try:
+            # Using the method requested by user
+            raw_growth_estimates = stock.get_growth_estimates(as_dict=False)
+            if raw_growth_estimates is not None and not raw_growth_estimates.empty:
+                # Convert to dict for JSON serialization
+                # Reset index to make 'period' a column if it's the index
+                raw_growth_estimates.index.name = 'period'
+                raw_growth_estimates_reset = raw_growth_estimates.reset_index()
+                # Convert to records
+                raw_growth_estimates_data = raw_growth_estimates_reset.to_dict(orient='records')
+            else:
+                 pass
+        except Exception as e:
+            print(f"Error fetching raw growth estimates: {e}")
+
         # Try to get growth estimates
         growth_estimates_data = []
         try:
@@ -567,6 +671,23 @@ def get_stock_data(ticker: str):
         except Exception as e:
             print(f"Error fetching growth estimates: {e}")
             growth_estimates = []
+
+        # Fetch Revenue Estimates
+        revenue_estimates_data = []
+        try:
+            re = None
+            if hasattr(stock, 'revenue_estimate'):
+                re = stock.revenue_estimate
+            elif hasattr(stock, 'get_revenue_estimate'):
+                re = stock.get_revenue_estimate()
+            
+            if re is not None and not re.empty:
+                # Reset index to make 'period' a column
+                re.index.name = 'period'
+                re = re.reset_index()
+                revenue_estimates_data = re.to_dict(orient='records')
+        except Exception as e:
+            print(f"Error fetching revenue estimates: {e}")
 
         print("\n--- YFINANCE DATA DEBUG ---")
         print("INFO KEYS:", info.keys())
@@ -779,23 +900,41 @@ def get_stock_data(ticker: str):
             is_reit = True
 
         # Helper to format DataFrame for frontend
-        def format_df(df):
+        def format_df(df, ttm_series=None):
             if df.empty:
-                return []
+                return {"dates": [], "metrics": []}
+            
             df_5y = df.iloc[:, :5]
             dates = [d.strftime("%Y-%m-%d") for d in df_5y.columns]
+            
+            # Prepend TTM if available
+            if ttm_series is not None and not ttm_series.empty:
+                dates.insert(0, "TTM")
+            
             metrics = []
             for index, row in df_5y.iterrows():
+                values = row.tolist()
+                
+                # Prepend TTM value if available
+                if ttm_series is not None and not ttm_series.empty:
+                    val = 0
+                    if index in ttm_series.index:
+                        val = ttm_series.loc[index]
+                        # Handle numpy types
+                        if hasattr(val, "item"):
+                            val = val.item()
+                    values.insert(0, val)
+
                 metrics.append({
                     "name": str(index),
-                    "values": row.tolist()
+                    "values": values
                 })
             return {"dates": dates, "metrics": metrics}
 
         # Format Financials
-        financials_data = format_df(financials)
-        balance_sheet_data = format_df(balance_sheet)
-        cashflow_data = format_df(cashflow)
+        financials_data = format_df(financials, ttm_income)
+        balance_sheet_data = format_df(balance_sheet, ttm_balance)
+        cashflow_data = format_df(cashflow, ttm_cashflow)
 
         # Format Calendar
         calendar_data = calendar if isinstance(calendar, dict) else {}
@@ -1303,7 +1442,10 @@ def get_stock_data(ticker: str):
             "valuation": calculate_intrinsic_value(
                 ticker, info, financials, balance_sheet, cashflow, 
                 revenue_series, net_income_series, op_cash_flow_series, 
-                growth_estimates_data, beta=info.get("beta")
+                growth_estimates_data, beta=info.get("beta"),
+                raw_growth_estimates_data=raw_growth_estimates_data,
+                revenue_estimates_data=revenue_estimates_data,
+                history=history
             ),
             "financials": {
                 "income_statement": financials_data,
@@ -1319,7 +1461,8 @@ def get_stock_data(ticker: str):
                 "total": total_score,
                 "max": max_score,
                 "criteria": score_criteria
-            }
+            },
+            "raw_growth_estimates": raw_growth_estimates_data
         }
 
     except Exception as e:

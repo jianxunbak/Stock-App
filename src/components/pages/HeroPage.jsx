@@ -106,7 +106,7 @@ const HeroPage = () => {
                                 title="User Profile"
                             >
                                 {currentUser.photoURL ? (
-                                    <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} />
+                                    <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} referrerPolicy="no-referrer" />
                                 ) : (
                                     <div className={styles.userAvatarPlaceholder}>
                                         {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
@@ -158,7 +158,7 @@ const HeroPage = () => {
                                     }}
                                 >
                                     {currentUser.photoURL ? (
-                                        <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} />
+                                        <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} referrerPolicy="no-referrer" />
                                     ) : (
                                         <div className={styles.userAvatarPlaceholder}>
                                             {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}

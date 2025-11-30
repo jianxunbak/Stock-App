@@ -40,6 +40,23 @@ const ValuationCard = () => {
                     </div>
 
                 </div>
+                {(() => {
+                    const diff = valuation.differencePercent;
+                    let warningMsg = null;
+                    if (diff >= 1.0) {
+                        warningMsg = "Price is too high, consider selling all.";
+                    } else if (diff >= 0.8) {
+                        warningMsg = "Price is too high, consider selling more.";
+                    } else if (diff >= 0.5) {
+                        warningMsg = "Price is too high, consider selling some.";
+                    }
+
+                    return warningMsg ? (
+                        <div className={styles.warningNote}>
+                            {warningMsg}
+                        </div>
+                    ) : null;
+                })()}
             </div>
             <div className={styles.metricsContainer}>
                 <div className={styles.section}>
@@ -50,12 +67,35 @@ const ValuationCard = () => {
                 <div className={styles.section}>
                     <h4 className={styles.label}>Key Assumptions</h4>
                     <div className={styles.assumptionsContainer}>
-                        {valuation.assumptions && Object.entries(valuation.assumptions).map(([key, value]) => (
-                            <div key={key} className={styles.assumptionRow}>
-                                <span className={styles.assumptionKey}>{key}</span>
-                                <span className={styles.assumptionValue}>{value}</span>
-                            </div>
-                        ))}
+                        {valuation.assumptions && Object.entries(valuation.assumptions)
+                            .sort(([keyA], [keyB]) => {
+                                const order = [
+                                    "Current Operating Cash Flow",
+                                    "Current Net Income",
+                                    "Current Free Cash Flow",
+                                    "Total Debt",
+                                    "Cash & Equivalents",
+                                    "Growth Rate (Yr 1-5)",
+                                    "Growth Rate (Yr 6-10)",
+                                    "Growth Rate (Yr 11-20)",
+                                    "Shares Outstanding",
+                                    "Discount Rate",
+                                    "Beta"
+                                ];
+                                let indexA = order.indexOf(keyA);
+                                let indexB = order.indexOf(keyB);
+
+                                if (indexA === -1) indexA = 999;
+                                if (indexB === -1) indexB = 999;
+
+                                return indexA - indexB;
+                            })
+                            .map(([key, value]) => (
+                                <div key={key} className={styles.assumptionRow}>
+                                    <span className={styles.assumptionKey}>{key}</span>
+                                    <span className={styles.assumptionValue}>{value}</span>
+                                </div>
+                            ))}
                     </div>
                 </div>
 

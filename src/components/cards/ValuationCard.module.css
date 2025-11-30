@@ -150,7 +150,6 @@ h4 {
 }
 
 .statusFair {
-    background-color: rgba(234, 179, 8, 0.2);
     color: #facc15;
 }
 
@@ -249,4 +248,16 @@ h4 {
 
 .overvalued {
     color: #f87171;
+}
+
+.warningNote {
+    color: #f87171;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+    font-weight: 500;
+    padding: 0.75rem;
+    background: rgba(248, 113, 113, 0.1);
+    border-radius: 0.5rem;
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    text-align: center;
 }

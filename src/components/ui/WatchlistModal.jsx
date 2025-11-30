@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import styles from './WatchlistModal.module.css';
@@ -9,12 +9,24 @@ const WatchlistModal = ({ isOpen, onClose }) => {
     const { watchlist, removeFromWatchlist, updateWatchlistItem, setFullWatchlist } = useWatchlist();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const navigate = useNavigate();
+    const hasRefreshedRef = useRef(false);
+
+    // Reset ref when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            hasRefreshedRef.current = false;
+        }
+    }, [isOpen]);
+
+    // Auto-refresh when opening
+    useEffect(() => {
+        if (isOpen && watchlist.length > 0 && !hasRefreshedRef.current) {
+            refreshWatchlist(watchlist);
+            hasRefreshedRef.current = true;
+        }
+    }, [isOpen, watchlist]);
 
     useEffect(() => {
-        if (isOpen && watchlist.length > 0) {
-            refreshWatchlist(watchlist);
-        }
-
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
                 onClose();
@@ -28,7 +40,7 @@ const WatchlistModal = ({ isOpen, onClose }) => {
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen, onClose]); // Removed watchlist dependency to prevent infinite loop if refresh updates it
+    }, [isOpen, onClose]);
 
     const refreshWatchlist = async (currentList) => {
         if (!currentList || currentList.length === 0) return;

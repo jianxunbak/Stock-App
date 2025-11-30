@@ -31,7 +31,7 @@ export const getUserTheme = async (userId) => {
 // --- Watchlist Operations ---
 
 export const saveWatchlist = async (userId, watchlist) => {
-    console.log("Attempting to save watchlist to Firestore...", { userId, itemCount: watchlist?.length });
+    // console.log("Attempting to save watchlist to Firestore...", { userId, itemCount: watchlist?.length });
     if (!userId) {
         console.warn("saveWatchlist called without userId");
         return;

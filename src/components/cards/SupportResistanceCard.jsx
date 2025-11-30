@@ -31,8 +31,6 @@ const SupportResistanceCard = () => {
                 {levels.map((level, index) => {
                     const currentPrice = stockData?.overview?.price || 0;
                     const isHit = currentPrice <= level.price;
-                    const isSell = currentPrice >= level.price * 1.5;
-
                     let actionText = "Hold";
                     let actionClass = styles.actionHold;
                     let note = "";
@@ -40,10 +38,6 @@ const SupportResistanceCard = () => {
                     if (isHit) {
                         actionText = "Buy";
                         actionClass = styles.actionBuy;
-                    } else if (isSell) {
-                        actionText = "Sell";
-                        actionClass = styles.actionSell;
-                        note = "Price is too high";
                     }
 
                     return (

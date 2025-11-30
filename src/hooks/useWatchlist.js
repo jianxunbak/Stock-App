@@ -12,16 +12,36 @@ export const useWatchlist = () => {
         const loadWatchlist = async () => {
             setLoading(true);
             let list = [];
+            const local = JSON.parse(localStorage.getItem('watchlist') || '[]');
 
             // 1. Try to load from Firestore if logged in
             if (currentUser) {
                 try {
                     const firestoreList = await getWatchlist(currentUser.uid);
+
                     if (firestoreList && firestoreList.length > 0) {
-                        list = firestoreList;
+                        // Merge logic: Combine Firestore and Local, removing duplicates by ticker
+                        const mergedMap = new Map();
+
+                        // Add Firestore items first
+                        firestoreList.forEach(item => mergedMap.set(item.ticker, item));
+
+                        // Add Local items (if not present, or maybe overwrite if newer?)
+                        // For now, let's just ensure local items are added if missing from Firestore
+                        local.forEach(item => {
+                            if (!mergedMap.has(item.ticker)) {
+                                mergedMap.set(item.ticker, item);
+                            }
+                        });
+
+                        list = Array.from(mergedMap.values());
+
+                        // If the list changed (i.e., we added local items to Firestore list), save back to Firestore
+                        if (list.length > firestoreList.length) {
+                            await saveWatchlist(currentUser.uid, list);
+                        }
                     } else {
-                        // If Firestore empty, fallback to local (and maybe sync up?)
-                        const local = JSON.parse(localStorage.getItem('watchlist') || '[]');
+                        // If Firestore empty, use local and sync up
                         if (local.length > 0) {
                             list = local;
                             await saveWatchlist(currentUser.uid, list);
@@ -29,11 +49,11 @@ export const useWatchlist = () => {
                     }
                 } catch (err) {
                     console.error("Failed to load watchlist from Firestore", err);
-                    list = JSON.parse(localStorage.getItem('watchlist') || '[]');
+                    list = local;
                 }
             } else {
                 // 2. Fallback to localStorage
-                list = JSON.parse(localStorage.getItem('watchlist') || '[]');
+                list = local;
             }
 
             setWatchlist(list);

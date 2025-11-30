@@ -154,7 +154,7 @@ const ProfitabilityCard = () => {
                                                 fontSize: '12px',
                                                 padding: '8px 10px'
                                             }}
-                                            formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]}
+                                            formatter={(value, name) => [`$${Number(value / 1e9).toFixed(2)}B`, name]}
                                             itemStyle={{ margin: '0', padding: '0' }}
                                             labelStyle={{
                                                 margin: '0 0 3px 0',
