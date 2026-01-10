@@ -1371,16 +1371,28 @@
     animation: fadeIn 0.2s ease-out;
 }
 
-@media (max-width: 480px) {
-    .datePickerPopup {
-        left: 50%;
-        transform: translateX(-50%);
-        width: 85vw;
+@media (max-width: 768px) {
+
+    .datePickerPopup,
+    .customSelectMenu {
         position: fixed;
-        /* Better for mobile modals */
+        /* Center on screen (or containing block) */
         top: 50%;
+        left: 50%;
         transform: translate(-50%, -50%);
-        z-index: 9999;
+        width: 300px;
+        max-width: 90vw;
+        max-height: 80vh;
+        z-index: 99999;
+        overflow-y: auto;
+        border-radius: 1.5rem;
+        /* Ensure consistent rounding */
+    }
+
+    /* Disable hover scale on touch devices to prevent stuck state and conflicts */
+    .datePickerPopup:hover,
+    .customSelectMenu:hover {
+        transform: translate(-50%, -50%);
     }
 }
 
