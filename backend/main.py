@@ -138,7 +138,7 @@ app.add_middleware(
 # --- Firebase Initialization ---
 db = None
 try:
-    # Check if a specific service account file exists
+    # 1. Check if a local service account file exists (Dev Mode)
     cred_path = pathlib.Path(__file__).parent / 'serviceAccountKey.json'
     
     if cred_path.exists():
@@ -146,14 +146,28 @@ try:
         firebase_admin.initialize_app(cred)
         db = firestore.client()
         print("SUCCESS: Firebase Admin Initialized with serviceAccountKey.json")
+    
+    # 2. Check for Environment Variable (Deployment Mode)
+    elif os.environ.get("FIREBASE_SERVICE_ACCOUNT"):
+        print("INFO: Found FIREBASE_SERVICE_ACCOUNT env var.")
+        try:
+            # Parse the JSON string
+            service_account_info = json.loads(os.environ["FIREBASE_SERVICE_ACCOUNT"])
+            cred = credentials.Certificate(service_account_info)
+            firebase_admin.initialize_app(cred)
+            db = firestore.client()
+            print("SUCCESS: Firebase Admin Initialized via FIREBASE_SERVICE_ACCOUNT env var")
+        except Exception as env_e:
+            print(f"ERROR: Failed to parse FIREBASE_SERVICE_ACCOUNT: {env_e}")
+            
     else:
-        # Try default/environment (good for deployment)
+        # 3. Try default google credentials (Good for GCP/Cloud Run)
         try:
             firebase_admin.initialize_app()
             db = firestore.client()
-            print("SUCCESS: Firebase Admin Initialized with Default Credentials")
+            print("SUCCESS: Firebase Admin Initialized with Default Cloud Credentials")
         except:
-            print("WARNING: No Firebase credentials found. Caching will be disabled.")
+            print("WARNING: No Firebase credentials found (File or Env). Caching will be disabled.")
             db = None
 
 except Exception as e:
