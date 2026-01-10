@@ -1352,6 +1352,8 @@
     top: 100%;
     left: 0;
     width: 300px;
+    max-width: 90vw;
+    /* Prevent overflow on small screens */
     margin-top: 0.5rem;
     background: rgba(10, 10, 10, 0.85);
     /* High opacity dark background */
@@ -1367,6 +1369,19 @@
     flex-direction: column;
     gap: 0.5rem;
     animation: fadeIn 0.2s ease-out;
+}
+
+@media (max-width: 480px) {
+    .datePickerPopup {
+        left: 50%;
+        transform: translateX(-50%);
+        width: 85vw;
+        position: fixed;
+        /* Better for mobile modals */
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 9999;
+    }
 }
 
 [data-theme="light"] .datePickerPopup {

@@ -830,13 +830,80 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
         }
 
 def get_stock_data(ticker: str):
+    # --- PROPOSED CACHING LOGIC START ---
+    try:
+        if db:
+            cache_ref = db.collection('stock_cache').document(ticker)
+            doc = cache_ref.get()
+            
+            if doc.exists:
+                data = doc.to_dict()
+                timestamp = data.get('timestamp')
+                # Cache validity: 24 hours
+                if timestamp and datetime.now(timezone.utc) - timestamp < timedelta(hours=24):
+                    print(f"DEBUG: Returning CACHED data for {ticker} (Age: {datetime.now(timezone.utc) - timestamp})")
+                    payload = data['payload']
+                    
+                    # --- HYBRID CACHE: Refresh Price Only ---
+                    try:
+                        # Fetch ONLY live price (fast operation, ~0.2s)
+                        fast_stock = yf.Ticker(ticker)
+                        # fast_info is much faster than .info
+                        latest_price = fast_stock.fast_info.last_price 
+                        
+                        if latest_price:
+                            # Update Price in Overview
+                            if 'overview' in payload:
+                                payload['overview']['price'] = latest_price
+                            
+                            # Update Top-level Price (if exists)
+                            payload['currentPrice'] = latest_price
+                            
+                            # --- CHART PATCHING ---
+                            # Patch Intraday Chart (for 1D view)
+                            if 'intraday_history' in payload and isinstance(payload['intraday_history'], list):
+                                current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                                payload['intraday_history'].append({
+                                    "date": current_time_str,
+                                    "close": latest_price
+                                })
+                            
+                            # Patch Daily Chart (for 5Y view, prevents flatline at end)
+                            if 'history' in payload and isinstance(payload['history'], list):
+                                today_str = datetime.now().strftime("%Y-%m-%d")
+                                # Check if today already exists to avoid dupes
+                                if not payload['history'] or payload['history'][-1]['date'] != today_str:
+                                    payload['history'].append({
+                                        "date": today_str,
+                                        "close": latest_price
+                                    })
+                                else:
+                                    # Update today's close if it exists
+                                    payload['history'][-1]['close'] = latest_price
+                            # ----------------------
+
+                            print(f"DEBUG: Updated cached {ticker} with live price: {latest_price}")
+                    except Exception as p_e:
+                        print(f"WARNING: Failed to update live price for cached {ticker}: {p_e}")
+                    # ----------------------------------------
+                    
+                    return payload
+                else:
+                    print(f"DEBUG: Cache expired for {ticker}, refreshing...")
+            else:
+                print(f"DEBUG: No cache found for {ticker}, fetching fresh...")
+    except Exception as e:
+        print(f"WARNING: Cache check failed for {ticker}: {e}")
+    # --- PROPOSED CACHING LOGIC END ---
+
     try:
         start_time = time.time()
         print(f"\n--- [API] START FETCHING DATA FOR {ticker} ---")
         
         stock = yf.Ticker(ticker)
         info = stock.info
-        print(f"DEBUG: yFinance info fetched for {ticker}: {info}")
+        print(f"DEBUG: yFinance info fetched for {ticker}")
+
         print(f"DEBUG: info fetching took {time.time() - start_time:.2f}s")
         
         # Validate if stock exists
@@ -1802,6 +1869,19 @@ def get_stock_data(ticker: str):
         # Log summary of the response for the user
         print(f"--- [API] Returning data for {ticker} ---")
         print(f"Payload Size: {len(str(final_response))} characters")
+        
+        # --- CACHE SAVE ---
+        try:
+            if db:
+                db.collection('stock_cache').document(ticker).set({
+                    'timestamp': datetime.now(timezone.utc),
+                    'payload': final_response
+                })
+                print(f"DEBUG: Saved fresh data for {ticker} to cache.")
+        except Exception as e:
+            print(f"WARNING: Failed to save cache for {ticker}: {e}")
+        # ------------------
+
         return final_response
 
     except HTTPException:

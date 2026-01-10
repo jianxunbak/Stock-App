@@ -629,9 +629,9 @@ const PortfolioPage = () => {
 
     }, [portfolio, liveData, currentRate, searchTicker]);
 
-    const handleAnalyzePortfolio = async () => {
+    const handleAnalyzePortfolio = useCallback(async () => {
         if (portfolio.length === 0) {
-            setAnalysis("Please add stocks to your portfolio first.");
+            // Don't show error on auto-load, just return
             return;
         }
         setAnalyzing(true);
@@ -644,16 +644,20 @@ const PortfolioPage = () => {
             const result = await analyzePortfolio(portfolio, metrics, currentUser?.uid);
             if (result && result.analysis) {
                 setAnalysis(result.analysis);
-            } else {
-                setAnalysis("Could not generate analysis. Please try again.");
             }
         } catch (error) {
-            console.error(error);
-            setAnalysis("Error gathering analysis. Please try again later.");
+            console.error("Analysis fetch failed:", error);
         } finally {
             setAnalyzing(false);
         }
-    };
+    }, [portfolio, weightedBeta, weightedGrowth, weightedPeg, currentUser]);
+
+    // Auto-fetch analysis if we have data but no analysis yet
+    useEffect(() => {
+        if (portfolio.length > 0 && !analysis && !analyzing && currentUser) {
+            handleAnalyzePortfolio();
+        }
+    }, [portfolio.length, analysis, analyzing, currentUser, handleAnalyzePortfolio]);
 
 
 
