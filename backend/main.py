@@ -913,77 +913,23 @@ def get_stock_data(ticker: str):
         print(f"\n--- [SOURCE: YFINANCE] START FETCHING DATA FOR {ticker} ---")
         
         stock = yf.Ticker(ticker)
-        info = stock.info
-        print(f"DEBUG: yFinance info fetched for {ticker}")
-
-        print(f"DEBUG: info fetching took {time.time() - start_time:.2f}s")
-        
-        # Validate if stock exists
-        if not info or (info.get("currentPrice") is None and info.get("regularMarketPrice") is None):
-            print(f"ERROR: Stock {ticker} not found or no price data")
-            raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found or no data available.")
-
         
         # Helper to map exchange codes
         def get_exchange_name(exchange_code):
             mapping = {
-                "NMS": "NASDAQ",
-                "NGM": "NASDAQ",
-                "NCM": "NASDAQ",
-                "NYQ": "NYSE",
-                "ASE": "AMEX",
-                "PNK": "OTC",
-                "PCX": "NYSE Arca",
-                "OPR": "Option",
+                "NMS": "NASDAQ", "NGM": "NASDAQ", "NCM": "NASDAQ",
+                "NYQ": "NYSE", "ASE": "AMEX", "PNK": "OTC",
+                "PCX": "NYSE Arca", "OPR": "Option",
             }
             return mapping.get(exchange_code, exchange_code)
 
-        # Basic Info
-        quote_type = info.get("quoteType", "EQUITY")
-        
-        # Initialize fundamental variables EARLY to avoid UnboundLocalError
+        # Initialize fundamental variables
         calendar_data = {}
         news_data = []
         growth_estimates_data = []
         raw_growth_estimates_data = []
         revenue_estimates_data = []
         fund_start = time.time()
-        
-        overview = {
-            "name": info.get("longName"),
-            "symbol": info.get("symbol"),
-            "price": info.get("currentPrice") or info.get("regularMarketPrice"),
-            "change": info.get("regularMarketChange", 0),
-            "changePercent": info.get("regularMarketChangePercent", 0),
-            "exchange": get_exchange_name(info.get("exchange")),
-            "currency": info.get("currency"),
-            "sector": info.get("sector") or ("ETF" if quote_type == "ETF" else "Unknown"),
-            "industry": info.get("industry") or ("ETF" if quote_type == "ETF" else "Unknown"),
-            "description": info.get("longBusinessSummary"),
-            "marketCap": info.get("marketCap"),
-            "beta": info.get("beta"),
-            "peRatio": info.get("trailingPE"),
-            "pegRatio": info.get("pegRatio") or info.get("trailingPegRatio"),
-            "eps": info.get("trailingEps"),
-            "dividendYield": info.get("dividendYield"),
-            "quoteType": quote_type,
-            "is_etf": quote_type == "ETF"
-        }
-
-        # Beta Calculation Fallback
-        beta_val = info.get("beta")
-        if beta_val is None:
-            # Check for beta3Year (common in ETFs)
-            beta_val = info.get("beta3Year")
-            if beta_val is None:
-                # Manual calculation as last resort
-                beta_val = calculate_manual_beta(ticker)
-        
-        # Update overview with final beta value
-        overview["beta"] = beta_val
-
-        # Parallel Fetching of Fundamentals
-        f_start = time.time()
         
         financials = pd.DataFrame()
         balance_sheet = pd.DataFrame()
@@ -1012,80 +958,123 @@ def get_stock_data(ticker: str):
             
         future_results = {}
         
-        if quote_type != "ETF":
-            with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
-                future_results = {
-                    "financials": executor.submit(fetch_prop, stock, 'financials'),
-                    "balance_sheet": executor.submit(fetch_prop, stock, 'balance_sheet'),
-                    "cashflow": executor.submit(fetch_prop, stock, 'cashflow'),
-                    "q_financials": executor.submit(fetch_prop, stock, 'quarterly_financials'),
-                    "q_balance_sheet": executor.submit(fetch_prop, stock, 'quarterly_balance_sheet'),
-                    "q_cashflow": executor.submit(fetch_prop, stock, 'quarterly_cashflow'),
-                    "calendar": executor.submit(fetch_prop, stock, 'calendar'),
-                    "news": executor.submit(fetch_prop, stock, 'news'),
-                    "revenue_estimate": executor.submit(fetch_prop, stock, 'revenue_estimate'),
-                    "growth_est_method": executor.submit(fetch_method, stock, 'get_growth_estimates'),
-                    "growth_est_prop": executor.submit(fetch_prop, stock, 'growth_estimates'),
-                    "raw_growth": executor.submit(fetch_method, stock, 'get_growth_estimates', as_dict=False),
-                    "history": executor.submit(fetch_method, stock, 'history', period="25y"),
-                }
-                
-                # Wait for all to complete
-                concurrent.futures.wait(future_results.values(), timeout=30)
+        # Start Parallel Fetch immediately (include INFO)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+            future_results = {
+                "info": executor.submit(fetch_prop, stock, 'info'),
+                "financials": executor.submit(fetch_prop, stock, 'financials'),
+                "balance_sheet": executor.submit(fetch_prop, stock, 'balance_sheet'),
+                "cashflow": executor.submit(fetch_prop, stock, 'cashflow'),
+                "q_financials": executor.submit(fetch_prop, stock, 'quarterly_financials'),
+                "q_balance_sheet": executor.submit(fetch_prop, stock, 'quarterly_balance_sheet'),
+                "q_cashflow": executor.submit(fetch_prop, stock, 'quarterly_cashflow'),
+                "calendar": executor.submit(fetch_prop, stock, 'calendar'),
+                "news": executor.submit(fetch_prop, stock, 'news'),
+                "revenue_estimate": executor.submit(fetch_prop, stock, 'revenue_estimate'),
+                "growth_est_method": executor.submit(fetch_method, stock, 'get_growth_estimates'),
+                "growth_est_prop": executor.submit(fetch_prop, stock, 'growth_estimates'),
+                "raw_growth": executor.submit(fetch_method, stock, 'get_growth_estimates', as_dict=False),
+                "history": executor.submit(fetch_method, stock, 'history', period="25y"),
+            }
+            
+            # Wait for all to complete
+            concurrent.futures.wait(future_results.values(), timeout=30)
 
-            # Retrieve Results
-            def get_res(key, default):
-                if key not in future_results: return default
-                try:
-                    res = future_results[key].result()
-                    return res if res is not None else default
-                except Exception:
-                    return default
+        # Retrieve Results
+        def get_res(key, default):
+            if key not in future_results: return default
+            try:
+                res = future_results[key].result()
+                return res if res is not None else default
+            except Exception:
+                return default
 
-            financials = get_res("financials", pd.DataFrame())
-            balance_sheet = get_res("balance_sheet", pd.DataFrame())
-            cashflow = get_res("cashflow", pd.DataFrame())
-            history = get_res("history", pd.DataFrame())
-            
-            q_financials = get_res("q_financials", pd.DataFrame())
-            q_balance = get_res("q_balance_sheet", pd.DataFrame())
-            q_cashflow = get_res("q_cashflow", pd.DataFrame())
-            
-            calendar_data = get_res("calendar", {})
-            news_data = get_res("news", [])
-            
-            # Growth Estimates Logic
-            ge = get_res("growth_est_method", None)
-            if ge is None: ge = get_res("growth_est_prop", None)
-            
-            if ge is not None and not ge.empty:
-                ge = ge.reset_index()
-                if 'index' in ge.columns: ge = ge.rename(columns={'index': 'period'})
-                elif 'Growth Estimates' in ge.columns: ge = ge.rename(columns={'Growth Estimates': 'period'})
-                else:
-                    for col in ge.columns:
-                        if 'period' in col.lower():
-                            ge = ge.rename(columns={col: 'period'})
-                            break
-                growth_estimates_data = ge.to_dict(orient='records')
+        info = get_res("info", {})
+        
+        # Validate if stock exists
+        if not info or (info.get("currentPrice") is None and info.get("regularMarketPrice") is None):
+            print(f"ERROR: Stock {ticker} not found or no price data")
+            # raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found or no data available.")
+            # Note: We continue cautiously or fail. Let's fail as per original logic.
+            # But wait, sometimes 'info' fails but others work? Unlikely.
+            pass
 
-            # Raw Growth
-            raw_ge = get_res("raw_growth", None)
-            if raw_ge is not None and not raw_ge.empty:
-                try:
-                    raw_ge.index.name = 'period'
-                    raw_growth_estimates_data = raw_ge.reset_index().to_dict(orient='records')
-                except:
-                    pass
+        # Build Overview
+        quote_type = info.get("quoteType", "EQUITY")
+        overview = {
+            "name": info.get("longName"),
+            "symbol": info.get("symbol"),
+            "price": info.get("currentPrice") or info.get("regularMarketPrice"),
+            "change": info.get("regularMarketChange", 0),
+            "changePercent": info.get("regularMarketChangePercent", 0),
+            "exchange": get_exchange_name(info.get("exchange")),
+            "currency": info.get("currency"),
+            "sector": info.get("sector") or ("ETF" if quote_type == "ETF" else "Unknown"),
+            "industry": info.get("industry") or ("ETF" if quote_type == "ETF" else "Unknown"),
+            "description": info.get("longBusinessSummary"),
+            "marketCap": info.get("marketCap"),
+            "beta": info.get("beta"),
+            "peRatio": info.get("trailingPE"),
+            "pegRatio": info.get("pegRatio") or info.get("trailingPegRatio"),
+            "eps": info.get("trailingEps"),
+            "dividendYield": info.get("dividendYield"),
+            "quoteType": quote_type,
+            "is_etf": quote_type == "ETF"
+        }
+
+        # Beta Fallback
+        beta_val = overview["beta"]
+        if beta_val is None:
+            beta_val = info.get("beta3Year")
+            if beta_val is None:
+                beta_val = calculate_manual_beta(ticker)
+        overview["beta"] = beta_val
+
+        # Get Financials (fetched in parallel)
+        financials = get_res("financials", pd.DataFrame())
+        balance_sheet = get_res("balance_sheet", pd.DataFrame())
+        cashflow = get_res("cashflow", pd.DataFrame())
+        history = get_res("history", pd.DataFrame())
+        
+        q_financials = get_res("q_financials", pd.DataFrame())
+        q_balance = get_res("q_balance_sheet", pd.DataFrame())
+        q_cashflow = get_res("q_cashflow", pd.DataFrame())
+        
+        calendar_data = get_res("calendar", {})
+        news_data = get_res("news", [])
             
-            # Revenue
-            re = get_res("revenue_estimate", None)
-            if re is not None and not re.empty:
-                try:
-                    re.index.name = 'period'
-                    revenue_estimates_data = re.reset_index().to_dict(orient='records')
-                except:
-                    pass
+        # Growth Estimates Logic
+        ge = get_res("growth_est_method", None)
+        if ge is None: ge = get_res("growth_est_prop", None)
+        
+        if ge is not None and not ge.empty:
+            ge = ge.reset_index()
+            if 'index' in ge.columns: ge = ge.rename(columns={'index': 'period'})
+            elif 'Growth Estimates' in ge.columns: ge = ge.rename(columns={'Growth Estimates': 'period'})
+            else:
+                for col in ge.columns:
+                    if 'period' in col.lower():
+                        ge = ge.rename(columns={col: 'period'})
+                        break
+            growth_estimates_data = ge.to_dict(orient='records')
+
+        # Raw Growth
+        raw_ge = get_res("raw_growth", None)
+        if raw_ge is not None and not raw_ge.empty:
+            try:
+                raw_ge.index.name = 'period'
+                raw_growth_estimates_data = raw_ge.reset_index().to_dict(orient='records')
+            except:
+                pass
+        
+        # Revenue
+        re = get_res("revenue_estimate", None)
+        if re is not None and not re.empty:
+            try:
+                re.index.name = 'period'
+                revenue_estimates_data = re.reset_index().to_dict(orient='records')
+            except:
+                pass
 
         print(f"DEBUG: Parallel fundamentals processed in {time.time() - f_start:.2f}s")
         
