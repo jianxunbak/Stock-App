@@ -896,6 +896,8 @@ def get_stock_data(ticker: str):
                         print(f"WARNING: Failed to update live price for cached {ticker}: {p_e}")
                     # ----------------------------------------
                     
+                    # Mark source for frontend debugging
+                    payload['_source'] = 'FIREBASE'
                     return payload
                 else:
                     print(f"DEBUG: Cache expired for {ticker}, refreshing...")
@@ -1816,6 +1818,7 @@ def get_stock_data(ticker: str):
 
         print(f"--- TOTAL TIME FOR {ticker}: {time.time() - start_time:.2f}s ---")
         final_response = {
+            "_source": "YFINANCE",
             "overview": {**overview, "ceo": ceo},
             "growth": {
                 "revenueGrowth": revenue_growth,

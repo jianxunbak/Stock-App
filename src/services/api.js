@@ -38,7 +38,14 @@ export const fetchStockData = async (ticker, forceRefresh = false) => {
                 data: response.data
             });
 
-            console.log(`%c🚀 Fetch completed for ${ticker}`, "color: #00ff00; font-weight: bold;");
+            const source = response.data._source || 'UNKNOWN';
+            if (source === 'FIREBASE') {
+                console.log(`%c🌐 [SOURCE: BACKEND -> FIREBASE] Data for ${ticker} retrieved from Firestore Cache`, "color: #00befa; font-weight: bold;");
+            } else if (source === 'YFINANCE') {
+                console.log(`%c🌐 [SOURCE: BACKEND -> YFINANCE] Data for ${ticker} fetched fresh from API`, "color: #f59e0b; font-weight: bold;");
+            } else {
+                console.log(`%c🚀 Fetch completed for ${ticker}`, "color: #00ff00; font-weight: bold;");
+            }
             return response.data;
         } catch (error) {
             if (error.code === 'ECONNABORTED') {
