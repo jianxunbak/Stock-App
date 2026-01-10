@@ -27,7 +27,7 @@ export const fetchStockData = async (ticker, forceRefresh = false) => {
     // 3. Perform Fetch
     const fetchPromise = (async () => {
         try {
-            console.log(`%c⏳ Requesting ${ticker} from Backend API... (Source: TBD)`, "color: #9ca3af; font-style: italic;");
+            console.log(`Requesting ${ticker} data...`);
             const response = await axios.get(`${API_URL}/stock/${ticker}`, {
                 timeout: 60000 // 60 seconds timeout
             });
@@ -40,11 +40,11 @@ export const fetchStockData = async (ticker, forceRefresh = false) => {
 
             const source = response.data._source || 'UNKNOWN';
             if (source === 'FIREBASE') {
-                console.log(`%c🌐 [SOURCE: BACKEND -> FIREBASE] Data for ${ticker} retrieved from Firestore Cache`, "color: #00befa; font-weight: bold;");
+                console.log(`%cFetched ${ticker} from Firebase`, "color: #00befa; font-weight: bold;");
             } else if (source === 'YFINANCE') {
-                console.log(`%c🌐 [SOURCE: BACKEND -> YFINANCE] Data for ${ticker} fetched fresh from API`, "color: #f59e0b; font-weight: bold;");
+                console.log(`%cFetched ${ticker} from yFinance`, "color: #f59e0b; font-weight: bold;");
             } else {
-                console.log(`%c🚀 Fetch completed for ${ticker}`, "color: #00ff00; font-weight: bold;");
+                console.log(`%cFetched ${ticker} data`, "color: #00ff00; font-weight: bold;");
             }
             return response.data;
         } catch (error) {
