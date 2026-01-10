@@ -174,6 +174,15 @@ except Exception as e:
     print(f"WARNING: Firebase Init Failed: {e}")
     db = None
 
+# --- Health Check Endpoint ---
+@app.get("/api/health/cache")
+async def health_check_cache():
+    return {
+        "status": "online",
+        "firebase_connected": db is not None,
+        "mode": "hybrid_cache"
+    }
+
 # def get_validated_support_levels(ticker: str):
 #     try:
 #         s_start = time.time()
