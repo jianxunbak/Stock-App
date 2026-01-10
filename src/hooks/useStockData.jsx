@@ -10,7 +10,12 @@ export const StockDataProvider = ({ children }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(true); // Mock login
 
     const loadStockData = async (ticker) => {
-        setLoading(true);
+        // Optimization: If we already have data for this ticker, don't show loading spinner.
+        // This prevents flickering when re-visiting or re-fetching.
+        const isSameTicker = stockData?.overview?.symbol === ticker || stockData?.symbol === ticker;
+        if (!isSameTicker) {
+            setLoading(true);
+        }
         setError(null);
         try {
             const data = await fetchStockData(ticker);
