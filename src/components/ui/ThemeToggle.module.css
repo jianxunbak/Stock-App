@@ -1,18 +1,25 @@
 .toggleButton {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding: 0.4rem;
-    border-radius: 20px;
+    border-radius: 50%;
     color: var(--text-primary);
     cursor: pointer;
     transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 2rem;
-    width: auto;
+    height: 2.8rem;
+    width: 2.8rem;
 }
 
 .toggleButton:focus {
@@ -26,14 +33,13 @@
 }
 
 .toggleButton:hover {
-    background: transparent;
-    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1));
+    transform: scale(1.1);
     box-shadow:
         0 6px 12px rgba(96, 165, 250, 0.5),
         inset 0 2px 4px rgba(96, 165, 250, 0.5);
-    transform: scale(1.1);
-    transform: translateY(-2px);
-    border-radius: 10px;
+    border-radius: 12px;
+    border: none;
 }
 
 

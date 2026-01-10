@@ -4,7 +4,7 @@ import styles from './FinancialTables.module.css';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 
-const FinancialTables = () => {
+const FinancialTables = ({ currency = 'USD', currencySymbol = '$', currentRate = 1 }) => {
     const { stockData, loading } = useStockData();
     const [activeTab, setActiveTab] = useState('income_statement');
     const [isExpanded, setIsExpanded] = useState(false);
@@ -13,6 +13,7 @@ const FinancialTables = () => {
     if (!stockData || !stockData.financials) return null;
 
     const { financials } = stockData;
+    const isETF = stockData?.overview?.is_etf || stockData?.overview?.quoteType === 'ETF';
     const tabs = [
         { id: 'income_statement', label: 'Income Statement' },
         { id: 'balance_sheet', label: 'Balance Sheet' },
@@ -66,13 +67,16 @@ const FinancialTables = () => {
                         {data.metrics.map((metric, index) => (
                             <tr key={index} className={styles.tableRow}>
                                 <td className={`${styles.td} ${styles.stickyCell}`}>{metric.name}</td>
-                                {metric.values.map((value, vIndex) => (
-                                    <td key={vIndex} className={styles.td}>
-                                        {typeof value === 'number'
-                                            ? (Math.abs(value) > 1e6 ? `$${(value / 1e6).toFixed(2)}M` : value.toLocaleString())
-                                            : value}
-                                    </td>
-                                ))}
+                                {metric.values.map((value, vIndex) => {
+                                    const convertedValue = typeof value === 'number' ? value * currentRate : value;
+                                    return (
+                                        <td key={vIndex} className={styles.td}>
+                                            {typeof convertedValue === 'number'
+                                                ? (Math.abs(convertedValue) > 1e6 ? `${currencySymbol}${(convertedValue / 1e6).toFixed(2)}M` : `${currencySymbol}${convertedValue.toLocaleString()}`)
+                                                : convertedValue}
+                                        </td>
+                                    );
+                                })}
                             </tr>
                         ))}
                     </tbody>
@@ -96,24 +100,32 @@ const FinancialTables = () => {
 
             {isExpanded && (
                 <>
-                    <div className={styles.tabsContainer}>
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`${styles.tabButton} ${activeTab === tab.id
-                                    ? styles.activeTab
-                                    : styles.inactiveTab
-                                    }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
+                    {isETF ? (
+                        <div className={styles.etfMessage}>
+                            Financial statements are not available for ETFs.
+                        </div>
+                    ) : (
+                        <>
+                            <div className={styles.tabsContainer}>
+                                {tabs.map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`${styles.tabButton} ${activeTab === tab.id
+                                            ? styles.activeTab
+                                            : styles.inactiveTab
+                                            }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
 
-                    <div>
-                        {renderTable(financials[activeTab])}
-                    </div>
+                            <div>
+                                {renderTable(financials[activeTab])}
+                            </div>
+                        </>
+                    )}
                 </>
             )}
         </div>

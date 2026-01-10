@@ -30,3 +30,5 @@ export const FluidCard = ({ children, className = '' }) => {
         </motion.div>
     );
 };
+
+export default FluidCard;

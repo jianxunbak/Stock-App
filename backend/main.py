@@ -8,6 +8,8 @@ import requests
 import json
 from dotenv import load_dotenv
 import pathlib
+import time
+from datetime import datetime, timedelta
 
 # Load .env from the project root (one level up from backend/)
 env_path = pathlib.Path(__file__).parent.parent / '.env'
@@ -16,6 +18,106 @@ load_dotenv(dotenv_path=env_path)
 # Set cache directory for Vercel (read-only file system fix)
 if os.environ.get('VERCEL'):
     os.environ['XDG_CACHE_HOME'] = '/tmp'
+
+MAJOR_SECTORS = [
+    "Technology", "Healthcare", "Financial Services", "Consumer Cyclical", 
+    "Consumer Defensive", "Industrials", "Communication Services", 
+    "Energy", "Utilities", "Real Estate", "Basic Materials"
+]
+
+def calculate_manual_beta(ticker_symbol):
+    """
+    Calculates a 1-year manual Beta by comparing the ticker's daily returns 
+    to the S&P 500 (^GSPC).
+    """
+    try:
+        print(f"DEBUG: Calculating 1-year manual beta for {ticker_symbol}...")
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)
+        
+        # Use a fresh Ticker object to avoid any session issues
+        ticker_obj = yf.Ticker(ticker_symbol)
+        market_obj = yf.Ticker("^GSPC")
+        
+        # Fetch 1 year of daily data
+        t_hist = ticker_obj.history(start=start_date, end=end_date)['Close']
+        m_hist = market_obj.history(start=start_date, end=end_date)['Close']
+        
+        if t_hist.empty or m_hist.empty:
+            print("DEBUG: History empty for manual beta calculation")
+            return 1.0
+            
+        # Align dates and calculate daily returns
+        df = pd.concat([t_hist, m_hist], axis=1, keys=['ticker', 'market']).dropna()
+        if len(df) < 20:
+            print("DEBUG: Not enough aligned data for manual beta calculation")
+            return 1.0
+            
+        returns = df.pct_change().dropna()
+        
+        covariance = returns['ticker'].cov(returns['market'])
+        variance = returns['market'].var()
+        
+        if variance == 0:
+            return 1.0
+            
+        manual_beta = covariance / variance
+        print(f"DEBUG: Manual beta calculated: {manual_beta:.4f}")
+        return manual_beta
+    except Exception as e:
+        print(f"Error calculating manual beta: {e}")
+        return 1.0
+
+def get_forex_rate(target_currency: str, base_currency: str = "USD"):
+    """
+    Fetches the live exchange rate from Base -> Target.
+    Uses Frankfurter API first, falls back to yfinance.
+    """
+    # 1. Try Frankfurter API (Free, no key)
+    # URL: https://api.frankfurter.app/latest?from=USD&to=SGD
+    try:
+        url = f"https://api.frankfurter.app/latest?from={base_currency}&to={target_currency}"
+        print(f"DEBUG: Fetching forex rate from {url}")
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            rate = data.get("rates", {}).get(target_currency)
+            if rate:
+                print(f"DEBUG: Frankfurter rate for {base_currency}->{target_currency}: {rate}")
+                return float(rate)
+    except Exception as e:
+        print(f"WARNING: Frankfurter API failed: {e}")
+
+    # 2. Fallback to yfinance
+    # Ticker format: "USDSGD=X"
+    try:
+        ticker = f"{base_currency}{target_currency}=X"
+        print(f"DEBUG: Fetching fallback forex rate from yfinance ({ticker})")
+        df = yf.download(ticker, period="1d", interval="1d", progress=False)
+        if not df.empty:
+            # yfinance returns a DataFrame, get the last 'Close'
+            rate = df['Close'].iloc[-1]
+            if isinstance(rate, pd.Series):
+                 rate = rate.iloc[0] # handle if multi-index or series
+            
+            # Additional check for numpy scalar
+            if hasattr(rate, "item"):
+                rate = rate.item()
+                
+            print(f"DEBUG: yfinance rate for {ticker}: {rate}")
+            return float(rate)
+    except Exception as e:
+        print(f"ERROR: yfinance forex fallback failed: {e}")
+
+    # 3. Final Fallback (Approximate Consts if everything fails)
+    fallbacks = {
+        "SGD": 1.35,
+        "EUR": 0.92,
+        "GBP": 0.79,
+        "CNY": 7.20
+    }
+    return fallbacks.get(target_currency, 1.0)
+
 
 app = FastAPI()
 
@@ -26,161 +128,309 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# def get_validated_support_levels(ticker: str):
+#     try:
+#         s_start = time.time()
+#         stock = yf.Ticker(ticker)
+        
+#         # 1. Fetch Data - Combine into fewer requests if possible, but intervals vary
+#         hist_5y_wk = stock.history(period="5y", interval="1wk")
+#         hist_1y_d = stock.history(period="1y", interval="1d")
+        
+#         if hist_1y_d.empty:
+#             return []
+            
+#         current_price = hist_1y_d['Close'].iloc[-1]
+#         support_candidates = []
+
+#         # --- Logic 1: The "Bounce" Test (SMAs) ---
+#         timeframes = [
+#             ("Weekly", hist_5y_wk),
+#             ("Daily", hist_1y_d)
+#         ]
+        
+#         sma_periods = [50, 100, 150, 200]
+        
+#         for tf_name, df in timeframes:
+#             if len(df) < 50: continue # Need at least some data
+            
+#             for period in sma_periods:
+#                 if len(df) < period: continue
+                
+#                 sma_col = f"SMA_{period}"
+#                 df[sma_col] = df['Close'].rolling(window=period).mean()
+                
+#                 # Vectorized Bounce Calculation
+#                 # Condition: Low comes within 1% of SMA, and Close finishes above SMA
+#                 bounces = (df['Low'] <= df[sma_col] * 1.01) & (df['Close'] >= df[sma_col] * 0.99)
+#                 bounce_count = bounces.sum()
+                
+#                 if bounce_count >= 3:
+#                     current_sma = df[sma_col].iloc[-1]
+#                     if not pd.isna(current_sma) and current_sma < current_price:
+#                         support_candidates.append({
+#                             "price": current_sma,
+#                             "source": f"{tf_name}",
+#                             "reason": f"{tf_name} {period} SMA - {bounce_count} touches",
+#                             "score": float(bounce_count) * 2
+#                         })
+
+#         # --- Logic 2: Horizontal Clusters (Swing Lows) ---
+#         def get_swing_lows_vectorized(df, window=5):
+#             if len(df) < window * 2 + 1: return []
+#             # Find local minima in a rolling window
+#             is_min = df['Low'] == df['Low'].rolling(window=window*2+1, center=True).min()
+#             return df[is_min]['Low'].tolist()
+
+#         swing_lows = []
+#         swing_lows.extend(get_swing_lows_vectorized(hist_5y_wk, window=5)) 
+#         swing_lows.extend(get_swing_lows_vectorized(hist_1y_d, window=3)) 
+        
+#         swing_lows.sort()
+        
+#         # Cluster lows within 2%
+#         clusters = []
+#         if swing_lows:
+#             current_cluster = [swing_lows[0]]
+            
+#             for i in range(1, len(swing_lows)):
+#                 price = swing_lows[i]
+#                 avg_cluster = sum(current_cluster) / len(current_cluster)
+                
+#                 if abs(price - avg_cluster) / avg_cluster <= 0.02:
+#                     current_cluster.append(price)
+#                 else:
+#                     if len(current_cluster) >= 2:
+#                         avg_price = sum(current_cluster) / len(current_cluster)
+#                         if avg_price < current_price:
+#                             clusters.append({"price": avg_price, "count": len(current_cluster)})
+#                     current_cluster = [price]
+            
+#             if len(current_cluster) >= 2:
+#                 avg_price = sum(current_cluster) / len(current_cluster)
+#                 if avg_price < current_price:
+#                     clusters.append({"price": avg_price, "count": len(current_cluster)})
+
+#         for c in clusters:
+#             support_candidates.append({
+#                 "price": c['price'],
+#                 "source": "Price Action",
+#                 "reason": f"Historical Support - {c['count']} confirmation points",
+#                 "score": float(c['count']) * 1.5
+#             })
+
+#         print(f"DEBUG: Support levels calculated in {time.time() - s_start:.2f}s")
+
+#         # --- Final Selection ---
+#         # Sort by Score (Validation Strength) first, then closeness?
+#         # User asked: "sorted by closeness to the current price"
+#         # But we should prioritize "Validated" levels.
+#         # Let's sort by Price Descending (Closeness to current price, assuming support is below)
+        
+#         # Deduplicate (merge close levels)
+#         support_candidates.sort(key=lambda x: x['price'], reverse=True)
+#         unique_levels = []
+        
+#         if support_candidates:
+#             current_level = support_candidates[0]
+#             merged_group = [current_level]
+            
+#             for i in range(1, len(support_candidates)):
+#                 next_level = support_candidates[i]
+#                 if abs(current_level['price'] - next_level['price']) / current_level['price'] <= 0.015:
+#                     merged_group.append(next_level)
+#                     # Keep the one with highest score as the "main" reason
+#                     if next_level['score'] > current_level['score']:
+#                         current_level = next_level
+#                 else:
+#                     unique_levels.append(current_level)
+#                     current_level = next_level
+#                     merged_group = [current_level]
+#             unique_levels.append(current_level)
+
+#         return unique_levels[:5]
+
+#     except Exception as e:
+#         print(f"Error in get_validated_support_levels: {e}")
+#         return []
 
 def get_validated_support_levels(ticker: str):
     try:
+        s_start = time.time()
         stock = yf.Ticker(ticker)
         
-        # 1. Fetch Data
-        hist_10y_mo = stock.history(period="10y", interval="1mo")
+        # Fetching data
         hist_5y_wk = stock.history(period="5y", interval="1wk")
         hist_1y_d = stock.history(period="1y", interval="1d")
         
-        current_price = hist_1y_d['Close'].iloc[-1] if not hist_1y_d.empty else 0
-        
+        if hist_1y_d.empty:
+            return []
+            
+        current_price = hist_1y_d['Close'].iloc[-1]
         support_candidates = []
 
-        # --- Logic 1: The "Bounce" Test (SMAs) ---
-        timeframes = [
-            ("Monthly", hist_10y_mo),
-            ("Weekly", hist_5y_wk),
-            ("Daily", hist_1y_d)
-        ]
-        
-        sma_periods = [50, 100, 150, 200]
+        # --- Logic 1: Improved SMA "Touch" Logic ---
+        timeframes = [("Weekly", hist_5y_wk), ("Daily", hist_1y_d)]
+        sma_periods = [50, 100, 200] # Focus on the most respected ones
         
         for tf_name, df in timeframes:
-            if len(df) < 200: continue # Need enough data
+            if len(df) < 50: continue
             
             for period in sma_periods:
+                if len(df) < period: continue
+                
                 sma_col = f"SMA_{period}"
                 df[sma_col] = df['Close'].rolling(window=period).mean()
                 
-                # Count Bounces
-                # Test: Low < SMA * 1.01 (touched or came close)
-                # Hold: Close > SMA (didn't break)
-                # We iterate through the last N periods (e.g., all available valid SMA points)
+                # Check for "Touches": Low gets near the SMA, and Close is above it.
+                # Increased buffer to 1.5% and ensured the trend is supportive.
+                touches = (df['Low'] <= df[sma_col] * 1.015) & (df['Close'] > df[sma_col])
+                touch_count = touches.sum()
                 
-                bounce_count = 0
-                valid_points = df.dropna(subset=[sma_col])
-                
-                for i in range(len(valid_points)):
-                    row = valid_points.iloc[i]
-                    sma_val = row[sma_col]
-                    low = row['Low']
-                    close = row['Close']
-                    
-                    if low <= sma_val * 1.01 and close >= sma_val:
-                        bounce_count += 1
-                
-                # If significant bounces, add to candidates
-                if bounce_count >= 3:
-                    current_sma = valid_points[sma_col].iloc[-1]
-                    if current_sma < current_price: # Must be support
+                if touch_count >= 2: # 2 touches on a major SMA is significant
+                    current_sma = df[sma_col].iloc[-1]
+                    # Only include if current price is above the SMA (making it support)
+                    if not pd.isna(current_sma) and current_sma < current_price:
+                        # Proximity weight: levels closer to current price get a slight boost
+                        proximity = 1 - (abs(current_price - current_sma) / current_price)
                         support_candidates.append({
-                            "price": current_sma,
-                            "source": f"{tf_name}",
-                            "reason": f"{tf_name} {period} SMA - {bounce_count} verified bounces",
-                            "score": bounce_count * 2 # Weight bounces higher
+                            "price": float(current_sma),
+                            "source": f"{tf_name} SMA",
+                            "reason": f"{tf_name} {period} SMA - {touch_count} touches",
+                            "score": float(touch_count) * 2.5 * proximity
                         })
 
-        # --- Logic 2: Horizontal Clusters (Swing Lows) ---
-        # Use Daily and Weekly data for swing lows
+        # --- Logic 2: Swing Lows (Fractals) ---
         def get_swing_lows(df, window=5):
             lows = []
             for i in range(window, len(df) - window):
-                is_low = True
-                for j in range(1, window + 1):
-                    if df['Low'].iloc[i] > df['Low'].iloc[i-j] or df['Low'].iloc[i] > df['Low'].iloc[i+j]:
-                        is_low = False
-                        break
-                if is_low:
+                # Check if current low is lower than 'window' bars before and after
+                if all(df['Low'].iloc[i] <= df['Low'].iloc[i-window:i]) and \
+                   all(df['Low'].iloc[i] <= df['Low'].iloc[i+1:i+window+1]):
                     lows.append(df['Low'].iloc[i])
             return lows
 
-        swing_lows = []
-        swing_lows.extend(get_swing_lows(hist_5y_wk, window=5)) # Weekly lows
-        swing_lows.extend(get_swing_lows(hist_1y_d, window=3))  # Daily lows (tighter window)
+        # Use wider windows for cleaner levels
+        sl = get_swing_lows(hist_5y_wk, window=10) # Major multi-year lows
+        sl.extend(get_swing_lows(hist_1y_d, window=14)) # Solid daily lows
+        sl.sort()
         
-        swing_lows.sort()
-        
-        # Cluster lows within 2%
+        # --- Logic 3: Dynamic Clustering (The "Zone" Approach) ---
         clusters = []
-        if swing_lows:
-            current_cluster = [swing_lows[0]]
-            
-            for i in range(1, len(swing_lows)):
-                price = swing_lows[i]
-                avg_cluster = sum(current_cluster) / len(current_cluster)
-                
-                if abs(price - avg_cluster) / avg_cluster <= 0.02:
-                    current_cluster.append(price)
+        if sl:
+            current_cluster = [sl[0]]
+            for i in range(1, len(sl)):
+                # Use a slightly wider 3% threshold for historical "zones"
+                if (sl[i] - (sum(current_cluster)/len(current_cluster))) / (sum(current_cluster)/len(current_cluster)) <= 0.03:
+                    current_cluster.append(sl[i])
                 else:
-                    # Finalize previous cluster
-                    if len(current_cluster) >= 2: # Need at least 2 touches
-                        avg_price = sum(current_cluster) / len(current_cluster)
-                        if avg_price < current_price:
-                            clusters.append({
-                                "price": avg_price,
-                                "count": len(current_cluster)
-                            })
-                    current_cluster = [price]
-            
-            # Add last cluster
-            if len(current_cluster) >= 2:
-                avg_price = sum(current_cluster) / len(current_cluster)
-                if avg_price < current_price:
-                    clusters.append({
-                        "price": avg_price,
-                        "count": len(current_cluster)
-                    })
+                    avg_price = sum(current_cluster) / len(current_cluster)
+                    if avg_price < current_price:
+                        clusters.append({"price": avg_price, "count": len(current_cluster)})
+                    current_cluster = [sl[i]]
+            # Final cluster check
+            avg_price = sum(current_cluster) / len(current_cluster)
+            if avg_price < current_price:
+                clusters.append({"price": avg_price, "count": len(current_cluster)})
 
         for c in clusters:
+            # Score based on number of lows in that zone
             support_candidates.append({
-                "price": c['price'],
+                "price": float(c['price']),
                 "source": "Price Action",
-                "reason": f"Horizontal Cluster - {c['count']} touch points",
-                "score": c['count'] * 1.5
+                "reason": f"Historical Support Zone ({c['count']} points)",
+                "score": float(c['count']) * 2.0
             })
 
-        # --- Final Selection ---
-        # Sort by Score (Validation Strength) first, then closeness?
-        # User asked: "sorted by closeness to the current price"
-        # But we should prioritize "Validated" levels.
-        # Let's sort by Price Descending (Closeness to current price, assuming support is below)
-        
-        # Deduplicate (merge close levels)
+        # --- Final Selection & Deduplication ---
+        # 1. Sort by price (highest to lowest, i.e., closest to current price first)
         support_candidates.sort(key=lambda x: x['price'], reverse=True)
-        unique_levels = []
         
+        unique_levels = []
         if support_candidates:
-            current_level = support_candidates[0]
-            merged_group = [current_level]
-            
+            unique_levels.append(support_candidates[0])
             for i in range(1, len(support_candidates)):
-                next_level = support_candidates[i]
-                if abs(current_level['price'] - next_level['price']) / current_level['price'] <= 0.015:
-                    merged_group.append(next_level)
-                    # Keep the one with highest score as the "main" reason
-                    if next_level['score'] > current_level['score']:
-                        current_level = next_level
-                else:
-                    unique_levels.append(current_level)
-                    current_level = next_level
-                    merged_group = [current_level]
-            unique_levels.append(current_level)
+                # Merge levels within 2% of each other to avoid clutter
+                is_duplicate = False
+                for ul in unique_levels:
+                    if abs(support_candidates[i]['price'] - ul['price']) / ul['price'] < 0.025:
+                        # Keep the one with the higher score
+                        if support_candidates[i]['score'] > ul['score']:
+                            ul.update(support_candidates[i])
+                        is_duplicate = True
+                        break
+                if not is_duplicate:
+                    unique_levels.append(support_candidates[i])
 
         return unique_levels[:5]
 
     except Exception as e:
-        print(f"Error in get_validated_support_levels: {e}")
+        print(f"Error in support calculation: {e}")
         return []
+
+def get_next_5y_growth(stock_obj, ticker, info):
+    """
+    Enhanced growth estimation. 
+    1. ETF -> fiveYearAverageReturn
+    2. Stock -> Scrape Yahoo Finance Analysis tab (Priority)
+    3. Stock -> info lookup (earningsGrowth, revenueGrowth) (Fallback)
+    """
+    quote_type = info.get("quoteType")
+    
+    # 1. ETF Logic
+    if quote_type == "ETF":
+        val = info.get("fiveYearAverageReturn")
+        if val is not None:
+            return float(val), "Note: ETFs use historical 5Y average return rather than analyst projections."
+        return 0.05, "Note: ETF growth default (5%) used as 5Y average return was missing."
+
+    # 2. Scraping Yahoo Finance "Analysis" Tab (Priority for Stocks)
+    # This matches "Next 5 Years (per annum)" which is what we want.
+    try:
+        url = f"https://finance.yahoo.com/quote/{ticker}/analysis"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        tables = pd.read_html(response.text)
+        
+        for table in tables:
+            # Look for "Growth Estimates" table
+            if any("Growth Estimates" in str(col) for col in table.columns) or \
+               any("Next 5 Years (per annum)" in str(row) for row in table.values):
+                
+                # Search rows
+                for i, row in table.iterrows():
+                    row_label = str(row[0])
+                    if "Next 5 Years (per annum)" in row_label:
+                        val_str = str(row[1]).replace("%", "").replace(",", "")
+                        if val_str and val_str.lower() != 'nan' and val_str != 'N/A':
+                            return float(val_str) / 100.0, "" # Success
+    except Exception as e:
+        print(f"Scraping fallback failed for {ticker}: {e}")
+
+    # 3. Stock Info Lookup (Fallback)
+    # This often returns TTM growth which can be misleading (e.g. 90% jump), so we label it.
+    # CRITICAL FIX: Do not use negative estimates for long term growth projections.
+    eg = info.get("earningsGrowth")
+    rg = info.get("revenueGrowth")
+    
+    if eg is not None and eg > 0.01:
+        return float(eg), "Note: Used current TTM Earnings Growth (long-term est. unavailable)."
+        
+    if rg is not None and rg > 0.01:
+         return float(rg), "Note: Used current TTM Revenue Growth (long-term est. unavailable)."
+
+    # 4. Final Fallback (Historical or Default)
+    return 0.05, "Note: Default growth (5%) used as no projections or growth metrics were found."
 
 def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow, 
                               revenue_series, net_income_series, op_cash_flow_series, 
                               growth_estimates, beta=None, raw_growth_estimates_data=None,
-                              revenue_estimates_data=None, history=None):
+                              revenue_estimates_data=None, history=None, stock_obj=None):
     try:
         # --- 1. Determine Method ---
         sector = info.get("sector", "")
@@ -231,11 +481,24 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
                 method = "Discounted Free Cash Flow (DFCF)" # Fallback
 
         # --- 2. Assumptions ---
-        current_price = info.get("currentPrice", 0)
-        shares_outstanding = info.get("sharesOutstanding", 1)
-        if not current_price or not shares_outstanding:
-            return {"status": "Error", "intrinsicValue": 0, "differencePercent": 0, "method": "N/A", "assumptions": {}}
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+        shares_outstanding = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding") or 1
         
+        if not current_price or not shares_outstanding:
+            return {
+                "status": "Error", 
+                "intrinsicValue": 0, 
+                "currentPrice": current_price,
+                "differencePercent": 0, 
+                "method": "N/A", 
+                "assumptions": {},
+                "growthRateNext5Y": None,
+                "growthNote": "Error: Missing price or share data"
+            }
+        
+        # 1. Use the new enhanced growth helper
+        enhanced_growth, growth_note = get_next_5y_growth(stock_obj, ticker, info)
+
         # Discount Rate (WACC / Cost of Equity)
         # Simplified based on Beta and Risk Free Rate (approx 4%) + Risk Premium (5%)
         # Or lookup table based on Beta/Country
@@ -248,14 +511,10 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
                 # Higher risk
                 # Map beta to discount rate table provided by user previously
                 # < 0.8: 8.5%, 0.8-0.9: 9.3%, etc.
-                if beta < 0.85: return 0.085 # < 0.8
-                if beta < 0.95: return 0.093 # ~0.9
-                if beta < 1.05: return 0.100 # ~1.0
-                if beta < 1.15: return 0.108 # ~1.1
-                if beta < 1.25: return 0.115 # ~1.2
-                if beta < 1.35: return 0.122 # ~1.3
-                if beta < 1.45: return 0.130 # ~1.4
-                return 0.137 # ~1.5
+                if beta < 0.8: return 0.08
+                if beta < 1.0: return 0.09
+                if beta < 1.2: return 0.10
+                return 0.11
                 
             else: # US / Default
                 if beta < 0.80: return 0.054
@@ -274,57 +533,11 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
         discount_rate = get_discount_rate(beta_val, country)
         
         # Growth Rate (Yr 1-5)
-        # New Logic: Min(Estimate 1Y, PE/PEG)
-        growth_rate_1_5 = 0.05 # Default 5%
+        # Use our enhanced logic as the primary driver for growth_rate_1_5
+        growth_rate_1_5 = enhanced_growth
         
-        # 1. Calculate PE/PEG Growth
-        pe_ratio = info.get("trailingPE")
-        peg_ratio = info.get("pegRatio") or info.get("trailingPegRatio")
-        
-        pe_peg_growth = None
-        if pe_ratio and peg_ratio and peg_ratio != 0:
-            pe_peg_growth = (pe_ratio / peg_ratio) / 100 # Convert to decimal (e.g. 15 -> 0.15)
-        
-        # 2. Get Estimate 1Y Growth
-        est_1y_growth = None
-        if raw_growth_estimates_data:
-            for est in raw_growth_estimates_data:
-                if est.get("period") == "+1y":
-                    val = est.get("stockTrend")
-                    if val is not None:
-                        est_1y_growth = float(val) # Assuming raw data is already decimal (e.g. 0.15) or check format
-                        break
-        
-        # 3. Compare and use lower
-        if pe_peg_growth is not None and est_1y_growth is not None:
-            growth_rate_1_5 = min(pe_peg_growth, est_1y_growth)
-        elif pe_peg_growth is not None:
-            growth_rate_1_5 = pe_peg_growth
-        elif est_1y_growth is not None:
-            growth_rate_1_5 = est_1y_growth
-        else:
-            # Fallback to old logic if new data missing
-            if growth_estimates:
-                # Look for "Next 5 Years"
-                for est in growth_estimates:
-                    if "Next 5 Years" in str(est.get("period", "")):
-                        try:
-                            val_str = str(est.get("stockTrend", "0")).replace("%", "")
-                            growth_rate_1_5 = float(val_str) / 100
-                            break
-                        except: pass
-            else:
-                # Use historical CAGR (Rev or NI)
-                if not net_income_series.empty and len(net_income_series) > 3:
-                    try:
-                        start = abs(net_income_series.iloc[-1])
-                        end = net_income_series.iloc[0]
-                        if start > 0:
-                            growth_rate_1_5 = (end/start)**(1/len(net_income_series)) - 1
-                    except: pass
-        
-        # Cap Growth Rate 1-5 reasonable limits
-        growth_rate_1_5 = min(max(growth_rate_1_5, -0.10), 0.30) # Cap between -10% and 30%
+        # We still cap it for safety in DCF
+        growth_rate_1_5 = min(max(growth_rate_1_5, -0.10), 0.35) # Expanded upper cap slightly to 35%
         
         # Growth Rate (Yr 6-10) - Same but capped at 15%
         growth_rate_6_10 = min(growth_rate_1_5, 0.15)
@@ -418,14 +631,10 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
             intrinsic_value = book_value * mean_pb
             assumptions = {
                 "Current Book Value Per Share": f"${book_value:.2f}",
-                "Mean PB Ratio": f"{mean_pb:.2f}"
+                "Mean PB Ratio": f"{mean_pb:.2f}",
+                "Growth Note": growth_note
             }
-            
-            return {"status": "Undervalued" if current_price < intrinsic_value else "Overvalued", 
-                    "intrinsicValue": intrinsic_value, 
-                    "differencePercent": ((current_price / intrinsic_value) - 1) if intrinsic_value else 0, 
-                    "method": method, 
-                    "assumptions": assumptions}
+            # No early return here anymore
 
         elif method == "Price to Sales Growth (PSG)":
             # Intrinsic Value = Sales Per Share * Projected Growth Rate * 0.20
@@ -454,7 +663,8 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
             assumptions = {
                 "Sales Per Share (TTM)": f"${sales_per_share:.2f}",
                 "Projected Sales Growth": f"{growth_rate_whole:.2f}%",
-                "Fair PSG Constant": "0.20"
+                "Fair PSG Constant": "0.20",
+                "Growth Note": growth_note
             }
 
         else: # DCF / DOCF / DNI
@@ -511,6 +721,7 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
             assumptions = {
                 f"Current {metric_name}": f"${base_value/1e9:.2f}B",
                 "Growth Rate (Yr 1-5)": f"{growth_rate_1_5*100:.2f}%",
+                "Growth Note": growth_note,
                 "Growth Rate (Yr 6-10)": f"{growth_rate_6_10*100:.2f}%",
                 "Growth Rate (Yr 11-20)": f"{growth_rate_11_20*100:.2f}%",
                 "Discount Rate": f"{discount_rate*100:.2f}%",
@@ -529,27 +740,66 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
         if diff_percent > 0.15: status = "Overvalued"
         elif diff_percent < -0.15: status = "Undervalued"
         
+        # Prepare raw values for frontend conversion
+        def clean_numeric(val):
+            try:
+                import math
+                v = float(val)
+                if math.isnan(v): return 0
+                return v
+            except:
+                return 0
+
+        raw_base_value = clean_numeric(base_value) if 'base_value' in locals() else 0
+        raw_sales_per_share = clean_numeric(sales_per_share) if 'sales_per_share' in locals() else 0
+        raw_book_value = clean_numeric(book_value) if 'book_value' in locals() else 0
+
         return {
             "method": method,
             "intrinsicValue": intrinsic_value,
             "currentPrice": current_price,
             "differencePercent": diff_percent,
             "status": status,
-            "assumptions": assumptions
+            "assumptions": assumptions,
+            "raw_assumptions": {
+                "base_value": raw_base_value,
+                "total_debt": clean_numeric(total_debt),
+                "cash_and_equivalents": clean_numeric(cash_and_equivalents),
+                "shares_outstanding": clean_numeric(shares_outstanding),
+                "sales_per_share": raw_sales_per_share,
+                "book_value": raw_book_value
+            },
+            "growthRateNext5Y": growth_rate_1_5,
+            "growthNote": growth_note
         }
 
     except Exception as e:
-        print(f"Error calculating intrinsic value: {e}")
-        return {"status": "Error", "intrinsicValue": 0, "differencePercent": 0, "method": "Error", "assumptions": {}}
+        print(f"Error calculating intrinsic value for {ticker}: {e}")
+        return {
+            "status": "Error", 
+            "intrinsicValue": 0, 
+            "currentPrice": info.get("currentPrice") or info.get("regularMarketPrice") or 0,
+            "differencePercent": 0, 
+            "method": "Error", 
+            "assumptions": {},
+            "growthRateNext5Y": None,
+            "growthNote": f"Exception: {str(e)}"
+        }
 
 def get_stock_data(ticker: str):
     try:
+        start_time = time.time()
+        print(f"\n--- [API] START FETCHING DATA FOR {ticker} ---")
+        
         stock = yf.Ticker(ticker)
         info = stock.info
+        print(f"DEBUG: yFinance info fetched for {ticker}: {info}")
+        print(f"DEBUG: info fetching took {time.time() - start_time:.2f}s")
         
         # Validate if stock exists
         if not info or (info.get("currentPrice") is None and info.get("regularMarketPrice") is None):
-            raise ValueError(f"Stock '{ticker}' not found or no data available.")
+            print(f"ERROR: Stock {ticker} not found or no price data")
+            raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found or no data available.")
 
         
         # Helper to map exchange codes
@@ -567,16 +817,26 @@ def get_stock_data(ticker: str):
             return mapping.get(exchange_code, exchange_code)
 
         # Basic Info
+        quote_type = info.get("quoteType", "EQUITY")
+        
+        # Initialize fundamental variables EARLY to avoid UnboundLocalError
+        calendar_data = {}
+        news_data = []
+        growth_estimates_data = []
+        raw_growth_estimates_data = []
+        revenue_estimates_data = []
+        fund_start = time.time()
+        
         overview = {
             "name": info.get("longName"),
             "symbol": info.get("symbol"),
-            "price": info.get("currentPrice"),
+            "price": info.get("currentPrice") or info.get("regularMarketPrice"),
             "change": info.get("regularMarketChange", 0),
             "changePercent": info.get("regularMarketChangePercent", 0),
             "exchange": get_exchange_name(info.get("exchange")),
             "currency": info.get("currency"),
-            "sector": info.get("sector"),
-            "industry": info.get("industry"),
+            "sector": info.get("sector") or ("ETF" if quote_type == "ETF" else "Unknown"),
+            "industry": info.get("industry") or ("ETF" if quote_type == "ETF" else "Unknown"),
             "description": info.get("longBusinessSummary"),
             "marketCap": info.get("marketCap"),
             "beta": info.get("beta"),
@@ -584,110 +844,135 @@ def get_stock_data(ticker: str):
             "pegRatio": info.get("pegRatio") or info.get("trailingPegRatio"),
             "eps": info.get("trailingEps"),
             "dividendYield": info.get("dividendYield"),
+            "quoteType": quote_type,
+            "is_etf": quote_type == "ETF"
         }
 
+        # Beta Calculation Fallback
+        beta_val = info.get("beta")
+        if beta_val is None:
+            # Check for beta3Year (common in ETFs)
+            beta_val = info.get("beta3Year")
+            if beta_val is None:
+                # Manual calculation as last resort
+                beta_val = calculate_manual_beta(ticker)
+        
+        # Update overview with final beta value
+        overview["beta"] = beta_val
+
         # Financials for Growth & Profitability (Annual data)
-        financials = stock.financials
-        balance_sheet = stock.balance_sheet
-        cashflow = stock.cashflow
+        # For ETFs, skip these as they don't exist and yfinance hangs trying to fetch them.
+        f_start = time.time()
+        financials = pd.DataFrame()
+        balance_sheet = pd.DataFrame()
+        cashflow = pd.DataFrame()
+        
+        if quote_type != "ETF":
+            try:
+                financials = stock.financials if hasattr(stock, 'financials') else pd.DataFrame()
+                balance_sheet = stock.balance_sheet if hasattr(stock, 'balance_sheet') else pd.DataFrame()
+                cashflow = stock.cashflow if hasattr(stock, 'cashflow') else pd.DataFrame()
+            except Exception:
+                pass
+        print(f"DEBUG: Financials processed in {time.time() - f_start:.2f}s")
         
         # Fetch TTM (Trailing Twelve Months) data for ratio calculations
-        try:
-            financials_ttm = stock.quarterly_financials
-            balance_sheet_ttm = stock.quarterly_balance_sheet
-            cashflow_ttm = stock.quarterly_cashflow
-            
-            # Sum last 4 quarters for TTM income statement and cash flow
-            if not financials_ttm.empty and len(financials_ttm.columns) >= 4:
-                ttm_income = financials_ttm.iloc[:, :4].sum(axis=1)
-            else:
-                ttm_income = pd.Series()
-            
-            if not cashflow_ttm.empty and len(cashflow_ttm.columns) >= 4:
-                ttm_cashflow = cashflow_ttm.iloc[:, :4].sum(axis=1)
-            else:
-                ttm_cashflow = pd.Series()
-            
-            # Use most recent quarter for TTM balance sheet (point in time data)
-            if not balance_sheet_ttm.empty:
-                ttm_balance = balance_sheet_ttm.iloc[:, 0]
-            else:
-                ttm_balance = pd.Series()
-                
-        except Exception as e:
-            print(f"Error fetching TTM data: {e}")
-            ttm_income = pd.Series()
-            ttm_cashflow = pd.Series()
-            ttm_balance = pd.Series()
-        
-        calendar = stock.calendar
-        news_data = stock.news
-        
-        # Try to get growth estimates, might vary by yfinance version
-        # Fetch Growth Estimates (Original)
-        growth_estimates = stock.growth_estimates
-        
-        # Fetch Raw Growth Estimates (New Request)
-        raw_growth_estimates_data = {}
-        try:
-            # Using the method requested by user
-            raw_growth_estimates = stock.get_growth_estimates(as_dict=False)
-            if raw_growth_estimates is not None and not raw_growth_estimates.empty:
-                # Convert to dict for JSON serialization
-                # Reset index to make 'period' a column if it's the index
-                raw_growth_estimates.index.name = 'period'
-                raw_growth_estimates_reset = raw_growth_estimates.reset_index()
-                # Convert to records
-                raw_growth_estimates_data = raw_growth_estimates_reset.to_dict(orient='records')
-            else:
-                 pass
-        except Exception as e:
-            print(f"Error fetching raw growth estimates: {e}")
+        ttm_start = time.time()
+        ttm_income = pd.Series()
+        ttm_cashflow = pd.Series()
+        ttm_balance = pd.Series()
 
-        # Try to get growth estimates
-        growth_estimates_data = []
-        try:
-            # Try method first (newer yfinance versions)
-            ge = None
-            if hasattr(stock, 'get_growth_estimates'):
-                ge = stock.get_growth_estimates()
-            elif hasattr(stock, 'growth_estimates'):
-                ge = stock.growth_estimates
-            
-            if ge is not None and not ge.empty:
-                # Reset index to make 'Growth Estimates' a column if it's the index
-                # yfinance usually returns Period as index
-                ge = ge.reset_index()
+        if quote_type != "ETF":
+            try:
+                financials_ttm = stock.quarterly_financials
+                balance_sheet_ttm = stock.quarterly_balance_sheet
+                cashflow_ttm = stock.quarterly_cashflow
                 
-                # Rename 'index' to 'Period' if it exists, or 'Growth Estimates'
-                if 'index' in ge.columns:
-                    ge = ge.rename(columns={'index': 'Period'})
-                elif 'Growth Estimates' in ge.columns:
-                    ge = ge.rename(columns={'Growth Estimates': 'Period'})
+                # Sum last 4 quarters for TTM income statement and cash flow
+                if not financials_ttm.empty and len(financials_ttm.columns) >= 4:
+                    ttm_income = financials_ttm.iloc[:, :4].sum(axis=1)
                 
-                growth_estimates_data = ge.to_dict(orient='records')
+                if not cashflow_ttm.empty and len(cashflow_ttm.columns) >= 4:
+                    ttm_cashflow = cashflow_ttm.iloc[:, :4].sum(axis=1)
+                
+                # Use most recent quarter for TTM balance sheet (point in time data)
+                if not balance_sheet_ttm.empty:
+                    ttm_balance = balance_sheet_ttm.iloc[:, 0]
+            except Exception as e:
+                print(f"Error fetching TTM data: {e}")
+        print(f"DEBUG: TTM data processed in {time.time() - ttm_start:.2f}s")
+        
 
-            growth_estimates = growth_estimates_data
-        except Exception as e:
-            print(f"Error fetching growth estimates: {e}")
-            growth_estimates = []
+        if quote_type != "ETF":
+            try:
+                # 1. Calendar
+                cal_start = time.time()
+                try:
+                    calendar_data = stock.calendar
+                except Exception as e:
+                    print(f"Error fetching calendar: {e}")
+                print(f"DEBUG: Calendar fetched in {time.time() - cal_start:.2f}s")
+                
+                # 2. News
+                news_start = time.time()
+                try:
+                    news_data = stock.news
+                except Exception as e:
+                    print(f"Error fetching news: {e}")
+                print(f"DEBUG: News fetched in {time.time() - news_start:.2f}s")
 
-        # Fetch Revenue Estimates
-        revenue_estimates_data = []
-        try:
-            re = None
-            if hasattr(stock, 'revenue_estimate'):
-                re = stock.revenue_estimate
-            elif hasattr(stock, 'get_revenue_estimate'):
-                re = stock.get_revenue_estimate()
-            
-            if re is not None and not re.empty:
-                # Reset index to make 'period' a column
-                re.index.name = 'period'
-                re = re.reset_index()
-                revenue_estimates_data = re.to_dict(orient='records')
-        except Exception as e:
-            print(f"Error fetching revenue estimates: {e}")
+                # 3. Standard Growth Estimates (for calculation)
+                est_start = time.time()
+                try:
+                    ge = None
+                    if hasattr(stock, 'get_growth_estimates'):
+                        ge = stock.get_growth_estimates()
+                    elif hasattr(stock, 'growth_estimates'):
+                        ge = stock.growth_estimates
+                    
+                    if ge is not None and not ge.empty:
+                        ge = ge.reset_index()
+                        if 'index' in ge.columns:
+                            ge = ge.rename(columns={'index': 'period'})
+                        elif 'Growth Estimates' in ge.columns:
+                            ge = ge.rename(columns={'Growth Estimates': 'period'})
+                        else:
+                            # Try to find any column that might be the period
+                            for col in ge.columns:
+                                if 'period' in col.lower():
+                                    ge = ge.rename(columns={col: 'period'})
+                                    break
+                        growth_estimates_data = ge.to_dict(orient='records')
+                    print(f"DEBUG: Standard Growth Est fetched in {time.time() - est_start:.2f}s")
+                except Exception as e:
+                    print(f"Error fetching standard growth estimates: {e}")
+
+                # 4. Raw Growth Estimates (user detail)
+                raw_est_start = time.time()
+                try:
+                    raw_growth_estimates = stock.get_growth_estimates(as_dict=False)
+                    if raw_growth_estimates is not None and not raw_growth_estimates.empty:
+                        raw_growth_estimates.index.name = 'period'
+                        raw_growth_estimates_data = raw_growth_estimates.reset_index().to_dict(orient='records')
+                    print(f"DEBUG: Raw Growth Est fetched in {time.time() - raw_est_start:.2f}s")
+                except Exception:
+                    pass
+
+                # 5. Revenue Estimates
+                rev_start = time.time()
+                try:
+                    re = stock.revenue_estimate
+                    if re is not None and not re.empty:
+                        re.index.name = 'period'
+                        revenue_estimates_data = re.reset_index().to_dict(orient='records')
+                    print(f"DEBUG: Revenue Est fetched in {time.time() - rev_start:.2f}s")
+                except Exception:
+                    pass
+                
+            except Exception as e:
+                print(f"Error fetching fundamentals: {e}")
+        
+        print(f"DEBUG: Total fundamentals processed in {time.time() - fund_start:.2f}s")
 
         print("\n--- YFINANCE DATA DEBUG ---")
         print("INFO KEYS:", info.keys())
@@ -695,8 +980,8 @@ def get_stock_data(ticker: str):
         print("\nBALANCE SHEET (5Y Check):\n", balance_sheet.head(5))
         print("\nCASHFLOW (5Y Check):\n", cashflow.head(5))
         print("\nCASHFLOW INDEX:", cashflow.index) # Added to debug OCF
-        print("\nCALENDAR:\n", calendar)
-        print("\nGROWTH ESTIMATES:\n", growth_estimates)
+        print("\nCALENDAR:\n", calendar_data)
+        print("\nGROWTH ESTIMATES:\n", growth_estimates_data)
         print("---------------------------\n")
 
         # Helper to get value safely
@@ -790,7 +1075,9 @@ def get_stock_data(ticker: str):
         debt_to_ebitda = (total_debt / ebitda) if ebitda else 0
 
         # Historical Data for Charts
-        history = stock.history(period="max")
+        h_start = time.time()
+        history = stock.history(period="25y")  # Changed from "max" to speed up validation
+        print(f"DEBUG: History (25y) fetched in {time.time() - h_start:.2f}s")
         history_data = [{"date": date.strftime("%Y-%m-%d"), "close": close} for date, close in zip(history.index, history["Close"])]
 
         # Helper to get series safely
@@ -826,16 +1113,6 @@ def get_stock_data(ticker: str):
              except:
                  pass
 
-        # Process Growth Estimates for Table
-        growth_estimates_data = []
-        if isinstance(growth_estimates, pd.DataFrame) and not growth_estimates.empty:
-             for index, row in growth_estimates.iterrows():
-                 growth_estimates_data.append({
-                     "period": str(index),
-                     "stockTrend": row.get("stockTrend"),
-                     "indexTrend": row.get("indexTrend"),
-                     "industryTrend": row.get("industryTrend")
-                 })
 
         # --- Calculations for Tables ---
         
@@ -937,13 +1214,12 @@ def get_stock_data(ticker: str):
         cashflow_data = format_df(cashflow, ttm_cashflow)
 
         # Format Calendar
-        calendar_data = calendar if isinstance(calendar, dict) else {}
+        # calendar_data is already a dict or empty dict from initialization
         
 
 
         # --- New Data Fetching ---
         shares_outstanding = info.get("sharesOutstanding")
-        news = stock.news
         
         # CEO
         company_officers = info.get("companyOfficers", [])
@@ -1390,6 +1666,26 @@ def get_stock_data(ticker: str):
         # for c in score_criteria:
         #     c["weight"] = current_weights.get(c["name"], 0)
 
+        v_start = time.time()
+        # --- Valuation Logic ---
+        valuation_data = {}
+        try:
+            # Re-fetch growth estimates if necessary or use what we have
+            valuation_data = calculate_intrinsic_value(
+                ticker, info, financials, balance_sheet, cashflow,
+                revenue_series, net_income_series, op_cash_flow_series,
+                growth_estimates_data, beta=beta_val,
+                raw_growth_estimates_data=raw_growth_estimates_data,
+                revenue_estimates_data=revenue_estimates_data,
+                history=history,
+                stock_obj=stock
+            )
+        except Exception as e:
+            print(f"Error calculating valuation: {e}")
+            valuation_data = {"status": "Error", "intrinsicValue": 0, "method": "Error", "assumptions": {}}
+        print(f"DEBUG: Valuation calculated in {time.time() - v_start:.2f}s")
+
+        sr_start = time.time()
         # --- Support Resistance Calculation ---
         support_resistance_data = {}
         try:
@@ -1397,8 +1693,10 @@ def get_stock_data(ticker: str):
             support_resistance_data = {"levels": levels}
         except Exception as e:
             print(f"Error calculating support levels: {e}")
+        print(f"DEBUG: Support Resistance calculated in {time.time() - sr_start:.2f}s")
 
-        return {
+        print(f"--- TOTAL TIME FOR {ticker}: {time.time() - start_time:.2f}s ---")
+        final_response = {
             "overview": {**overview, "ceo": ceo},
             "growth": {
                 "revenueGrowth": revenue_growth,
@@ -1439,14 +1737,7 @@ def get_stock_data(ticker: str):
                 "type": moat_type,
                 "details": "High ROE and Margins indicate potential moat"
             },
-            "valuation": calculate_intrinsic_value(
-                ticker, info, financials, balance_sheet, cashflow, 
-                revenue_series, net_income_series, op_cash_flow_series, 
-                growth_estimates_data, beta=info.get("beta"),
-                raw_growth_estimates_data=raw_growth_estimates_data,
-                revenue_estimates_data=revenue_estimates_data,
-                history=history
-            ),
+            "valuation": valuation_data,
             "financials": {
                 "income_statement": financials_data,
                 "balance_sheet": balance_sheet_data,
@@ -1464,7 +1755,14 @@ def get_stock_data(ticker: str):
             },
             "raw_growth_estimates": raw_growth_estimates_data
         }
+        
+        # Log summary of the response for the user
+        print(f"--- [API] Returning data for {ticker} ---")
+        print(f"Payload Size: {len(str(final_response))} characters")
+        return final_response
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error fetching data for {ticker}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1477,10 +1775,318 @@ async def get_stock_history(ticker: str, period: str = "20y"):
         if history.empty:
             return []
         
+        # Format: [{date, close}, ...]
         history_data = [{"date": date.strftime("%Y-%m-%d"), "close": close} for date, close in zip(history.index, history["Close"])]
         return history_data
     except Exception as e:
+        print(f"Error fetching history: {e}")
+        return []
+
+@app.get("/api/currency-rate")
+async def get_currency_rate_endpoint(target: str = "SGD"):
+    """
+    Returns the exchange rate from USD to {target}.
+    """
+    try:
+        rate = get_forex_rate(target.upper(), "USD")
+        return {"rate": rate}
+    except Exception as e:
+        print(f"Error in currency endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+class PortfolioItem(BaseModel):
+    ticker: str
+    shares: float
+    totalCost: float
+    date: str = Field(alias="purchaseDate")
+    class Config:
+        populate_by_name = True
+        extra = "ignore"
+
+@app.post("/api/portfolio/twr")
+async def get_portfolio_twr(items: List[PortfolioItem]):
+    print(f"--- [API] Calculating Portfolio TWR for {len(items)} items ---")
+    return await calculate_portfolio_twr(items)
+
+async def calculate_portfolio_twr(items: List[PortfolioItem]):
+    """
+    Calculates Time Weighted Returns (TWR) for the portfolio and individual stocks
+    using the GIPS standard with Start-of-Day (SOD) flows.
+    
+    Methodology:
+    1. Flows (Buys/Deposits) are assumed to happen at the START of the day.
+    2. Denominator (Basis) for the day = Value_Prev_Close + Inflow_Cost.
+    3. Numerator (End Value) = (Old_Shares + New_Shares) * Today_Close_Price.
+    4. Daily Return = End_Value / Basis - 1.
+    
+    This ensures that the price movement of the new shares on the day of purchase 
+    is CAPTURED in that day's return.
+    """
+    try:
+        if not items:
+            return {"total_twr": 0, "tickers": {}}
+
+        unique_tickers = set(item.ticker for item in items)
+        
+        # 1. Standardize Flows
+        # Map: Date -> List of {ticker, shares, cost}
+        flows_by_date = {}
+        processed_tickers = set()
+        
+        for item in items:
+            processed_tickers.add(item.ticker)
+            try:
+                # Normalize to midnight date
+                d = pd.Timestamp(datetime.strptime(item.date, "%Y-%m-%d").date())
+                if d not in flows_by_date:
+                    flows_by_date[d] = []
+                flows_by_date[d].append({
+                    'ticker': item.ticker,
+                    'shares': item.shares,
+                    'cost': item.totalCost
+                })
+            except Exception as e:
+                print(f"WARN: Invalid date for item {item.ticker}: {e}")
+                continue
+
+        if not flows_by_date:
+             return {"total_twr": 0, "tickers": {}}
+             
+        # Determine global time range
+        min_date = min(flows_by_date.keys())
+        end_date = pd.Timestamp.now().normalize()
+        all_dates = pd.date_range(start=min_date, end=end_date, freq='D')
+        
+        # 2. Fetch Adjusted History (Total Return)
+        # Fetch 7 days prior to capture Friday close for weekend/holiday purchases
+        fetch_start = min_date - pd.Timedelta(days=7)
+        print(f"DEBUG: Fetching history from {fetch_start.strftime('%Y-%m-%d')}")
+        history_map = {}
+        ticker_currencies = {}
+        
+        for ticker in processed_tickers:
+            try:
+                # Reuse ticker object
+                obj = yf.Ticker(ticker)
+                
+                # auto_adjust=True for Dividends -> Total Return Price
+                h = obj.history(start=fetch_start.strftime("%Y-%m-%d"), auto_adjust=True)
+                
+                # Check Currency
+                try:
+                    curr = obj.fast_info['currency']
+                    ticker_currencies[ticker] = curr
+                except:
+                    ticker_currencies[ticker] = 'USD' # Default
+                
+                # Ensure index is normalized to midnight and remove timezone for easy lookup
+                if h.index.tz is not None:
+                    h.index = h.index.tz_localize(None)
+                h.index = h.index.normalize()
+                
+                # print(f"DEBUG: {ticker} history start: {h.index[0] if not h.empty else 'EMPTY'}")
+                history_map[ticker] = h['Close']
+            except Exception as e:
+                 print(f"WARN: Failed history for {ticker}: {e}")
+
+        # 2a. Normalize to USD (Fetch FX)
+        unique_currencies = set(c for c in ticker_currencies.values() if c and c.upper() != 'USD')
+        fx_map = {}
+        
+        if unique_currencies:
+            print(f"DEBUG: Need FX for: {unique_currencies}")
+            # Map currency to pair, e.g. SGD -> SGD=X
+            # Assumes Quote is Currency per 1 USD (e.g. SGD=1.34)
+            fx_tickers = [f"{c}=X" for c in unique_currencies] 
+            
+            try:
+                 # Fetch batch FX
+                 print(f"DEBUG: Fetching FX: {fx_tickers}")
+                 fx_data_all = yf.download(fx_tickers, start=fetch_start.strftime("%Y-%m-%d"), progress=False)
+                 
+                 # Handle structure variations (MultiIndex vs Single Level)
+                 fx_closes = None
+                 if 'Close' in fx_data_all:
+                     fx_closes = fx_data_all['Close']
+                 else:
+                     # Fallback if structure is different
+                     fx_closes = fx_data_all
+                 
+                 # Ensure proper DateTime index
+                 if fx_closes.index.tz is not None:
+                     fx_closes.index = fx_closes.index.tz_localize(None)
+                 fx_closes.index = fx_closes.index.normalize()
+                 
+                 # Map back to Currency Code
+                 for c in unique_currencies:
+                      symbol = f"{c}=X"
+                      series = None
+                      
+                      # Check if result is Series (single ticker) or DataFrame (multiple)
+                      if isinstance(fx_closes, pd.Series):
+                          # Check if the single ticker matches (unlikely name mismatch but safe check)
+                          # Actually yf.download list usually returns DF unless 1 item not list
+                          series = fx_closes
+                      elif isinstance(fx_closes, pd.DataFrame):
+                          if symbol in fx_closes.columns:
+                              series = fx_closes[symbol]
+                          elif len(unique_currencies) == 1 and len(fx_closes.columns) == 1:
+                              # Case where column might not be named symbol exactly if 1 requested
+                              series = fx_closes.iloc[:, 0]
+                      
+                      if series is not None:
+                           fx_map[c] = series
+            except Exception as e:
+                print(f"WARN: FX Fetch failed: {e}")
+
+        # Convert History to USD
+        for ticker, series in history_map.items():
+            curr = ticker_currencies.get(ticker, 'USD')
+            if curr and curr.upper() != 'USD' and curr in fx_map:
+                try:
+                    rate = fx_map[curr]
+                    # Align rate to the stock series dates
+                    # We reindex rate to match stock series, ffill to handle gaps (holidays)
+                    aligned_rate = rate.reindex(series.index, method='ffill').fillna(method='bfill')
+                    
+                    # Log check
+                    # print(f"DEBUG: Converting {ticker}. Price: {series.iloc[-1]:.2f}, Rate: {aligned_rate.iloc[-1]:.4f}")
+                    
+                    # Convert: Price_USD = Price_Local / Rate
+                    # Example: Price 134 SGD, Rate 1.34. Price USD = 100. Correct.
+                    history_map[ticker] = series / aligned_rate
+                except Exception as e:
+                    print(f"WARN: Failed to convert {ticker} to USD: {e}")
+
+        # 3. Calculate Portfolio TWR
+        # State
+        current_shares = {t: 0.0 for t in processed_tickers}
+        portfolio_twr = 1.0
+        v_prev_close = 0.0 # Portfolio Value at close of yesterday
+        
+        last_known_prices = {t: 0.0 for t in processed_tickers}
+
+        # We also want to calculate Individual TWRs in the same loop or separate?
+        # Let's do separate tracking for individual TWRs to keep logic clean.
+        ticker_states = {t: {'shares': 0.0, 'twr': 1.0, 'v_prev': 0.0} for t in processed_tickers}
+        
+        chart_data = [] # To store daily performance
+
+        for date in all_dates:
+            # Skip weekends if no price data? 
+            # Actually, we should check if we have ANY price data for this date.
+            # If it's a weekend, usually no price updates, returns are 0.
+            
+            # --- START OF DAY ---
+            # Apply Flows First (SOD Assumption)
+            todays_total_inflow = 0.0
+            todays_ticker_inflows = {t: 0.0 for t in processed_tickers}
+            
+            if date in flows_by_date:
+                for flow in flows_by_date[date]:
+                    t = flow['ticker']
+                    # Update Shares
+                    current_shares[t] += flow['shares']
+                    ticker_states[t]['shares'] += flow['shares']
+                    
+                    # Track Cost Inflow for Basis
+                    todays_total_inflow += flow['cost']
+                    todays_ticker_inflows[t] += flow['cost']
+                    
+                    # Initialize last_known_price if not set (fallback to cost basis)
+                    if last_known_prices[t] == 0 and flow['shares'] > 0:
+                        last_known_prices[t] = flow['cost'] / flow['shares']
+            
+            # --- END OF DAY ---
+            # Calculate Value of Holdings at TODAY'S Close
+            v_end_today = 0.0
+            v_end_tickers = {t: 0.0 for t in processed_tickers}
+            
+            for t, qty in current_shares.items():
+                if qty != 0:
+                    # Get Price
+                    price = 0.0
+                    
+                    # Try lookup
+                    if t in history_map and not history_map[t].empty:
+                        if date in history_map[t].index:
+                            price = history_map[t].loc[date]
+                            last_known_prices[t] = price
+                        elif last_known_prices[t] > 0:
+                            # Forward fill / Use last known
+                            price = last_known_prices[t]
+                        else:
+                            # Try to find previous valid price in history (if any before today)
+                            try:
+                                # This is fallback if we missed setting last_known_prices
+                                idx = history_map[t].index.get_indexer([date], method='pad')[0]
+                                if idx != -1:
+                                    price = history_map[t].iloc[idx]
+                                    last_known_prices[t] = price
+                            except:
+                                pass
+                    
+                    # Last resort: use last_known_price even if not in history map (from cost basis)
+                    if price == 0 and last_known_prices[t] > 0:
+                        price = last_known_prices[t]
+                    
+                    val = qty * price
+                    v_end_today += val
+                    v_end_tickers[t] = val
+
+            # --- CALCULATE RETURN ---
+            # Portfolio Level
+            # Basis = Yesterday's Close Value + Today's Inflow Check
+            basis = v_prev_close + todays_total_inflow
+            
+            if basis > 0.001: # Avoid div/0
+                # Return = V_end / Basis - 1
+                r = (v_end_today / basis) - 1
+                portfolio_twr *= (1 + r)
+            
+            # Record Daily Cummulative TWR
+            chart_data.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "value": (portfolio_twr - 1) * 100
+            })
+
+            # Update Prev for next day
+            v_prev_close = v_end_today
+            
+            # Ticker Level Loops
+            for t in processed_tickers:
+                state = ticker_states[t]
+                t_basis = state['v_prev'] + todays_ticker_inflows[t]
+                t_end = v_end_tickers[t]
+                
+                if t_basis > 0.001:
+                    tr = (t_end / t_basis) - 1
+                    state['twr'] *= (1 + tr)
+                
+                state['v_prev'] = t_end
+
+        # Format Results
+        result_ticker_twrs = {}
+        for t, state in ticker_states.items():
+            result_ticker_twrs[t] = (state['twr'] - 1) * 100
+            
+        final_total_twr = (portfolio_twr - 1) * 100
+        print(f"DEBUG: Final GIPS TWR: {final_total_twr:.2f}%")
+
+        return {
+            "total_twr": final_total_twr,
+            "tickers": result_ticker_twrs,
+            "chart_data": chart_data
+        }
+
+    except Exception as e:
+        print(f"Error checking implementation: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"total_twr": 0, "tickers": {}}
 
 import math
 
@@ -1574,6 +2180,7 @@ async def get_chart(ticker: str, timeframe: str):
 
 @app.get("/api/stock/{ticker}")
 async def read_stock(ticker: str):
+    print(f"\n--- [API] Received request for {ticker} ---")
     data = get_stock_data(ticker)
     return clean_nan(data)
 
@@ -1622,6 +2229,7 @@ async def evaluate_moat(ticker: str):
     models_to_try = ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
     last_exception = None
 
+    # ... existing evaluate_moat logic ...
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         
@@ -1651,6 +2259,203 @@ async def evaluate_moat(ticker: str):
 
     # If we get here, all models failed
     raise HTTPException(status_code=500, detail=f"All Gemini models failed. Last error: {str(last_exception)}")
+
+class PortfolioAnalysisRequest(BaseModel):
+    items: List[PortfolioItem]
+    metrics: dict # To pass pre-calculated metrics like sector allocation, beta, etc.
+
+@app.post("/api/portfolio/analyze")
+async def analyze_portfolio(request: PortfolioAnalysisRequest):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not found in environment variables.")
+
+# 1. Calculate Sector Allocation & Identify Missing Sectors
+    # We assume 'request.items' contains the current stock data
+    current_allocations = {}
+    total_value = 0
+
+# Calculate total portfolio value first
+    for item in request.items:
+        # In a real app, you'd fetch the latest price; here we use cost as a proxy
+        total_value += item.totalCost        
+
+# Map your stocks to sectors
+    user_sector_totals = {}
+    for item in request.items:
+        try:
+            # We fetch info to get the sector for each ticker
+            stock_info = yf.Ticker(item.ticker).info
+            sector = stock_info.get('sector', 'Other')
+            user_sector_totals[sector] = user_sector_totals.get(sector, 0) + item.totalCost
+        except:
+            continue
+
+# Convert to percentages for the prompt
+    sector_allocation_str = ", ".join([f"{s}: {(v/total_value)*100:.1f}%" for s, v in user_sector_totals.items()])
+    
+    # Find Missing Sectors
+    # Note: Sector names from yfinance might vary slightly from GICS, but this is a solid proxy
+    user_sector_names = set(user_sector_totals.keys())
+    missing = [s for s in MAJOR_SECTORS if s not in user_sector_names]
+    underweight_sectors = ", ".join(missing[:4]) # Suggest up to 4 missing sectors
+
+# # Construct a more detailed holdings context
+#     detailed_holdings = []
+#     for item in request.items:
+#         # You can pass extra info from the frontend to this endpoint
+#         detailed_holdings.append(
+#             f"- {item.ticker}: {item.shares} shares (Cost: {item.totalCost}). "
+#         )
+    
+# 2. Construct the Prompt
+    
+    # We need to fetch detailed metrics for each item to pass to the prompt
+    list_of_valuation_results = []
+    
+    for item in request.items:
+        try:
+            # get_stock_data returns a comprehensive dict with 'valuation', 'overview', etc.
+            data = get_stock_data(item.ticker)
+            val_data = data.get("valuation", {})
+            raw_assumptions = val_data.get("raw_assumptions", {})
+            overview = data.get("overview", {})
+            
+            # Extract specific metrics requested
+            peg = overview.get("pegRatio")
+            if peg is None: peg = "N/A"
+            else: peg = f"{peg:.2f}"
+            
+            beta = overview.get("beta")
+            if beta is None: beta = "N/A"
+            else: beta = f"{beta:.2f}"
+            
+            growth_5y = val_data.get("growthRateNext5Y", 0)
+            if growth_5y: growth_5y_str = f"{growth_5y*100:.1f}%"
+            else: growth_5y_str = "N/A"
+            
+            # Calculate Cash-to-Debt
+            # raw_assumptions has numbers (not strings) if clean_numeric worked
+            cash = raw_assumptions.get("cash_and_equivalents", 0)
+            debt = raw_assumptions.get("total_debt", 0)
+            cash_to_debt = "N/A"
+            
+            if isinstance(cash, (int, float)) and isinstance(debt, (int, float)):
+                if debt > 0:
+                    cash_to_debt = f"{cash / debt:.2f}"
+                elif cash > 0:
+                    cash_to_debt = "High (Net Cash)"
+            
+            list_of_valuation_results.append({
+                "intrinsicValue": val_data.get("intrinsicValue", 0),
+                "currentPrice": val_data.get("currentPrice", 0),
+                "status": val_data.get("status", "Unknown"),
+                "peg": peg,
+                "beta": beta,
+                "growth_5y": growth_5y_str,
+                "cash_to_debt": cash_to_debt
+            })
+        except Exception as e:
+            print(f"Error fetching valuation for {item.ticker} for analysis: {e}")
+            list_of_valuation_results.append({
+                "intrinsicValue": 0,
+                "currentPrice": 0,
+                "status": "Error",
+                "peg": "N/A", "beta": "N/A", "growth_5y": "N/A", "cash_to_debt": "N/A"
+            })
+
+    holdings_str = "\n".join([
+        f"- {item.ticker}: {item.shares} shares. "
+        f"(Intrinsic Value: ${val_data['intrinsicValue']:.2f}, "
+        f"Current Price: ${val_data['currentPrice']:.2f}, "
+        f"Status: {val_data['status']}, "
+        f"PEG: {val_data['peg']}, "
+        f"Beta: {val_data['beta']}, "
+        f"5Y Growth Est: {val_data['growth_5y']}, "
+        f"Cash/Debt: {val_data['cash_to_debt']})" 
+        for item, val_data in zip(request.items, list_of_valuation_results)
+    ])
+    performance = request.metrics.get('totalTwr', 'N/A')
+    # Enrichment from your metrics dictionary
+    sector_context = request.metrics.get('sectorAllocation', 'N/A')
+    performance = request.metrics.get('totalTwr', 'N/A')
+    missing_sectors = request.metrics.get('underweightSectors', 'Defensive or Emerging Markets')
+
+    prompt = f"""
+    You are a Senior Quantitative Portfolio Manager and Fiduciary Strategist. 
+    
+    MANDATE: 
+    Optimize this portfolio for a 12-15% annual return (or higher) while minimizing downside volatility and concentration risk. 
+    
+    PORTFOLIO DATA CORE (Inward):
+    {holdings_str}
+    - Weighted Portfolio Beta: {request.metrics.get('weightedBeta', 'N/A')}
+    - Aggregate 5Y Growth Est: {request.metrics.get('weightedGrowth', 'N/A')}%
+    - Portfolio TWR (Performance to Date): {performance}%
+    - Sector Allocation: {sector_allocation_str}
+    - Portfolio HHI (Concentration Index): {request.metrics.get('portfolioHHI', 'N/A')}
+    
+    OUTWARD LOOK (The Opportunity Set):
+    - Benchmark: S&P 500 (Beta 1.0)
+    - Underweight Sectors: {underweight_sectors}
+    - Risk-Free Rate Proxy (10Y Treasury): ~4.2%
+    - Target Return: 12-15% CAGR
+
+    ANALYSIS REQUIREMENTS (Clinical & Data-Driven):
+    1. **Allocation & Concentration Audit**: 
+       - Evaluate the Sector Allocation and the Portfolio HHI. Is the portfolio "top-heavy" or over-concentrated in a few names or sectors? 
+       - If HHI is <1500, validate the diversification. If HHI is > 1500 (moderate) or > 2500 (high), flag concentration risk and suggest specific rebalancing to lower concentration risk.
+       - Assess if the weighted growth target is being skewed by 1-2 volatile tickers.
+    
+    2. **Growth-to-Value Efficiency**: 
+       - Analyze the relationship between the Expected 5Y Growth and the average PEG Ratio of the holdings. 
+       - Are we paying too much for the 12-15% target? Identify any "Growth at any Price" (GAAP) risks where PEG > 2.0.
+
+    3. **Holdings Audit (Inward)**: 
+       - **STAR**: Best-in-class PEG ratio with strong Cash-to-Debt ratios and >15% growth.
+       - **LAGGARD**: High Beta (>1.2) or high Debt-to-Equity that threatens the "Low Risk" mandate.
+
+    4. **The "Outward" Strategy**: 
+       - Define the **Selection Basis** for new entries in {underweight_sectors} that offer high 5Y growth projections but lower the overall Portfolio Beta. 
+       - Specify exactly what criteria (e.g., "Positive FCF Yield," "ROIC > 15%," or "Low Debt-to-EBITDA" or "Strong Pricing Power" or "Wide Economic moat", or "Low Debt-to-EBITDA") the user should look for to hit 12-15% growth safely.
+       - Based on this criteria, list 5 illustrative "Strategic Peer Alternatives" (tickers) that fit this profile today.
+
+    5. **Actionable Rebalancing Roadmap**: 
+       - **Trim/Exit**: Clear recommendation for the laggard or overvalued assets.
+       - **Tactical Entry**: How to integrate the scouted tickers to fix sector gaps.
+       - **Optimization**: Provide 3 specific rebalancing moves (e.g., "Shift 5% from Sector A to Sector B") to push the portfolio toward the Efficient Frontier.
+   
+    FORMAT RULES:
+    - Use **bold headers** for the 5 sections above.
+    - Use bullet points for all details. 
+    - **NO concluding summary** or generic advice after section 5.
+    - Keep it under 350 words.
+    """
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
+    models_to_try = ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        try:
+            response = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+             
+            if "candidates" in result and result["candidates"]:
+                text = result["candidates"][0]["content"]["parts"][0]["text"]
+                return {"analysis": text}
+                
+        except Exception as e:
+            print(f"Gemini Analysis Error ({model}): {e}")
+            continue
+
+    raise HTTPException(status_code=500, detail="Failed to generate analysis.")
 
 if __name__ == "__main__":
     import uvicorn

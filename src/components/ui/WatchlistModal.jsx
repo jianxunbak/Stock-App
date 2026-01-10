@@ -5,7 +5,7 @@ import styles from './WatchlistModal.module.css';
 import { fetchStockData } from '../../services/api';
 import { useWatchlist } from '../../hooks/useWatchlist';
 
-const WatchlistModal = ({ isOpen, onClose }) => {
+const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$', currentRate = 1 }) => {
     const { watchlist, removeFromWatchlist, updateWatchlistItem, setFullWatchlist } = useWatchlist();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const navigate = useNavigate();
@@ -51,6 +51,7 @@ const WatchlistModal = ({ isOpen, onClose }) => {
                 try {
                     const data = await fetchStockData(item.ticker);
                     // Extract updated fields
+                    const name = data.overview?.name || item.name;
                     const currentPrice = data.overview?.price || item.price;
                     const currency = data.overview?.currency || item.currency || 'USD';
                     const intrinsicValue = data.valuation?.intrinsicValue || item.intrinsicValue;
@@ -68,6 +69,7 @@ const WatchlistModal = ({ isOpen, onClose }) => {
 
                     return {
                         ...item,
+                        name: name,
                         price: currentPrice,
                         currency: currency,
                         intrinsicValue: intrinsicValue,
@@ -123,6 +125,7 @@ const WatchlistModal = ({ isOpen, onClose }) => {
                             {/* Header Row */}
                             <div className={styles.headerRow}>
                                 <span>Ticker</span>
+                                <span>Name</span>
                                 <span>Health</span>
                                 <span>Ccy</span>
                                 <span>Price</span>
@@ -145,6 +148,16 @@ const WatchlistModal = ({ isOpen, onClose }) => {
                                         </span>
                                     </div>
 
+                                    <div className={styles.nameCol}>
+                                        <span
+                                            className={styles.nameLink}
+                                            onClick={() => handleNavigate(item.ticker)}
+                                            title={item.name}
+                                        >
+                                            {item.name || '-'}
+                                        </span>
+                                    </div>
+
                                     <div className={styles.scoreCol}>
                                         <div className={styles.scoreBadge} style={{
                                             backgroundColor: item.score >= 70 ? 'rgba(16, 185, 129, 0.2)' :
@@ -157,11 +170,11 @@ const WatchlistModal = ({ isOpen, onClose }) => {
                                     </div>
 
                                     <div className={styles.currencyCol}>
-                                        {item.currency || 'USD'}
+                                        {currency}
                                     </div>
 
                                     <div className={styles.priceCol}>
-                                        {item.price?.toFixed(2)}
+                                        {currencySymbol}{(item.price * currentRate)?.toFixed(2)}
                                     </div>
 
                                     <div className={styles.signalCol}>
@@ -174,11 +187,11 @@ const WatchlistModal = ({ isOpen, onClose }) => {
                                     </div>
 
                                     <div className={styles.valCol}>
-                                        {item.intrinsicValue ? item.intrinsicValue.toFixed(2) : 'N/A'}
+                                        {item.intrinsicValue ? `${currencySymbol}${(item.intrinsicValue * currentRate).toFixed(2)}` : 'N/A'}
                                     </div>
 
                                     <div className={styles.valCol}>
-                                        {item.supportLevel ? `${item.supportLevel.toFixed(2)}` : 'N/A'}
+                                        {item.supportLevel ? `${currencySymbol}${(item.supportLevel * currentRate).toFixed(2)}` : 'N/A'}
                                     </div>
 
                                     <div className={styles.notesCol}>

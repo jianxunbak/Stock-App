@@ -290,6 +290,27 @@
     color: #EF4444;
 }
 
+.etfNote {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.etfMessage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px dashed var(--border-color);
+}
+
 .criteriaList {
     display: flex;
     flex-direction: column;
@@ -355,6 +376,9 @@
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
     font-size: 0.75rem;
+    min-width: 140px;
+    text-align: center;
+    display: inline-block;
 }
 
 .pass {

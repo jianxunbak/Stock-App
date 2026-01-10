@@ -46,16 +46,16 @@ export const AuthProvider = ({ children }) => {
                 // 3. Clean the user's email
                 const userEmail = user.email ? user.email.toLowerCase() : "";
 
+                console.log("Auth: Checking security for user:", userEmail);
+                console.log("Auth: Allowed list:", allowedList);
+
                 // 4. The Decision Logic
                 if (allowedList.includes(userEmail)) {
-                    // SUCCESS: User is on the list
+                    console.log("Auth: Access granted for", userEmail);
                     setCurrentUser(user);
                 } else {
-                    // FAIL: User is NOT on the list
                     console.warn(`Unauthorized login attempt by: ${userEmail}`);
                     alert("Access Denied: You are not authorized to use this app.");
-
-                    // Force them to log out immediately
                     await signOut(auth);
                     setCurrentUser(null);
                 }

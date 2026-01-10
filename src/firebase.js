@@ -12,14 +12,18 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
+console.log("Firebase Project ID:", firebaseConfig.projectId);
+if (!firebaseConfig.apiKey) console.error("Firebase API Key is MISSING!");
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Initialize Firestore with settings to avoid CORS/Network issues
+// Customizing Firestore to use long polling to bypass some CORS/Access Control issues
+// If the "Access Control" error persists, it might be due to browser privacy settings.
+// export const db = getFirestore(app); 
+
+// Trying initializeFirestore one more time with a simpler config
 export const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-    }),
-    experimentalForceLongPolling: true, // Force long polling to bypass some proxy/CORS issues
+    experimentalForceLongPolling: true,
 });

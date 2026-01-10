@@ -58,3 +58,28 @@ export const getWatchlist = async (userId) => {
     }
     return [];
 };
+// --- Portfolio Operations ---
+
+export const savePortfolio = async (userId, portfolio) => {
+    if (!userId) return;
+    try {
+        const userRef = doc(db, "users", userId);
+        await setDoc(userRef, { portfolio }, { merge: true });
+    } catch (error) {
+        console.error("Error saving portfolio to Firestore:", error);
+    }
+};
+
+export const getPortfolio = async (userId) => {
+    if (!userId) return [];
+    try {
+        const userRef = doc(db, "users", userId);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+            return docSnap.data().portfolio || [];
+        }
+    } catch (error) {
+        console.error("Error fetching portfolio from Firestore:", error);
+    }
+    return [];
+};

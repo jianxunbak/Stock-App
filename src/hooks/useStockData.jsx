@@ -14,7 +14,7 @@ export const StockDataProvider = ({ children }) => {
         setError(null);
         try {
             const data = await fetchStockData(ticker);
-            // console.log("Fetched Stock Data:", data);
+            console.log("%c💎 Context: Final Stock Data to be used in UI:", "color: #ff00ff; font-weight: bold;", data);
             // Calculate Quant Moat Score (Mock logic for now)
             const moatScore = calculateQuantMoat(data);
             const enrichedData = { ...data, moat: { ...data.moat, score: moatScore } };

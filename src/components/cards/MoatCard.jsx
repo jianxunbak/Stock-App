@@ -13,7 +13,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 import { useAuth } from '../../context/AuthContext';
 
-const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
+const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange, currency = 'USD', currencySymbol = '$', currentRate = 1 }) => {
     const { stockData, loading } = useStockData();
     const { theme } = useTheme();
     const { currentUser } = useAuth();
@@ -375,213 +375,222 @@ const MoatCard = ({ onMoatStatusChange, onIsEvaluatingChange }) => {
     if (!stockData) return null;
 
     // Lazy load charts (Moved to top)
+    const isETF = stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF';
 
     return (
         <div ref={cardRef} className={styles.card}>
             {/* <LiquidGlassBackground /> */}
             <h3 className={styles.title}>Economic Moat</h3>
 
-            {/* Top Zone: Score (Zone 1) and Checklist (Zone 2) */}
-            <div className={styles.topZone}>
-                {/* Zone 1: Total Moat Score */}
-                <div className={styles.scoreSection}>
-                    <div className={styles.scoreCard}>
+            {isETF ? (
+                <div className={styles.etfMessage}>
+                    This is an ETF and Economic Moat is not applicable.
+                </div>
+            ) : (
+                <>
+                    {/* Top Zone: Score (Zone 1) and Checklist (Zone 2) */}
+                    <div className={styles.topZone}>
+                        {/* Zone 1: Total Moat Score */}
+                        <div className={styles.scoreSection}>
+                            <div className={styles.scoreCard}>
 
-                        {/* <Sparkles size={16} className={styles.aiIcon} /> */}
+                                {/* <Sparkles size={16} className={styles.aiIcon} /> */}
 
-                        {/* <p className={styles.scoreLabel}>Total Moat Score</p> */}
-                        {isEvaluating ? (
-                            <div className={styles.evaluatingText}>
-                                <Loader2 className={styles.spin} size={16} />
-                                <span>AI Analyzing Moat...</span>
-                            </div>
-                        ) : (
-                            <>
-                                {hasEvaluated && (
-                                    <div className={styles.score}>
-                                        <div className={`${styles.scoreValue} ${moatStatus.color}`}>{totalScore} <span className={styles.scoreMax}>/ 5</span></div>
-                                        <p className={`${styles.scoreStatus} ${moatStatus.color}`}>{moatStatus.label}</p>
-
-                                        {/* User Note Area - Only visible if evaluated by user or if user wants to add notes */}
-                                        {evaluator && evaluator !== 'Gemini AI' && (
-                                            <textarea
-                                                className={styles.userNoteInput}
-                                                placeholder="Add your notes here..."
-                                                value={userNote}
-                                                onChange={handleNoteChange}
-                                                onBlur={handleNoteBlur}
-                                                rows={3}
-                                            />
-                                        )}
-
-                                        {evaluator && (
-                                            <p className={styles.evaluatorNote}>Evaluated by {evaluator}</p>
-                                        )}
+                                {/* <p className={styles.scoreLabel}>Total Moat Score</p> */}
+                                {isEvaluating ? (
+                                    <div className={styles.evaluatingText}>
+                                        <Loader2 className={styles.spin} size={16} />
+                                        <span>AI Analyzing Moat...</span>
                                     </div>
+                                ) : (
+                                    <>
+                                        {hasEvaluated && (
+                                            <div className={styles.score}>
+                                                <div className={`${styles.scoreValue} ${moatStatus.color}`}>{totalScore} <span className={styles.scoreMax}>/ 5</span></div>
+                                                <p className={`${styles.scoreStatus} ${moatStatus.color}`}>{moatStatus.label}</p>
+
+                                                {/* User Note Area - Only visible if evaluated by user or if user wants to add notes */}
+                                                {evaluator && evaluator !== 'Gemini AI' && (
+                                                    <textarea
+                                                        className={styles.userNoteInput}
+                                                        placeholder="Add your notes here..."
+                                                        value={userNote}
+                                                        onChange={handleNoteChange}
+                                                        onBlur={handleNoteBlur}
+                                                        rows={3}
+                                                    />
+                                                )}
+
+                                                {evaluator && (
+                                                    <p className={styles.evaluatorNote}>Evaluated by {evaluator}</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {aiDescription && <p className={styles.description}>{aiDescription}</p>}
+
+                                        <button onClick={handleAiEvaluation} className={styles.aiButton}>
+                                            <Sparkles size={14} />
+                                            {aiDescription ? "Re-evaluate with AI" : "Ask AI to Evaluate"}
+                                        </button>
+                                    </>
                                 )}
-
-                                {aiDescription && <p className={styles.description}>{aiDescription}</p>}
-
-                                <button onClick={handleAiEvaluation} className={styles.aiButton}>
-                                    <Sparkles size={14} />
-                                    {aiDescription ? "Re-evaluate with AI" : "Ask AI to Evaluate"}
-                                </button>
-                            </>
-                        )}
-                    </div>
-
-                    {/* <p className={styles.gradingNote}>Graded by Gemini AI.</p> */}
-                </div>
-
-                {/* Zone 2: Interactive Checklist */}
-                <div className={styles.checklistSection}>
-                    <div className={styles.checklistContainer}>
-                        {categories.map(cat => (
-                            <div key={cat.id} className={styles.checklistItem}>
-                                <label className={styles.checklistLabel}>{cat.label}</label>
-                                <div className={styles.buttonGroup}>
-                                    <button
-                                        onClick={() => handleScoreChange(cat.id, 1)}
-                                        className={`${styles.button} ${scores[cat.id] === 1 ? styles.buttonHighActive : styles.buttonHighInactive}`}
-                                    >
-                                        High
-                                    </button>
-                                    <button
-                                        onClick={() => handleScoreChange(cat.id, 0.5)}
-                                        className={`${styles.button} ${scores[cat.id] === 0.5 ? styles.buttonMedActive : styles.buttonMedInactive}`}
-                                    >
-                                        Low
-                                    </button>
-                                    <button
-                                        onClick={() => handleScoreChange(cat.id, 0)}
-                                        className={`${styles.button} ${scores[cat.id] === 0 ? styles.buttonLowActive : styles.buttonLowInactive}`}
-                                    >
-                                        None
-                                    </button>
-                                </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
 
-
-            {/* Zone 3: Chart (Bottom) */}
-            <div className={styles.bottomZone}>
-                <div className={styles.chartContainer}>
-                    <h4 className={styles.chartTitle}>20-Year Growth Performance (%)</h4>
-                    <p className={styles.chartNote}>(in hundreds)</p>
-
-                    <div className={styles.comparisonControls}>
-                        <input
-                            type="text"
-                            value={comparisonTicker}
-                            onChange={(e) => setComparisonTicker(e.target.value.toUpperCase())}
-                            placeholder="Add symbol (e.g. MSFT)"
-                            className={styles.tickerInput}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleAddComparison();
-                                }
-                            }}
-                        />
-                        <button onClick={handleAddComparison} className={styles.addButton}>Add</button>
-                    </div>
-
-                    {comparisonStocks.length > 0 && (
-                        <div className={styles.activeComparisons}>
-                            {comparisonStocks.map(stock => (
-                                <span key={stock.ticker} className={styles.comparisonTag} style={{ borderColor: stock.color, color: stock.color }}>
-                                    {stock.ticker}
-                                    <button onClick={() => removeComparison(stock.ticker)} className={styles.removeButton}>×</button>
-                                </span>
-                            ))}
+                            {/* <p className={styles.gradingNote}>Graded by Gemini AI.</p> */}
                         </div>
-                    )}
 
-                    <div className={styles.chartWrapper}>
-                        <ResponsiveContainer width="100%" height={chartHeight}>
-                            <AreaChart data={mergedChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorPriceMoat" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                                <XAxis
-                                    dataKey="date"
-                                    stroke={chartColors.text}
-                                    tick={{ fontSize: 10, fill: chartColors.text }}
-                                    tickFormatter={(val) => val.substring(0, 4)} // Show Year only
-                                    minTickGap={50}
-                                />
-                                <YAxis
-                                    stroke={chartColors.text}
-                                    tick={{ fontSize: 10, fill: chartColors.text, angle: -60 }}
-                                    // tickFormatter={(val) => `${val.toFixed(0)}%`}
-                                    width={50}
-                                    tickFormatter={(val) => {
-                                        // Ensure val is treated as a percentage (0-100) and display divided by 100
-                                        return `${(val / 100).toFixed(1)}%`;
-                                    }}
-
-                                />
-                                <Tooltip
-                                    wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
-                                    contentStyle={{
-                                        // 1. BACKGROUND
-                                        backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.7)' : 'rgba(255, 255, 255, 0.7)',
-
-                                        // 2. BORDER RADIUS
-                                        borderRadius: '15px',
-
-                                        // 3. BACKDROP FILTER
-                                        backdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
-                                        WebkitBackdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
-
-                                        // 4. BORDERS
-                                        borderTop: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
-                                        borderLeft: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
-                                        borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
-                                        borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
-
-                                        // 5. BOX SHADOW
-                                        boxShadow: theme === 'dark'
-                                            ? '0 10px 20px rgba(0, 0, 0, 0.5), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)'
-                                            : '10px 10px 20px rgba(0, 0, 0, 0.2), -3px -3px 10px rgba(0, 0, 0, 0.1), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)',
-
-                                        // 6. FONT/TEXT STYLES
-                                        color: chartColors.tooltipColor,
-                                        fontSize: '12px',
-                                        padding: '8px 10px'
-                                    }}
-                                    formatter={(value, name) => [`${Number(value).toFixed(2)}%`, name]}
-                                    itemStyle={{ margin: '0', padding: '0' }}
-                                    labelStyle={{
-                                        margin: '0 0 3px 0',
-                                        padding: '0',
-                                        fontWeight: 'bold'
-                                    }}
-                                />
-                                <Area type="monotone" dataKey="value" name={stockData.overview?.symbol || 'Stock'} stroke="#F59E0B" fillOpacity={1} fill="url(#colorPriceMoat)" />
-                                {comparisonStocks.map((stock, index) => (
-                                    <Area
-                                        key={stock.ticker}
-                                        type="monotone"
-                                        dataKey={`value_${stock.ticker}`}
-                                        name={stock.ticker}
-                                        stroke={stock.color}
-                                        fillOpacity={0}
-                                        strokeWidth={2}
-                                    />
+                        {/* Zone 2: Interactive Checklist */}
+                        <div className={styles.checklistSection}>
+                            <div className={styles.checklistContainer}>
+                                {categories.map(cat => (
+                                    <div key={cat.id} className={styles.checklistItem}>
+                                        <label className={styles.checklistLabel}>{cat.label}</label>
+                                        <div className={styles.buttonGroup}>
+                                            <button
+                                                onClick={() => handleScoreChange(cat.id, 1)}
+                                                className={`${styles.button} ${scores[cat.id] === 1 ? styles.buttonHighActive : styles.buttonHighInactive}`}
+                                            >
+                                                High
+                                            </button>
+                                            <button
+                                                onClick={() => handleScoreChange(cat.id, 0.5)}
+                                                className={`${styles.button} ${scores[cat.id] === 0.5 ? styles.buttonMedActive : styles.buttonMedInactive}`}
+                                            >
+                                                Low
+                                            </button>
+                                            <button
+                                                onClick={() => handleScoreChange(cat.id, 0)}
+                                                className={`${styles.button} ${scores[cat.id] === 0 ? styles.buttonLowActive : styles.buttonLowInactive}`}
+                                            >
+                                                None
+                                            </button>
+                                        </div>
+                                    </div>
                                 ))}
-                            </AreaChart>
-                        </ResponsiveContainer>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
+
+
+                    {/* Zone 3: Chart (Bottom) */}
+                    <div className={styles.bottomZone}>
+                        <div className={styles.chartContainer}>
+                            <h4 className={styles.chartTitle}>20-Year Growth Performance (%)</h4>
+                            <p className={styles.chartNote}>(in hundreds)</p>
+
+                            <div className={styles.comparisonControls}>
+                                <input
+                                    type="text"
+                                    value={comparisonTicker}
+                                    onChange={(e) => setComparisonTicker(e.target.value.toUpperCase())}
+                                    placeholder="Add symbol (e.g. MSFT)"
+                                    className={styles.tickerInput}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddComparison();
+                                        }
+                                    }}
+                                />
+                                <button onClick={handleAddComparison} className={styles.addButton}>Add</button>
+                            </div>
+
+                            {comparisonStocks.length > 0 && (
+                                <div className={styles.activeComparisons}>
+                                    {comparisonStocks.map(stock => (
+                                        <span key={stock.ticker} className={styles.comparisonTag} style={{ borderColor: stock.color, color: stock.color }}>
+                                            {stock.ticker}
+                                            <button onClick={() => removeComparison(stock.ticker)} className={styles.removeButton}>×</button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className={styles.chartWrapper}>
+                                <ResponsiveContainer width="100%" height={chartHeight}>
+                                    <AreaChart data={mergedChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="colorPriceMoat" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8} />
+                                                <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                                        <XAxis
+                                            dataKey="date"
+                                            stroke={chartColors.text}
+                                            tick={{ fontSize: 10, fill: chartColors.text }}
+                                            tickFormatter={(val) => val.substring(0, 4)} // Show Year only
+                                            minTickGap={50}
+                                        />
+                                        <YAxis
+                                            stroke={chartColors.text}
+                                            tick={{ fontSize: 10, fill: chartColors.text, angle: -60 }}
+                                            // tickFormatter={(val) => `${val.toFixed(0)}%`}
+                                            width={50}
+                                            tickFormatter={(val) => {
+                                                // Ensure val is treated as a percentage (0-100) and display divided by 100
+                                                return `${(val / 100).toFixed(1)}%`;
+                                            }}
+
+                                        />
+                                        <Tooltip
+                                            wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
+                                            contentStyle={{
+                                                // 1. BACKGROUND
+                                                backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+
+                                                // 2. BORDER RADIUS
+                                                borderRadius: '15px',
+
+                                                // 3. BACKDROP FILTER
+                                                backdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+                                                WebkitBackdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+
+                                                // 4. BORDERS
+                                                borderTop: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                                borderLeft: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                                borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+                                                borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+
+                                                // 5. BOX SHADOW
+                                                boxShadow: theme === 'dark'
+                                                    ? '0 10px 20px rgba(0, 0, 0, 0.5), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)'
+                                                    : '10px 10px 20px rgba(0, 0, 0, 0.2), -3px -3px 10px rgba(0, 0, 0, 0.1), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)',
+
+                                                // 6. FONT/TEXT STYLES
+                                                color: chartColors.tooltipColor,
+                                                fontSize: '12px',
+                                                padding: '8px 10px'
+                                            }}
+                                            formatter={(value, name) => [`${Number(value).toFixed(2)}%`, name]}
+                                            itemStyle={{ margin: '0', padding: '0' }}
+                                            labelStyle={{
+                                                margin: '0 0 3px 0',
+                                                padding: '0',
+                                                fontWeight: 'bold'
+                                            }}
+                                        />
+                                        <Area type="monotone" dataKey="value" name={stockData.overview?.symbol || 'Stock'} stroke="#F59E0B" fillOpacity={1} fill="url(#colorPriceMoat)" />
+                                        {comparisonStocks.map((stock, index) => (
+                                            <Area
+                                                key={stock.ticker}
+                                                type="monotone"
+                                                dataKey={`value_${stock.ticker}`}
+                                                name={stock.ticker}
+                                                stroke={stock.color}
+                                                fillOpacity={0}
+                                                strokeWidth={2}
+                                            />
+                                        ))}
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
 
             <Modal
                 isOpen={showErrorModal}

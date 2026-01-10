@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Star, Menu, X, LogOut } from 'lucide-react';
+import { Search } from 'lucide-react';
 import styles from './HeroPage.module.css';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../ui/Modal';
 import ThemeToggle from '../ui/ThemeToggle';
+import TopNav from '../ui/TopNav';
 import WatchlistModal from '../ui/WatchlistModal';
 import UserProfileModal from '../ui/UserProfileModal';
+import { fetchStockData } from '../../services/api';
 
 const HeroPage = () => {
     const [ticker, setTicker] = useState('');
@@ -15,24 +17,11 @@ const HeroPage = () => {
     const [showWatchlist, setShowWatchlist] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
     const navigate = useNavigate();
     const { currentUser, login, logout } = useAuth();
 
-    // Click outside to close menu
-    React.useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (isMenuOpen && !event.target.closest(`.${styles.mobileMenu}`) && !event.target.closest(`.${styles.menuButton}`)) {
-                setIsMenuOpen(false);
-            }
-        };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isMenuOpen]);
 
     const handleSearch = async (e) => {
         if (e) e.preventDefault();
@@ -43,21 +32,18 @@ const HeroPage = () => {
 
         // Validate ticker before navigating
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || '/api';
-            const response = await fetch(`${apiUrl}/stock/${trimmedTicker}`);
-            if (!response.ok) {
-                setIsValidating(false); // Stop loading on error
-                setErrorMessage('Invalid stock ticker. Please try again.');
-                setShowErrorModal(true);
-                return;
-            }
+            console.log(`HeroPage: Search triggered for ${trimmedTicker}...`);
+            console.log(`HeroPage: Validating ticker ${trimmedTicker}... using fetchStockData`);
+            const data = await fetchStockData(trimmedTicker);
+            console.log(`HeroPage: Ticker ${trimmedTicker} validated successfully.`);
+
             // If valid, navigate
             navigate(`/analysis?ticker=${trimmedTicker}`);
-            // Note: We don't set isValidating(false) here because we want the loading screen to persist until unmount/navigation completes
         } catch (error) {
-            console.error("Error validating ticker:", error);
-            setIsValidating(false); // Stop loading on error
-            setErrorMessage('Error validating ticker. Please check your connection.');
+            console.error("HeroPage Error validating ticker:", error);
+            setIsValidating(false);
+            const msg = error.message || 'Error validating ticker. Please check your connection.';
+            setErrorMessage(msg);
             setShowErrorModal(true);
         }
     };
@@ -85,104 +71,19 @@ const HeroPage = () => {
 
     return (
         <div className={styles.container}>
-            {/* Header */}
-            <header className={styles.header}>
-                <h1 className={styles.headerTitle}>Stock Analyser</h1>
-
-                {/* Desktop Actions */}
-                <div className={styles.desktopActions}>
-                    {currentUser ? (
-                        <>
-                            <button
-                                className={styles.watchlistButton}
-                                onClick={() => setShowWatchlist(true)}
-                            >
-                                <Star size={25} className={styles.starIcon} />
-                            </button>
-
-                            <button
-                                className={styles.userButton}
-                                onClick={() => setShowProfileModal(true)}
-                                title="User Profile"
-                            >
-                                {currentUser.photoURL ? (
-                                    <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} referrerPolicy="no-referrer" />
-                                ) : (
-                                    <div className={styles.userAvatarPlaceholder}>
-                                        {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
-                                    </div>
-                                )}
-                            </button>
-
-                            <button
-                                onClick={handleLogout}
-                                className={styles.logoutButton} // Reuse icon button style
-                                title="Log Out"
-                            >
-                                <LogOut size={25} className={styles.starIcon} />
-                            </button>
-                        </>
-                    ) : (
-                        <ThemeToggle />
-                    )}
+            <div className={styles.headerWrapper}>
+                <div className={styles.headerContent}>
+                    <TopNav
+                        showLogo={true}
+                        showSearch={false}
+                        showCurrency={false}
+                        setShowWatchlist={setShowWatchlist}
+                        setShowProfileModal={setShowProfileModal}
+                        handleLogout={handleLogout}
+                        showThemeToggle={!currentUser}
+                    />
                 </div>
-
-                {/* Mobile Menu Button */}
-                <button
-                    className={styles.menuButton}
-                    onClick={() => setIsMenuOpen(!isMenuOpen)}
-                >
-                    <Menu size={24} />
-                </button>
-
-                {/* Mobile Menu Dropdown */}
-                {isMenuOpen && (
-                    <div className={styles.mobileMenu}>
-                        {currentUser ? (
-                            <>
-                                <button
-                                    className={styles.watchlistButton}
-                                    onClick={() => {
-                                        setShowWatchlist(true);
-                                        setIsMenuOpen(false);
-                                    }}
-                                >
-                                    <Star size={20} className={styles.starIcon} />
-                                </button>
-
-                                <button
-                                    className={styles.userButton}
-                                    onClick={() => {
-                                        setShowProfileModal(true);
-                                        setIsMenuOpen(false);
-                                    }}
-                                >
-                                    {currentUser.photoURL ? (
-                                        <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} referrerPolicy="no-referrer" />
-                                    ) : (
-                                        <div className={styles.userAvatarPlaceholder}>
-                                            {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U'}
-                                        </div>
-                                    )}
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        handleLogout();
-                                        setIsMenuOpen(false);
-                                    }}
-                                    className={styles.watchlistButton}
-                                    title="Log Out"
-                                >
-                                    <LogOut size={20} className={styles.starIcon} />
-                                </button>
-                            </>
-                        ) : (
-                            <ThemeToggle />
-                        )}
-                    </div>
-                )}
-            </header>
+            </div>
 
             <div className={styles.content}>
                 <div className={styles.heroTitleContainer}>
@@ -216,17 +117,6 @@ const HeroPage = () => {
                         </p>
 
                         <div className={`${styles.searchWrapper} ${isSearchExpanded ? styles.searchExpanded : ''}`}>
-                            <Search
-                                className={styles.searchIcon}
-                                size={24}
-                                onClick={() => {
-                                    if (ticker.trim()) {
-                                        handleSearch();
-                                    } else {
-                                        setIsSearchExpanded(!isSearchExpanded);
-                                    }
-                                }}
-                            />
                             <input
                                 type="text"
                                 value={ticker}
@@ -244,6 +134,17 @@ const HeroPage = () => {
                                     }
                                 }}
                                 autoFocus={isSearchExpanded}
+                            />
+                            <Search
+                                className={styles.searchIcon}
+                                size={18}
+                                onClick={() => {
+                                    if (ticker.trim()) {
+                                        handleSearch();
+                                    } else {
+                                        setIsSearchExpanded(!isSearchExpanded);
+                                    }
+                                }}
                             />
                         </div>
                     </>

@@ -9,7 +9,7 @@ import { fetchChartData } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useWatchlist } from '../../hooks/useWatchlist';
 
-const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
+const OverviewCard = ({ moatStatusLabel, isMoatEvaluating, currency = 'USD', currencySymbol = '$', currentRate = 1 }) => {
     const { stockData, loading } = useStockData();
     const { theme } = useTheme();
     const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist();
@@ -264,6 +264,7 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
             }
 
             const newItem = {
+                name: stockData.overview.name, // Add name
                 ticker: symbol,
                 price: currentPrice,
                 score: percentageScore,
@@ -276,19 +277,19 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
         }
     };
 
-    // Downsample data for performance
+    // Apply conversion to chart data
     const processedChartData = useMemo(() => {
         if (!chartData || chartData.length === 0) return [];
 
-        // Backend already provides correct intervals:
-        // 1D: 1m
-        // 5Y: 1wk
-        // All: 1mo
-        // So we don't need to downsample these further unless performance is critical.
-        // User explicitly requested these frequencies.
-
-        return chartData;
-    }, [chartData, timeframe]);
+        return chartData.map(item => ({
+            ...item,
+            close: item.close * currentRate,
+            SMA_50: item.SMA_50 ? item.SMA_50 * currentRate : null,
+            SMA_100: item.SMA_100 ? item.SMA_100 * currentRate : null,
+            SMA_150: item.SMA_150 ? item.SMA_150 * currentRate : null,
+            SMA_200: item.SMA_200 ? item.SMA_200 * currentRate : null,
+        }));
+    }, [chartData, timeframe, currentRate]);
 
     // Generate Custom Ticks based on timeframe requirements
     const customTicks = useMemo(() => {
@@ -512,10 +513,10 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                             <p className={styles.ticker}>{overview.symbol} • {overview.exchange}</p>
                             <div className={styles.priceContainer}>
                                 <p className={styles.price}>
-                                    {overview.currency} ${overview.price?.toFixed(2)}
+                                    {currencySymbol}{(overview.price * currentRate)?.toFixed(2)}
                                 </p>
                                 <p className={`${styles.change} ${overview.change >= 0 ? styles.positive : styles.negative}`}>
-                                    {overview.change > 0 ? '+' : ''}{overview.change?.toFixed(2)} ({overview.changePercent ? (overview.changePercent * 100).toFixed(2) : '0.00'}%)
+                                    {overview.change > 0 ? '+' : ''}{(overview.change * currentRate)?.toFixed(2)} ({overview.changePercent ? (overview.changePercent * 100).toFixed(2) : '0.00'}%)
                                 </p>
                             </div>
 
@@ -531,7 +532,7 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                                 </div>
                                 <div className={styles.badge}>
                                     <span className={styles.badgeLabel}>Mkt Cap:</span>
-                                    <span className={styles.badgeValue}>${(overview.marketCap / 1e9).toFixed(2)}B</span>
+                                    <span className={styles.badgeValue}>{currencySymbol}{((overview.marketCap * currentRate) / 1e9).toFixed(2)}B</span>
                                 </div>
                                 <div className={styles.badge}>
                                     <span className={styles.badgeLabel}>Shares:</span>
@@ -550,24 +551,38 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                 <div className={styles.scoreSection}>
                     <div className={styles.scoreHeader}>
                         <h3 className={styles.scoreTitle}>Stock Health Score</h3>
-                        <div className={`${styles.totalScore} ${calculatedScoreColor}`}>
-                            {percentageScore}%
-                        </div>
-                    </div>
-                    <div className={styles.criteriaList}>
-                        {displayedCriteria.map((c, idx) => (
-                            <div key={idx} className={styles.criteriaItem}>
-                                <span className={styles.criteriaName}>{c.name}</span>
-                                <span className={`${styles.criteriaStatus} ${c.status === 'Pass' ? styles.pass : (c.status === 'Analyzing...' || c.status === 'Pending Evaluation') ? styles.pending : styles.fail}`}>
-                                    {c.status}
-                                </span>
+                        {(overview.quoteType !== 'ETF' && overview.industry !== 'ETF') ? (
+                            <div className={`${styles.totalScore} ${calculatedScoreColor}`}>
+                                {percentageScore}%
                             </div>
-                        ))}
+                        ) : (
+                            <div className={styles.etfNote}>
+                                N/A
+                            </div>
+                        )}
                     </div>
-                    <div className={styles.scrollIndicator}>
-                        <span className={styles.scrollText}>Scroll for details</span>
-                        <ChevronDown size={14} className={styles.scrollIcon} />
-                    </div>
+                    {(overview.quoteType !== 'ETF' && overview.industry !== 'ETF') ? (
+                        <>
+                            <div className={styles.criteriaList}>
+                                {displayedCriteria.map((c, idx) => (
+                                    <div key={idx} className={styles.criteriaItem}>
+                                        <span className={styles.criteriaName}>{c.name}</span>
+                                        <span className={`${styles.criteriaStatus} ${c.status === 'Pass' ? styles.pass : (c.status === 'Analyzing...' || c.status === 'Pending Evaluation') ? styles.pending : styles.fail}`}>
+                                            {c.status}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className={styles.scrollIndicator}>
+                                <span className={styles.scrollText}>Scroll for details</span>
+                                <ChevronDown size={14} className={styles.scrollIcon} />
+                            </div>
+                        </>
+                    ) : (
+                        <div className={styles.etfMessage}>
+                            This is an ETF and Stock Health Score is not applicable.
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -664,6 +679,7 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                                             domain={['auto', 'auto']}
                                             stroke={chartColors.text}
                                             tick={{ fontSize: 10, fill: chartColors.text }}
+                                            tickFormatter={(val) => `${currencySymbol}${val.toFixed(2)}`}
                                         />
                                         <Tooltip
                                             wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
@@ -694,7 +710,7 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating }) => {
                                                 fontSize: '12px',
                                                 padding: '8px 10px'
                                             }}
-                                            formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name]}
+                                            formatter={(value, name) => [`${currencySymbol}${Number(value).toFixed(2)}`, name]}
                                             itemStyle={{ margin: '0', padding: '0' }}
                                             labelStyle={{
                                                 margin: '0 0 3px 0',

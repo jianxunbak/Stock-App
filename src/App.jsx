@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { StockDataProvider } from './hooks/useStockData';
 import HeroPage from './components/pages/HeroPage';
 import DashboardPage from './components/pages/DashboardPage';
+import PortfolioPage from './components/pages/PortfolioPage';
 
 import ScrollToTop from './components/ui/ScrollToTop';
 
@@ -13,6 +14,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HeroPage />} />
           <Route path="/analysis" element={<DashboardPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
         </Routes>
         <ScrollToTop />
       </Router>
