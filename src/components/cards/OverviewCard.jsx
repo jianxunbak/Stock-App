@@ -95,13 +95,12 @@ const OverviewCard = ({ moatStatusLabel, isMoatEvaluating, currency = 'USD', cur
         if (cardRef.current) {
             observer.observe(cardRef.current);
         }
-
         return () => {
             if (cardRef.current) {
                 observer.unobserve(cardRef.current);
             }
         };
-    }, [loading]);
+    }, [loading, stockData]);
 
     // --- Score Logic ---
     // Recalculate criteria with overrides
