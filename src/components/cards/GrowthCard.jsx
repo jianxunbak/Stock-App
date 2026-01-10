@@ -57,7 +57,7 @@ const GrowthCard = ({ currency = 'USD', currencySymbol = '$', currentRate = 1 })
         }
 
         return () => observer.disconnect();
-    }, [loading]);
+    }, [loading, stockData]);
 
     if (loading) return <div className={styles.loading}></div>;
     if (!stockData) return null;

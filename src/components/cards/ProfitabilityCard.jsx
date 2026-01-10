@@ -32,7 +32,7 @@ const ProfitabilityCard = ({ currency = 'USD', currencySymbol = '$', currentRate
         }
 
         return () => observer.disconnect();
-    }, [loading]);
+    }, [loading, stockData]);
 
 
     React.useEffect(() => {
