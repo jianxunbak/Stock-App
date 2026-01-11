@@ -11,7 +11,7 @@
     border-radius: 24px;
     padding: 2rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    overflow: hidden;
+    overflow: visible;
     transition: background 0.3s ease;
 }
 

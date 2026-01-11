@@ -794,8 +794,22 @@ const PortfolioPage = () => {
         />
     );
 
+    // Mobile Title Logic
+    const [isMobileTitle, setIsMobileTitle] = useState(window.innerWidth < 600);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [menuOpenHoldings, setMenuOpenHoldings] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobileTitle(window.innerWidth < 600);
+            setIsMobile(window.innerWidth < 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     const logoContainerContent = (
-        <TopNavLogo customTitle="My Portfolio" />
+        <TopNavLogo customTitle={isMobileTitle ? null : "My Portfolio"} />
     );
 
     const backButtonContent = (<div onClick={() => navigate('/')} className={styles.backButton}><ArrowLeft size={20} /></div>);
@@ -1674,12 +1688,24 @@ const PortfolioPage = () => {
                 <FluidCard>
                     <div className={styles.portfolioCard}>
                         <div className={styles.tableCard} style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}>
-                            <div className={styles.tableHeader}>
+                            <div className={`${styles.tableHeader} ${menuOpenHoldings && isMobile ? styles.expandedMenu : ''}`}>
                                 <h2 className={styles.title}>Holdings</h2>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button className={styles.tableActionButton} onClick={() => setShowColumnModal(true)}><Eye size={18} /> </button>
-                                    <button className={styles.tableActionButton} onClick={() => setShowAddModal(true)}><Plus size={18} /> </button>
-                                </div>
+                                {isMobile ? (
+                                    menuOpenHoldings ? (
+                                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                            <button className={styles.tableActionButton} onClick={() => setShowColumnModal(true)} title="Show/Hide Columns"><Eye size={18} /> </button>
+                                            <button className={styles.tableActionButton} onClick={() => setShowAddModal(true)} title="Add Stock"><Plus size={18} /> </button>
+                                            <button className={styles.tableActionButton} onClick={() => setMenuOpenHoldings(false)} title="Close Menu"><X size={18} /> </button>
+                                        </div>
+                                    ) : (
+                                        <button className={styles.tableActionButton} onClick={() => setMenuOpenHoldings(true)} title="Actions Menu"><Menu size={18} /> </button>
+                                    )
+                                ) : (
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button className={styles.tableActionButton} onClick={() => setShowColumnModal(true)} title="Show/Hide Columns"><Eye size={18} /> </button>
+                                        <button className={styles.tableActionButton} onClick={() => setShowAddModal(true)} title="Add Stock"><Plus size={18} /> </button>
+                                    </div>
+                                )}
                             </div>
 
                             <div className={styles.tableScroll}>

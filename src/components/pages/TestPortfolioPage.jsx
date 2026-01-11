@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Edit2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Eye, Calendar, ChevronLeft, RefreshCw, Copy, Square, CheckSquare, CopyCheck, FileX } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Check, X, AlertTriangle, ChevronDown, ChevronRight, Eye, Calendar, ChevronLeft, RefreshCw, Copy, Square, CheckSquare, CopyCheck, FileX, Menu } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import styles from './TestPortfolioPage.module.css';
 import { useTestPortfolio } from '../../hooks/useTestPortfolio';
@@ -31,13 +32,35 @@ const SECTOR_LIMITS = {
     "Consumer Non-Cyclical": 20, "default": 15
 };
 
-const CustomSelect = ({ value, onChange, options, style, onDelete, onEdit, placeholder, triggerClassName }) => {
+const CustomSelect = ({ value, onChange, options, style, onDelete, onEdit, placeholder, triggerClassName, useModalOnDesktop = false, containerStyle }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef(null);
+    const menuRef = React.useRef(null);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+
+    React.useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+            setIsOpen(false);
+        };
+        const handleScroll = () => {
+            if (isOpen && !isMobile) setIsOpen(false);
+        };
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('scroll', handleScroll, true);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('scroll', handleScroll, true);
+        };
+    }, [isOpen]);
 
     React.useEffect(() => {
         const handleClickOutside = (event) => {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
+            const clickedOutsideContainer = containerRef.current && !containerRef.current.contains(event.target);
+            const clickedOutsideMenu = menuRef.current && !menuRef.current.contains(event.target);
+
+            if (clickedOutsideContainer && clickedOutsideMenu) {
                 setIsOpen(false);
             }
         };
@@ -45,61 +68,101 @@ const CustomSelect = ({ value, onChange, options, style, onDelete, onEdit, place
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const handleToggle = () => {
+        if (!isOpen && containerRef.current && !useModalOnDesktop) {
+            const rect = containerRef.current.getBoundingClientRect();
+            setCoords({
+                top: rect.bottom + window.scrollY,
+                left: rect.left + window.scrollX,
+                width: rect.width
+            });
+        }
+        setIsOpen(!isOpen);
+    };
+
+    const menuContent = (
+        <div
+            className={styles.customSelectMenu}
+            ref={menuRef}
+            style={!isMobile && !useModalOnDesktop ? {
+                position: 'absolute',
+                top: `${coords.top}px`,
+                left: `${coords.left}px`,
+                width: `${coords.width * 1.5}px`
+            } : {}}
+        >
+            <div className={styles.customSelectOptionsList}>
+                {options.map(opt => (
+                    <div
+                        key={opt.value || opt}
+                        className={`${styles.customSelectOption} ${value === (opt.value || opt) ? styles.selected : ''}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onChange(opt.value || opt);
+                            setIsOpen(false);
+                        }}
+                    >
+                        <div style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{opt.label || opt}</div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                            {onEdit && (
+                                <button
+                                    className={styles.deleteOptionBtn}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onEdit(opt.value || opt);
+                                        setIsOpen(false);
+                                    }}
+                                    title="Rename Portfolio"
+                                >
+                                    <Edit2 size={12} />
+                                </button>
+                            )}
+                            {onDelete && (opt.value || opt) !== value && (
+                                <button
+                                    className={styles.deleteOptionBtn}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDelete(opt.value || opt);
+                                    }}
+                                    title="Delete Portfolio"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
     return (
-        <div className={styles.customSelectContainer} ref={containerRef}>
-            <div className={`${styles.customSelectTrigger} ${triggerClassName || ''}`} onClick={() => setIsOpen(!isOpen)} style={style}>
+        <div className={styles.customSelectContainer} ref={containerRef} style={containerStyle}>
+            <div className={`${styles.customSelectTrigger} ${triggerClassName || ''}`} onClick={handleToggle} style={style}>
                 {options.find(opt => (opt.value || opt) === value)?.label || value || placeholder}
                 <ChevronDown size={16} color="var(--text-secondary)" />
             </div>
-            {isOpen && (
-                <div className={styles.customSelectMenu}>
-                    {options.map(opt => (
+            {isOpen && createPortal(
+                (isMobile || useModalOnDesktop) ? (
+                    <div
+                        className={styles.mobileModalOverlay}
+                        onClick={() => setIsOpen(false)}
+                    >
                         <div
-                            key={opt.value || opt}
-                            className={`${styles.customSelectOption} ${value === (opt.value || opt) ? styles.selected : ''}`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onChange(opt.value || opt);
-                                setIsOpen(false);
-                            }}
+                            className={styles.mobileModalContent}
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <div style={{ flex: 1 }}>{opt.label || opt}</div>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                                {onEdit && (
-                                    <button
-                                        className={styles.deleteOptionBtn}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onEdit(opt.value || opt);
-                                            setIsOpen(false);
-                                        }}
-                                        title="Rename Portfolio"
-                                    >
-                                        <Edit2 size={12} />
-                                    </button>
-                                )}
-                                {onDelete && (opt.value || opt) !== value && (
-                                    <button
-                                        className={styles.deleteOptionBtn}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onDelete(opt.value || opt);
-                                        }}
-                                        title="Delete Portfolio"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
-                                )}
-                            </div>
+                            {menuContent}
                         </div>
-                    ))}
-                </div>
+                    </div>
+                ) : menuContent,
+                document.body
             )}
         </div>
     );
 };
 
-const CustomDatePicker = ({ value, onChange, triggerClassName }) => {
+const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef(null);
     const [viewDate, setViewDate] = useState(new Date(value || new Date()));
@@ -174,24 +237,43 @@ const CustomDatePicker = ({ value, onChange, triggerClassName }) => {
         );
     }
 
+    const renderPopupContent = () => (
+        <div className={styles.datePickerPopup} onClick={(e) => e.stopPropagation()} style={!isMobile ? { position: 'relative', top: 'auto', left: 'auto', margin: 0 } : {}}>
+            <div className={styles.dateHeader}>
+                <button onClick={handlePrevMonth} className={styles.iconBtn}><ChevronLeft size={16} /></button>
+                <span>{monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}</span>
+                <button onClick={handleNextMonth} className={styles.iconBtn}><ChevronRight size={16} /></button>
+            </div>
+            <div className={styles.dateGrid}>
+                {dayNames.map(d => <div key={d} className={styles.dayName}>{d}</div>)}
+                {cells}
+            </div>
+        </div>
+    );
+
     return (
         <div className={styles.datePickerContainer} ref={containerRef}>
             <div className={triggerClassName || styles.customSelectTrigger} onClick={() => setIsOpen(!isOpen)}>
                 {value || 'Select Date'}
                 {!triggerClassName && <Calendar size={16} color="var(--text-secondary)" />}
             </div>
-            {isOpen && (
-                <div className={styles.datePickerPopup}>
-                    <div className={styles.dateHeader}>
-                        <button onClick={handlePrevMonth} className={styles.iconBtn}><ChevronLeft size={16} /></button>
-                        <span>{monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}</span>
-                        <button onClick={handleNextMonth} className={styles.iconBtn}><ChevronRight size={16} /></button>
-                    </div>
-                    <div className={styles.dateGrid}>
-                        {dayNames.map(d => <div key={d} className={styles.dayName}>{d}</div>)}
-                        {cells}
-                    </div>
-                </div>
+            {isOpen && createPortal(
+                <div
+                    className={styles.mobileModalOverlay}
+                    onClick={() => setIsOpen(false)}
+                >
+                    {isMobile ? (
+                        <div
+                            className={styles.mobileModalContent}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {renderPopupContent()}
+                        </div>
+                    ) : (
+                        renderPopupContent()
+                    )}
+                </div>,
+                document.body
             )}
         </div>
     );
@@ -201,8 +283,32 @@ const TestPortfolioPage = () => {
     const navigate = useNavigate();
     const { currentUser, logout } = useAuth();
     const { theme } = useTheme();
+    // Mobile Menu State
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [menuOpenHoldings, setMenuOpenHoldings] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    // Mobile Title State (Breaks at 600px to match TopNav CSS)
+    const [isMobileTitle, setIsMobileTitle] = useState(window.innerWidth < 600);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+            setIsMobileTitle(window.innerWidth < 600);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
     // Test Portfolio Management
-    const [currentPortfolioId, setCurrentPortfolioId] = useState(null);
+    const [currentPortfolioId, setCurrentPortfolioId] = useState(() => {
+        return localStorage.getItem('selectedTestPortfolioId') || null;
+    });
+
+    // Save selection to localStorage
+    useEffect(() => {
+        if (currentPortfolioId) {
+            localStorage.setItem('selectedTestPortfolioId', currentPortfolioId);
+        }
+    }, [currentPortfolioId]);
     const {
         portfolio,
         portfolioList,
@@ -221,10 +327,13 @@ const TestPortfolioPage = () => {
         clearPortfolio
     } = useTestPortfolio(currentPortfolioId);
 
-    // Initial load: pick the first portfolio if available
+    // Initial load: pick the first portfolio if nothing is selected or stored ID is invalid
     useEffect(() => {
-        if (!portfolioLoading && portfolioList.length > 0 && !portfolioList.find(p => p.id === currentPortfolioId)) {
-            setCurrentPortfolioId(portfolioList[0].id);
+        if (!portfolioLoading && portfolioList.length > 0) {
+            const isValidStored = portfolioList.some(p => p.id === currentPortfolioId);
+            if (!currentPortfolioId || !isValidStored) {
+                setCurrentPortfolioId(portfolioList[0].id);
+            }
         }
     }, [portfolioLoading, portfolioList, currentPortfolioId]);
 
@@ -927,7 +1036,7 @@ const TestPortfolioPage = () => {
     );
 
     const logoContainerContent = (
-        <TopNavLogo customTitle="My Portfolio" />
+        <TopNavLogo customTitle={isMobileTitle ? null : "My Portfolio"} />
     );
 
     const backButtonContent = (<div onClick={() => navigate('/')} className={styles.backButton}><ArrowLeft size={20} /></div>);
@@ -1015,6 +1124,7 @@ const TestPortfolioPage = () => {
                                     value={editValues.purchaseDate}
                                     onChange={(val) => setEditValues({ ...editValues, purchaseDate: val })}
                                     triggerClassName={styles.editableDateTrigger}
+                                    isMobile={isMobile}
                                 />
                             ) : (item.purchaseDate || 'N/A')}
                         </td>
@@ -1195,6 +1305,124 @@ const TestPortfolioPage = () => {
         return merged;
     }, [chartData, comparisonStocks]);
 
+
+    const actionButtons = (
+        isCreating || isRenaming ? (
+            <>
+                <button
+                    className={styles.roundActionBtn}
+                    onClick={() => {
+                        if (isRenaming) {
+                            handleRenamePortfolioSubmit(renameValue);
+                        } else if (newPortfolioName.trim()) {
+                            handleCreatePortfolio(newPortfolioName.trim());
+                            setIsCreating(false);
+                            setNewPortfolioName('');
+                        }
+                    }}
+                    title="Save"
+                >
+                    <Check size={20} />
+                </button>
+                <button
+                    className={styles.roundActionBtn}
+                    onClick={() => {
+                        setIsCreating(false);
+                        setIsRenaming(false);
+                    }}
+                    title="Cancel"
+                >
+                    <X size={20} />
+                </button>
+            </>
+        ) : (
+            <>
+                <button
+                    className={styles.roundActionBtn}
+                    onClick={() => {
+                        setNewPortfolioName('');
+                        setIsCreating(true);
+                    }}
+                    title="New Portfolio"
+                >
+                    <Plus size={20} />
+                </button>
+                {portfolioList.length > 0 && (
+                    <>
+                        <button
+                            className={styles.roundActionBtn}
+                            onClick={() => {
+                                const currentName = portfolioList.find(p => p.id === currentPortfolioId)?.name || '';
+                                setRenameValue(currentName);
+                                setRenamingId(currentPortfolioId);
+                                setIsRenaming(true);
+                            }}
+                            title="Rename Portfolio"
+                        >
+                            <Edit2 size={18} />
+                        </button>
+                        <button
+                            className={`${styles.roundActionBtn} ${styles.danger}`}
+                            onClick={() => handleDeletePortfolio(currentPortfolioId)}
+                            title="Delete Current Portfolio"
+                        >
+                            <Trash2 size={18} />
+                        </button>
+                    </>
+                )}
+            </>
+        )
+    );
+
+    const titleSection = (
+        portfolioList.length === 0 && !isCreating ? (
+            <h1 className={styles.portfolioMainTitleTrigger} style={{ cursor: 'default' }}>
+                Please add a new test Portfolio
+            </h1>
+        ) : isCreating || isRenaming ? (
+            <input
+                autoFocus
+                type="text"
+                className={styles.portfolioTitleInput}
+                placeholder={isRenaming ? "Rename Portfolio..." : "Enter Portfolio Name..."}
+                value={isRenaming ? renameValue : newPortfolioName}
+                onChange={e => isRenaming ? setRenameValue(e.target.value) : setNewPortfolioName(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        if (isRenaming) {
+                            handleRenamePortfolioSubmit(renameValue);
+                        } else if (newPortfolioName.trim()) {
+                            handleCreatePortfolio(newPortfolioName.trim());
+                            setIsCreating(false);
+                            setNewPortfolioName('');
+                        }
+                    }
+                    if (e.key === 'Escape') {
+                        setIsCreating(false);
+                        setIsRenaming(false);
+                    }
+                }}
+            />
+        ) : (
+            <CustomSelect
+                value={currentPortfolioId}
+                onChange={(val) => setCurrentPortfolioId(val)}
+                options={portfolioList.map(p => ({ label: p.name, value: p.id }))}
+                placeholder="Select Portfolio"
+                triggerClassName={styles.portfolioMainTitleTrigger}
+                containerStyle={{ width: 'fit-content' }}
+                style={{ width: 'auto', minWidth: '150px' }}
+                onDelete={handleDeletePortfolio}
+                onEdit={(id) => {
+                    const name = portfolioList.find(p => p.id === id)?.name || '';
+                    setRenameValue(name);
+                    setRenamingId(id);
+                    setIsRenaming(true);
+                }}
+            />
+        )
+    );
+
     return (
         <div className={styles.container}>
             <div style={{ position: 'absolute', top: '2rem', left: '2rem', zIndex: 60 }}>
@@ -1208,444 +1436,361 @@ const TestPortfolioPage = () => {
             />
             <div style={{ marginTop: '2rem' }}></div>
 
-            {/* Portfolio Switcher */}
-            {/* Portfolio Control Bar */}
-            {/* Portfolio Control Bar Removed - Moved to First Card */}
-
             <div className={styles.pageGrid}>
                 {/* Card 1: Summary + Health Breakdown */}
-                <FluidCard>
-                    <div className={styles.portfolioCard}>
-                        {/* Header Row: Title/Selector + Actions */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: (portfolioList.length === 0 && !isCreating) ? '0' : '1.5rem',
-                            borderBottom: (portfolioList.length === 0 && !isCreating) ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                            paddingBottom: (portfolioList.length === 0 && !isCreating) ? '0' : '1rem',
-                            position: 'relative',
-                            zIndex: 50
-                        }}>
-                            {/* Left: Portfolio Selector / Creator / Renamer / Empty Message */}
-                            <div>
-                                {portfolioList.length === 0 && !isCreating ? (
-                                    <h1 className={styles.portfolioMainTitleTrigger} style={{ cursor: 'default' }}>
-                                        Please add a new test Portfolio
-                                    </h1>
-                                ) : isCreating || isRenaming ? (
-                                    <input
-                                        autoFocus
-                                        type="text"
-                                        className={styles.portfolioTitleInput}
-                                        placeholder={isRenaming ? "Rename Portfolio..." : "Enter Portfolio Name..."}
-                                        value={isRenaming ? renameValue : newPortfolioName}
-                                        onChange={e => isRenaming ? setRenameValue(e.target.value) : setNewPortfolioName(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                if (isRenaming) {
-                                                    handleRenamePortfolioSubmit(renameValue);
-                                                } else if (newPortfolioName.trim()) {
-                                                    handleCreatePortfolio(newPortfolioName.trim());
-                                                    setIsCreating(false);
-                                                    setNewPortfolioName('');
-                                                }
-                                            }
-                                            if (e.key === 'Escape') {
-                                                setIsCreating(false);
-                                                setIsRenaming(false);
-                                            }
-                                        }}
-                                    />
-                                ) : (
-                                    <CustomSelect
-                                        value={currentPortfolioId}
-                                        onChange={(val) => setCurrentPortfolioId(val)}
-                                        options={portfolioList.map(p => ({ label: p.name, value: p.id }))}
-                                        placeholder="Select Portfolio"
-                                        triggerClassName={styles.portfolioMainTitleTrigger}
-                                        style={{ width: 'auto', minWidth: '150px' }}
-                                        onDelete={handleDeletePortfolio}
-                                        onEdit={(id) => {
-                                            const name = portfolioList.find(p => p.id === id)?.name || '';
-                                            setRenameValue(name);
-                                            setRenamingId(id);
-                                            setIsRenaming(true);
-                                        }}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Right: Actions */}
-                            <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                {isCreating || isRenaming ? (
-                                    <>
-                                        <button
-                                            className={styles.roundActionBtn}
-                                            onClick={() => {
-                                                if (isRenaming) {
-                                                    handleRenamePortfolioSubmit(renameValue);
-                                                } else if (newPortfolioName.trim()) {
-                                                    handleCreatePortfolio(newPortfolioName.trim());
-                                                    setIsCreating(false);
-                                                    setNewPortfolioName('');
-                                                }
-                                            }}
-                                            title="Save"
-                                        >
-                                            <Check size={20} />
-                                        </button>
-                                        <button
-                                            className={styles.roundActionBtn}
-                                            onClick={() => {
-                                                setIsCreating(false);
-                                                setIsRenaming(false);
-                                            }}
-                                            title="Cancel"
-                                        >
-                                            <X size={20} />
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <button
-                                            className={styles.roundActionBtn}
-                                            onClick={() => {
-                                                setNewPortfolioName('');
-                                                setIsCreating(true);
-                                            }}
-                                            title="New Portfolio"
-                                        >
-                                            <Plus size={20} />
-                                        </button>
-                                        {portfolioList.length > 0 && (
-                                            <>
-                                                <button
-                                                    className={styles.roundActionBtn}
-                                                    onClick={() => {
-                                                        const currentName = portfolioList.find(p => p.id === currentPortfolioId)?.name || '';
-                                                        setRenameValue(currentName);
-                                                        setRenamingId(currentPortfolioId);
-                                                        setIsRenaming(true);
-                                                    }}
-                                                    title="Rename Portfolio"
-                                                >
-                                                    <Edit2 size={18} />
-                                                </button>
-                                                <button
-                                                    className={`${styles.roundActionBtn} ${styles.danger}`}
-                                                    onClick={() => handleDeletePortfolio(currentPortfolioId)}
-                                                    title="Delete Current Portfolio"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-
-                        {portfolioList.length > 0 && (
-                            <>
-                                {/* ... Summary Content ... */}
-                                <div className={styles.topZone}>
-                                    {/* Left: Summary */}
-                                    <div className={styles.detailsSection}>
-                                        <div className={styles.priceContainer}>
-                                            <p className={styles.price}>
-                                                {currencySymbol}{totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </p>
-                                            <p className={`${styles.change} ${(totalPerformance || 0) >= 0 ? styles.pos : styles.neg}`}>
-                                                {(portfolio.length === 0) ? 'N/A' : (
-                                                    <>
-                                                        {(totalPerformance || 0) >= 0 ? '+' : ''}{(totalPerformance || 0).toFixed(2)}% {isTotalTWR ? 'All Time (TWR)' : 'All Time'}
-                                                    </>
+                <div className={styles.topCardContainer}>
+                    <FluidCard className={styles.topCard}>
+                        <div className={styles.portfolioCard}>
+                            {/* Header Row: Title/Selector + Actions */}
+                            <div className={`${styles.headerRow} ${menuOpen && isMobile ? styles.expandedMenu : ''}`} style={{
+                                marginBottom: (portfolioList.length === 0 && !isCreating) ? '0' : '1.5rem',
+                                borderBottom: (portfolioList.length === 0 && !isCreating) ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                                paddingBottom: (portfolioList.length === 0 && !isCreating) ? '0' : '1rem',
+                            }}>
+                                {/* Mobile Menu Logic */}
+                                {isMobile ? (
+                                    menuOpen ? (
+                                        /* EXPANDED MOBILE: Row 1 Actions, Row 2 Title */
+                                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '0.75rem', flex: 1 }}>
+                                                    {actionButtons}
+                                                </div>
+                                                {!isCreating && !isRenaming && (
+                                                    <button className={styles.roundActionBtn} onClick={() => setMenuOpen(false)}>
+                                                        <X size={20} />
+                                                    </button>
                                                 )}
-                                            </p>
+                                            </div>
+                                            <div className={styles.headerLeft}>
+                                                {titleSection}
+                                            </div>
                                         </div>
-
-                                        <div className={styles.badgesContainer}>
-                                            <div className={styles.badge}>
-                                                <span className={styles.badgeLabel}>Beta:</span>
-                                                <span className={styles.badgeValue}>{(weightedBeta || 0).toFixed(2)}</span>
+                                    ) : (
+                                        /* COLLAPSED MOBILE: Title Left, Menu Button Right */
+                                        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div className={styles.headerLeft}>
+                                                {titleSection}
                                             </div>
-                                            <div className={styles.badge}>
-                                                <span className={styles.badgeLabel}>Est. 5Y Growth:</span>
-                                                <span className={styles.badgeValue}>{(weightedGrowth || 0).toFixed(2)}%</span>
-                                            </div>
-                                            <div className={styles.badge}>
-                                                <span className={styles.badgeLabel}>HHI:</span>
-                                                <span className={styles.badgeValue}>{(hhi || 0).toFixed(2)}</span>
-                                            </div>
-                                            <div className={styles.badge}>
-                                                <span className={styles.badgeLabel}>PEG:</span>
-                                                <span className={styles.badgeValue}>{(weightedPeg || 0).toFixed(2)}</span>
-                                            </div>
-                                            <div className={styles.badge}>
-                                                <span className={styles.badgeLabel}>Cash/Debt:</span>
-                                                <span className={styles.badgeValue}>{(weightedLiquidity || 0).toFixed(2)}</span>
-                                            </div>
-
+                                            <button className={styles.roundActionBtn} onClick={() => setMenuOpen(true)}>
+                                                <Menu size={20} />
+                                            </button>
                                         </div>
-                                    </div >
+                                    )
+                                ) : (
+                                    /* DESKTOP: Title Left, Actions Right */
+                                    <>
+                                        <div className={styles.headerLeft}>
+                                            {titleSection}
+                                        </div>
+                                        <div className={styles.headerActions}>
+                                            {actionButtons}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
 
-                                    {/* Right: Health Score Breakdown */}
-                                    < div className={styles.scoreSection} >
-                                        <div className={styles.scoreHeader}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                                    <h3 className={styles.scoreTitle}>Portfolio Health Score</h3>
-                                                    <div
-                                                        className={`${styles.totalScore} ${portfolio.length === 0 ? '' : (healthScore >= 85 ? styles.scoreGreen : (healthScore >= 70 ? styles.scoreYellow : styles.scoreRed))}`}
-                                                        style={portfolio.length === 0 ? { color: 'var(--text-secondary)', borderColor: 'var(--text-secondary)' } : {}}
-                                                    >
-                                                        {portfolio.length === 0 ? 'N/A' : `${healthScore}/100`}
+
+                            {portfolioList.length > 0 && (
+                                <>
+                                    {/* ... Summary Content ... */}
+                                    <div className={styles.topZone}>
+                                        {/* Left: Summary */}
+                                        <div className={styles.detailsSection}>
+                                            <div className={styles.priceContainer}>
+                                                <p className={styles.price}>
+                                                    {currencySymbol}{totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
+                                                <p className={`${styles.change} ${(totalPerformance || 0) >= 0 ? styles.pos : styles.neg}`}>
+                                                    {(portfolio.length === 0) ? 'N/A' : (
+                                                        <>
+                                                            {(totalPerformance || 0) >= 0 ? '+' : ''}{(totalPerformance || 0).toFixed(2)}% {isTotalTWR ? 'All Time (TWR)' : 'All Time'}
+                                                        </>
+                                                    )}
+                                                </p>
+                                            </div>
+
+                                            <div className={styles.badgesContainer}>
+                                                <div className={styles.badge}>
+                                                    <span className={styles.badgeLabel}>Beta:</span>
+                                                    <span className={styles.badgeValue}>{(weightedBeta || 0).toFixed(2)}</span>
+                                                </div>
+                                                <div className={styles.badge}>
+                                                    <span className={styles.badgeLabel}>Est. 5Y Growth:</span>
+                                                    <span className={styles.badgeValue}>{(weightedGrowth || 0).toFixed(2)}%</span>
+                                                </div>
+                                                <div className={styles.badge}>
+                                                    <span className={styles.badgeLabel}>HHI:</span>
+                                                    <span className={styles.badgeValue}>{(hhi || 0).toFixed(2)}</span>
+                                                </div>
+                                                <div className={styles.badge}>
+                                                    <span className={styles.badgeLabel}>PEG:</span>
+                                                    <span className={styles.badgeValue}>{(weightedPeg || 0).toFixed(2)}</span>
+                                                </div>
+                                                <div className={styles.badge}>
+                                                    <span className={styles.badgeLabel}>Cash/Debt:</span>
+                                                    <span className={styles.badgeValue}>{(weightedLiquidity || 0).toFixed(2)}</span>
+                                                </div>
+
+                                            </div>
+                                        </div >
+
+                                        {/* Right: Health Score Breakdown */}
+                                        < div className={styles.scoreSection} >
+                                            <div className={styles.scoreHeader}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                                        <h3 className={styles.scoreTitle}>Portfolio Health Score</h3>
+                                                        <div
+                                                            className={`${styles.totalScore} ${portfolio.length === 0 ? '' : (healthScore >= 85 ? styles.scoreGreen : (healthScore >= 70 ? styles.scoreYellow : styles.scoreRed))}`}
+                                                            style={portfolio.length === 0 ? { color: 'var(--text-secondary)', borderColor: 'var(--text-secondary)' } : {}}
+                                                        >
+                                                            {portfolio.length === 0 ? 'N/A' : `${healthScore}/100`}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: '0.8rem',
+                                                        lineHeight: '1.4',
+                                                        fontStyle: 'italic',
+                                                        color: portfolio.length === 0 ? 'var(--text-secondary)' : (healthScore >= 85 ? '#10B981' : (healthScore >= 70 ? '#F59E0B' : '#EF4444')),
+                                                        display: 'flex',
+                                                        gap: '0.5rem',
+                                                        alignItems: 'start'
+                                                    }}>
+                                                        <div style={{ marginTop: '2px', flexShrink: 0 }}><AlertTriangle size={14} /></div>
+                                                        <span>
+                                                            {portfolio.length === 0
+                                                                ? "There are currently no stocks in this test portfolio"
+                                                                : (healthScore >= 85
+                                                                    ? "Portfolio is Institutional Grade. You are diversified, balanced, and primed for growth."
+                                                                    : (healthScore >= 70
+                                                                        ? "Portfolio is Healthy and has Good structure, but may be slightly heavy in one sector or category."
+                                                                        : "Portfolio is Risky and requires immediate rebalancing.")
+                                                                )
+                                                            }
+                                                        </span>
                                                     </div>
                                                 </div>
-                                                <div style={{
-                                                    fontSize: '0.8rem',
-                                                    lineHeight: '1.4',
-                                                    fontStyle: 'italic',
-                                                    color: portfolio.length === 0 ? 'var(--text-secondary)' : (healthScore >= 85 ? '#10B981' : (healthScore >= 70 ? '#F59E0B' : '#EF4444')),
-                                                    display: 'flex',
-                                                    gap: '0.5rem',
-                                                    alignItems: 'start'
-                                                }}>
-                                                    <div style={{ marginTop: '2px', flexShrink: 0 }}><AlertTriangle size={14} /></div>
-                                                    <span>
-                                                        {portfolio.length === 0
-                                                            ? "There are currently no stocks in this test portfolio"
-                                                            : (healthScore >= 85
-                                                                ? "Portfolio is Institutional Grade. You are diversified, balanced, and primed for growth."
-                                                                : (healthScore >= 70
-                                                                    ? "Portfolio is Healthy and has Good structure, but may be slightly heavy in one sector or category."
-                                                                    : "Portfolio is Risky and requires immediate rebalancing.")
-                                                            )
-                                                        }
-                                                    </span>
-                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div className={styles.criteriaList}>
-                                            {healthCriteria?.map((c, idx) => (
-                                                <div key={idx} className={styles.criteriaItem}>
-                                                    <span className={styles.criteriaName}>{c.name}</span>
-                                                    <span className={`${styles.criteriaStatus} ${c.status === 'Pass' ? styles.pass : (c.status === 'Warning' ? styles.scoreYellow : styles.fail)}`} style={c.status === 'Warning' ? { color: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)' } : {}}>
-                                                        {c.value}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        {/* <div className={styles.scrollIndicator}>
+                                            <div className={styles.criteriaList}>
+                                                {healthCriteria?.map((c, idx) => (
+                                                    <div key={idx} className={styles.criteriaItem}>
+                                                        <span className={styles.criteriaName}>{c.name}</span>
+                                                        <span className={`${styles.criteriaStatus} ${c.status === 'Pass' ? styles.pass : (c.status === 'Warning' ? styles.scoreYellow : styles.fail)}`} style={c.status === 'Warning' ? { color: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)' } : {}}>
+                                                            {c.value}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {/* <div className={styles.scrollIndicator}>
                                     <span className={styles.scrollText}>Scroll for details</span>
                                     <ChevronDown size={14} className={styles.scrollIcon} />
                                 </div> */}
 
+                                        </div >
                                     </div >
-                                </div >
 
-                                {/* Performance Chart Area */}
+                                    {/* Performance Chart Area */}
 
-                                < div style={{ marginTop: '2.5rem' }}>
-                                    <div style={{ marginBottom: '2rem' }}>
-                                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.02em', margin: 0 }}>Performance Since Inception (TWR)</h3>
-                                    </div>
+                                    < div style={{ marginTop: '2.5rem' }}>
+                                        <div style={{ marginBottom: '2rem' }}>
+                                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '0.02em', margin: 0 }}>Performance Since Inception (TWR)</h3>
+                                        </div>
 
-                                    {/* Comparison Controls - Hide if empty */}
-                                    {
-                                        portfolio.length > 0 ? (
-                                            <>
-                                                <div style={{ marginBottom: '1rem' }}>
-                                                    <div className={styles.comparisonControls}>
-                                                        <input
-                                                            type="text"
-                                                            value={comparisonTicker}
-                                                            onChange={(e) => setComparisonTicker(e.target.value.toUpperCase())}
-                                                            placeholder="Compare vs..." // Changed placeholder
-                                                            className={styles.tickerInput}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    e.preventDefault();
-                                                                    handleAddComparison();
-                                                                }
-                                                            }}
-                                                        />
-                                                        <button onClick={handleAddComparison} className={styles.addButton}>Add</button>
-                                                    </div>
-                                                    <div className={styles.activeComparisons}>
-                                                        {comparisonStocks.map(stock => (
-                                                            <div key={stock.ticker} className={styles.comparisonTag} style={{ borderColor: stock.color, color: stock.color }}>
-                                                                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: stock.color }}></div>
-                                                                {stock.ticker}
-                                                                <button onClick={() => removeComparison(stock.ticker)} className={styles.removeButton}><X size={12} /></button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                {isMounted && (
-                                                    <ResponsiveContainer width="100%" height={400}>
-                                                        <AreaChart data={mergedChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                                                            <defs>
-                                                                {(() => {
-                                                                    if (mergedChartData.length === 0) return null;
-
-                                                                    // Calculate gradient offset
-                                                                    const dataMax = Math.max(...mergedChartData.map((i) => i.value));
-                                                                    const dataMin = Math.min(...mergedChartData.map((i) => i.value));
-
-                                                                    let off = 0;
-                                                                    if (dataMax <= 0) {
-                                                                        off = 0;
-                                                                    } else if (dataMin >= 0) {
-                                                                        off = 1;
-                                                                    } else {
-                                                                        off = dataMax / (dataMax - dataMin);
+                                        {/* Comparison Controls - Hide if empty */}
+                                        {
+                                            portfolio.length > 0 ? (
+                                                <>
+                                                    <div style={{ marginBottom: '1rem' }}>
+                                                        <div className={styles.comparisonControls}>
+                                                            <input
+                                                                type="text"
+                                                                value={comparisonTicker}
+                                                                onChange={(e) => setComparisonTicker(e.target.value.toUpperCase())}
+                                                                placeholder="Compare vs..." // Changed placeholder
+                                                                className={styles.tickerInput}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        handleAddComparison();
                                                                     }
-
-                                                                    return (
-                                                                        <>
-                                                                            <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
-                                                                                <stop offset={off} stopColor="#10B981" stopOpacity={1} />
-                                                                                <stop offset={off} stopColor="#EF4444" stopOpacity={1} />
-                                                                            </linearGradient>
-                                                                            <linearGradient id="splitColorFill" x1="0" y1="0" x2="0" y2="1">
-                                                                                <stop offset="0%" stopColor="#10B981" stopOpacity={0.4} />
-                                                                                <stop offset={off} stopColor="#10B981" stopOpacity={0.05} />
-                                                                                <stop offset={off} stopColor="#EF4444" stopOpacity={0.05} />
-                                                                                <stop offset="100%" stopColor="#EF4444" stopOpacity={0.4} />
-                                                                            </linearGradient>
-                                                                        </>
-                                                                    );
-                                                                })()}
-                                                            </defs>
-                                                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} strokeOpacity={0.5} />
-                                                            <XAxis
-                                                                dataKey="date"
-                                                                stroke="#9CA3AF"
-                                                                tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                                                                tickFormatter={(str) => {
-                                                                    if (!str) return '';
-                                                                    const d = new Date(str);
-                                                                    return d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
                                                                 }}
-                                                                minTickGap={40}
-                                                                axisLine={false}
-                                                                tickLine={false}
-                                                                dy={10}
                                                             />
-                                                            <YAxis
-                                                                stroke="#9CA3AF"
-                                                                tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                                                                unit="%"
-                                                                domain={['auto', 'auto']}
-                                                                axisLine={false}
-                                                                tickLine={false}
-                                                                dx={-5}
-                                                            />
-                                                            <Tooltip
-                                                                wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
-                                                                content={({ active, payload, label }) => {
-                                                                    if (active && payload && payload.length) {
-                                                                        return (
-                                                                            <div style={{
-                                                                                backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.7)' : 'rgba(255, 255, 255, 0.7)',
-                                                                                borderRadius: '15px',
-                                                                                backdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
-                                                                                WebkitBackdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
-                                                                                borderTop: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
-                                                                                borderLeft: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
-                                                                                borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
-                                                                                borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
-                                                                                boxShadow: theme === 'dark'
-                                                                                    ? '0 10px 20px rgba(0, 0, 0, 0.5), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)'
-                                                                                    : '10px 10px 20px rgba(0, 0, 0, 0.2), -3px -3px 10px rgba(0, 0, 0, 0.1), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)',
-                                                                                color: theme === 'dark' ? "#fff" : "#111827",
-                                                                                fontSize: '12px',
-                                                                                padding: '8px 10px'
-                                                                            }}>
-                                                                                <p style={{
-                                                                                    margin: '0 0 5px 0',
-                                                                                    padding: '0',
-                                                                                    fontWeight: 'bold',
-                                                                                    color: theme === 'dark' ? '#D1D5DB' : '#374151'
-                                                                                }}>
-                                                                                    {new Date(label).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                                                                </p>
-                                                                                {payload.map((entry, index) => {
-                                                                                    // Determine color for My Portfolio
-                                                                                    let color = entry.color;
-                                                                                    if (entry.name === "My Portfolio") {
-                                                                                        color = entry.value >= 0 ? '#10B981' : '#EF4444';
-                                                                                    }
-                                                                                    return (
-                                                                                        <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                                                                            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }}></div>
-                                                                                            <span style={{ fontWeight: 500 }}>{entry.name}:</span>
-                                                                                            <span style={{ fontWeight: 600, color: color }}>{entry.value.toFixed(2)}%</span>
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        );
-                                                                    }
-                                                                    return null;
-                                                                }}
-                                                                cursor={{ stroke: '#4B5563', strokeDasharray: '4 4' }}
-                                                            />
-                                                            <Area
-                                                                name="My Portfolio"
-                                                                type="monotone"
-                                                                dataKey="value"
-                                                                stroke="url(#splitColor)"
-                                                                strokeWidth={1}
-                                                                fillOpacity={1}
-                                                                fill="url(#splitColorFill)"
-                                                                activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
-                                                            />
-
+                                                            <button onClick={handleAddComparison} className={styles.addButton}>Add</button>
+                                                        </div>
+                                                        <div className={styles.activeComparisons}>
                                                             {comparisonStocks.map(stock => (
-                                                                <Area
-                                                                    key={stock.ticker}
-                                                                    name={stock.ticker}
-                                                                    type="monotone"
-                                                                    dataKey={`val_${stock.ticker}`}
-                                                                    stroke={stock.color}
-                                                                    strokeWidth={1}
-                                                                    strokeDasharray="none"
-                                                                    connectNulls={true}
-                                                                    fill="none"
-                                                                    fillOpacity={0}
-                                                                    activeDot={{ r: 4, fill: stock.color, stroke: '#fff', strokeWidth: 1 }}
-                                                                />
+                                                                <div key={stock.ticker} className={styles.comparisonTag} style={{ borderColor: stock.color, color: stock.color }}>
+                                                                    <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: stock.color }}></div>
+                                                                    {stock.ticker}
+                                                                    <button onClick={() => removeComparison(stock.ticker)} className={styles.removeButton}><X size={12} /></button>
+                                                                </div>
                                                             ))}
-                                                        </AreaChart>
-                                                    </ResponsiveContainer>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <div style={{
-                                                fontSize: '0.9rem',
-                                                color: 'var(--text-secondary)',
-                                                fontStyle: 'italic',
-                                                marginTop: '0.5rem',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.5rem'
-                                            }}>
-                                                <AlertTriangle size={14} />
-                                                There are currently no stocks in this test portfolio
-                                            </div>
-                                        )
-                                    }
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </FluidCard>
+                                                        </div>
+                                                    </div>
+
+                                                    {isMounted && (
+                                                        <ResponsiveContainer width="100%" height={400}>
+                                                            <AreaChart data={mergedChartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                                                                <defs>
+                                                                    {(() => {
+                                                                        if (mergedChartData.length === 0) return null;
+
+                                                                        // Calculate gradient offset
+                                                                        const dataMax = Math.max(...mergedChartData.map((i) => i.value));
+                                                                        const dataMin = Math.min(...mergedChartData.map((i) => i.value));
+
+                                                                        let off = 0;
+                                                                        if (dataMax <= 0) {
+                                                                            off = 0;
+                                                                        } else if (dataMin >= 0) {
+                                                                            off = 1;
+                                                                        } else {
+                                                                            off = dataMax / (dataMax - dataMin);
+                                                                        }
+
+                                                                        return (
+                                                                            <>
+                                                                                <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                                                                                    <stop offset={off} stopColor="#10B981" stopOpacity={1} />
+                                                                                    <stop offset={off} stopColor="#EF4444" stopOpacity={1} />
+                                                                                </linearGradient>
+                                                                                <linearGradient id="splitColorFill" x1="0" y1="0" x2="0" y2="1">
+                                                                                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.4} />
+                                                                                    <stop offset={off} stopColor="#10B981" stopOpacity={0.05} />
+                                                                                    <stop offset={off} stopColor="#EF4444" stopOpacity={0.05} />
+                                                                                    <stop offset="100%" stopColor="#EF4444" stopOpacity={0.4} />
+                                                                                </linearGradient>
+                                                                            </>
+                                                                        );
+                                                                    })()}
+                                                                </defs>
+                                                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} strokeOpacity={0.5} />
+                                                                <XAxis
+                                                                    dataKey="date"
+                                                                    stroke="#9CA3AF"
+                                                                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                                                                    tickFormatter={(str) => {
+                                                                        if (!str) return '';
+                                                                        const d = new Date(str);
+                                                                        return d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+                                                                    }}
+                                                                    minTickGap={40}
+                                                                    axisLine={false}
+                                                                    tickLine={false}
+                                                                    dy={10}
+                                                                />
+                                                                <YAxis
+                                                                    stroke="#9CA3AF"
+                                                                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                                                                    unit="%"
+                                                                    domain={['auto', 'auto']}
+                                                                    axisLine={false}
+                                                                    tickLine={false}
+                                                                    dx={-5}
+                                                                />
+                                                                <Tooltip
+                                                                    wrapperStyle={{ outline: 'none', backgroundColor: 'transparent' }}
+                                                                    content={({ active, payload, label }) => {
+                                                                        if (active && payload && payload.length) {
+                                                                            return (
+                                                                                <div style={{
+                                                                                    backgroundColor: theme === 'dark' ? 'rgba(20, 20, 20, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+                                                                                    borderRadius: '15px',
+                                                                                    backdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+                                                                                    WebkitBackdropFilter: 'blur(15px) saturate(150%) brightness(1.2)',
+                                                                                    borderTop: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                                                                    borderLeft: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgb(255, 255, 255)',
+                                                                                    borderRight: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+                                                                                    borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.2)',
+                                                                                    boxShadow: theme === 'dark'
+                                                                                        ? '0 10px 20px rgba(0, 0, 0, 0.5), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)'
+                                                                                        : '10px 10px 20px rgba(0, 0, 0, 0.2), -3px -3px 10px rgba(0, 0, 0, 0.1), inset 2px 2px 3px rgba(255, 255, 255, 0.2), inset -1px -1px 3px rgba(0, 0, 0, 0.5)',
+                                                                                    color: theme === 'dark' ? "#fff" : "#111827",
+                                                                                    fontSize: '12px',
+                                                                                    padding: '8px 10px'
+                                                                                }}>
+                                                                                    <p style={{
+                                                                                        margin: '0 0 5px 0',
+                                                                                        padding: '0',
+                                                                                        fontWeight: 'bold',
+                                                                                        color: theme === 'dark' ? '#D1D5DB' : '#374151'
+                                                                                    }}>
+                                                                                        {new Date(label).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                                                                    </p>
+                                                                                    {payload.map((entry, index) => {
+                                                                                        // Determine color for My Portfolio
+                                                                                        let color = entry.color;
+                                                                                        if (entry.name === "My Portfolio") {
+                                                                                            color = entry.value >= 0 ? '#10B981' : '#EF4444';
+                                                                                        }
+                                                                                        return (
+                                                                                            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                                                                                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }}></div>
+                                                                                                <span style={{ fontWeight: 500 }}>{entry.name}:</span>
+                                                                                                <span style={{ fontWeight: 600, color: color }}>{entry.value.toFixed(2)}%</span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    }}
+                                                                    cursor={{ stroke: '#4B5563', strokeDasharray: '4 4' }}
+                                                                />
+                                                                <Area
+                                                                    name="My Portfolio"
+                                                                    type="monotone"
+                                                                    dataKey="value"
+                                                                    stroke="url(#splitColor)"
+                                                                    strokeWidth={1}
+                                                                    fillOpacity={1}
+                                                                    fill="url(#splitColorFill)"
+                                                                    activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
+                                                                />
+
+                                                                {comparisonStocks.map(stock => (
+                                                                    <Area
+                                                                        key={stock.ticker}
+                                                                        name={stock.ticker}
+                                                                        type="monotone"
+                                                                        dataKey={`val_${stock.ticker}`}
+                                                                        stroke={stock.color}
+                                                                        strokeWidth={1}
+                                                                        strokeDasharray="none"
+                                                                        connectNulls={true}
+                                                                        fill="none"
+                                                                        fillOpacity={0}
+                                                                        activeDot={{ r: 4, fill: stock.color, stroke: '#fff', strokeWidth: 1 }}
+                                                                    />
+                                                                ))}
+                                                            </AreaChart>
+                                                        </ResponsiveContainer>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div style={{
+                                                    fontSize: '0.9rem',
+                                                    color: 'var(--text-secondary)',
+                                                    fontStyle: 'italic',
+                                                    marginTop: '0.5rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem'
+                                                }}>
+                                                    <AlertTriangle size={14} />
+                                                    There are currently no stocks in this test portfolio
+                                                </div>
+                                            )
+                                        }
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </FluidCard>
+                </div>
 
                 {portfolioList.length > 0 && (
                     <>
@@ -1985,14 +2130,28 @@ const TestPortfolioPage = () => {
                         < FluidCard >
                             <div className={styles.portfolioCard}>
                                 <div className={styles.tableCard} style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}>
-                                    <div className={styles.tableHeader}>
+                                    <div className={`${styles.tableHeader} ${menuOpenHoldings && isMobile ? styles.expandedMenu : ''}`}>
                                         <h2 className={styles.title}>Holdings</h2>
-                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            <button className={styles.tableActionButton} onClick={() => setShowColumnModal(true)} title="Show/Hide Columns"><Eye size={18} /> </button>
-                                            <button className={styles.tableActionButton} onClick={handleCopyClick} title="Copy from Main Portfolio"><RefreshCw size={18} /> </button>
-                                            <button className={styles.tableActionButton} onClick={handleClearAll} title="Clear All Holdings"><Trash2 size={18} /> </button>
-                                            <button className={styles.tableActionButton} onClick={() => setShowAddModal(true)} title="Add Stock"><Plus size={18} /> </button>
-                                        </div>
+                                        {isMobile ? (
+                                            menuOpenHoldings ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                    <button className={styles.tableActionButton} onClick={() => setShowColumnModal(true)} title="Show/Hide Columns"><Eye size={18} /> </button>
+                                                    <button className={styles.tableActionButton} onClick={handleCopyClick} title="Copy from Main Portfolio"><RefreshCw size={18} /> </button>
+                                                    <button className={styles.tableActionButton} onClick={handleClearAll} title="Clear All Holdings"><Trash2 size={18} /> </button>
+                                                    <button className={styles.tableActionButton} onClick={() => setShowAddModal(true)} title="Add Stock"><Plus size={18} /> </button>
+                                                    <button className={styles.tableActionButton} onClick={() => setMenuOpenHoldings(false)} title="Close Menu"><X size={18} /> </button>
+                                                </div>
+                                            ) : (
+                                                <button className={styles.tableActionButton} onClick={() => setMenuOpenHoldings(true)} title="Actions Menu"><Menu size={18} /> </button>
+                                            )
+                                        ) : (
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button className={styles.tableActionButton} onClick={() => setShowColumnModal(true)} title="Show/Hide Columns"><Eye size={18} /> </button>
+                                                <button className={styles.tableActionButton} onClick={handleCopyClick} title="Copy from Main Portfolio"><RefreshCw size={18} /> </button>
+                                                <button className={styles.tableActionButton} onClick={handleClearAll} title="Clear All Holdings"><Trash2 size={18} /> </button>
+                                                <button className={styles.tableActionButton} onClick={() => setShowAddModal(true)} title="Add Stock"><Plus size={18} /> </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className={styles.tableScroll}>
@@ -2044,8 +2203,8 @@ const TestPortfolioPage = () => {
                         <div className={styles.formGroup}><label>Ticker</label><input type="text" placeholder="e.g. NVDA" value={newTicker} onChange={e => setNewTicker(e.target.value)} /></div>
                         <div className={styles.formGroup}><label>Shares</label><input type="number" placeholder="e.g. 10" value={newShares} onChange={e => setNewShares(e.target.value)} /></div>
                         <div className={styles.formGroup}><label>Cost Basis ({currency})</label><input type="number" placeholder="Total amount invested" value={newCost} onChange={e => setNewCost(e.target.value)} /></div>
-                        <div className={styles.formGroup}><label>Cost Basis Date</label><CustomDatePicker value={newDate} onChange={setNewDate} /></div>
-                        <div className={styles.formGroup}><label>Category</label><CustomSelect value={newCategory} onChange={setNewCategory} options={['Core', 'Growth', 'Compounder', 'Defensive', 'Speculative']} /></div>
+                        <div className={styles.formGroup}><label>Cost Basis Date</label><CustomDatePicker value={newDate} onChange={setNewDate} isMobile={isMobile} /></div>
+                        <div className={styles.formGroup}><label>Category</label><CustomSelect value={newCategory} onChange={setNewCategory} options={['Core', 'Growth', 'Compounder', 'Defensive', 'Speculative']} useModalOnDesktop={true} /></div>
                         {addError && <p className={styles.error}>{addError}</p>}
                     </div>
                 }
@@ -2072,7 +2231,7 @@ const TestPortfolioPage = () => {
             <Modal isOpen={showCopyModal} onClose={() => setShowCopyModal(false)}
                 title={`Copy from ${currentUser?.displayName || 'User'}'s Portfolio to ${portfolioList.find(p => p.id === currentPortfolioId)?.name}`}
                 message={
-                    <div className={`${styles.copyModalContainer} ${styles.tableScroll}`} style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                    <div className={styles.copyModalContainer} style={{ paddingRight: '0.5rem' }}>
                         <style>
                             {`
                                 /* Custom Checkbox Styling High Contrast */

@@ -690,6 +690,23 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.tableHeader.expandedMenu {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.tableHeader.expandedMenu .tableActionButton {
+    height: 2.2rem;
+    width: 2.2rem;
+}
+
+.tableHeader.expandedMenu .tableActionButton svg {
+    width: 16px;
+    height: 16px;
 }
 
 .tableTitle {
@@ -1568,6 +1585,7 @@
 
     /* Hide spinners */
     -moz-appearance: textfield;
+    appearance: none;
 }
 
 .pInput::-webkit-outer-spin-button,

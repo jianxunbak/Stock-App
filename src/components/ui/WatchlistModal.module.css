@@ -10,11 +10,13 @@
     align-items: center;
     z-index: 1000;
     backdrop-filter: blur(40px);
+    padding: 1rem;
+    box-sizing: border-box;
 }
 
 .modal {
     border-radius: 2rem;
-    width: 95%;
+    width: 100%;
     max-width: 900px;
     max-height: 80vh;
     display: flex;

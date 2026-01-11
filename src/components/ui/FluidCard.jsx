@@ -17,10 +17,18 @@ export const FluidCard = ({ children, className = '' }) => {
     // Adjusted range for balanced effect (max 3.5% stretch)
     const scaleY = useTransform(smoothVelocity, [-3000, 0, 3000], [1.035, 1, 1.035]);
 
+    const [isSmallScreen, setIsSmallScreen] = React.useState(window.innerWidth < 768);
+
+    React.useEffect(() => {
+        const handleResize = () => setIsSmallScreen(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     return (
         <motion.div
             className={`fluid-card-container ${className}`}
-            style={{
+            style={isSmallScreen ? {} : {
                 scaleY,
                 transformOrigin: "center center",
                 willChange: "transform"

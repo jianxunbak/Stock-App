@@ -10,12 +10,15 @@
     align-items: center;
     z-index: 1000;
     backdrop-filter: blur(40px);
+    padding: 1rem;
+    box-sizing: border-box;
 }
 
 .modal {
     border-radius: 2rem;
-    width: 90%;
+    width: 100%;
     max-width: 500px;
+    max-height: calc(100vh - 2rem);
     display: flex;
     flex-direction: column;
     padding: 1.5rem;
@@ -31,8 +34,6 @@
         inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
         inset -2px -2px 5px rgba(0, 0, 0, 0.5);
     z-index: 1;
-    z-index: 1;
-    overflow: visible;
     animation: slideIn 0.3s ease-out;
 }
 
@@ -70,6 +71,7 @@
     margin-bottom: 1.5rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
 }
 
 .title {
@@ -100,11 +102,43 @@
     color: var(--text-primary);
     margin-bottom: 1.5rem;
     line-height: 1.5;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 0.5rem;
+}
+
+.content::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.content::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.3);
+    border-radius: 4px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.5);
+}
+
+[data-theme="light"] .content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .content::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.4);
 }
 
 .footer {
     display: flex;
     justify-content: flex-end;
+    flex-shrink: 0;
 }
 
 .button {
