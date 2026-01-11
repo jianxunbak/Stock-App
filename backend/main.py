@@ -146,7 +146,7 @@ try:
         cred = credentials.Certificate(str(cred_path))
         firebase_admin.initialize_app(cred)
         db = firestore.client()
-        print("SUCCESS: Firebase Admin Initialized with serviceAccountKey.json")
+        print(f"SUCCESS: Firebase Admin Initialized with serviceAccountKey.json. Project: {db.project}")
     
     # 2. Check for Environment Variable (Deployment Mode)
     elif os.environ.get("FIREBASE_SERVICE_ACCOUNT"):
@@ -2479,6 +2479,7 @@ class PortfolioAnalysisRequest(BaseModel):
     items: List[PortfolioItem]
     metrics: dict
     uid: Optional[str] = None
+    forceRefresh: bool = False
 
 @app.post("/api/portfolio/analyze")
 async def analyze_portfolio(request: PortfolioAnalysisRequest):
@@ -2487,7 +2488,7 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest):
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not found in environment variables.")
 
     # --- Caching Logic ---
-    if db and request.uid:
+    if db and request.uid and not request.forceRefresh:
         try:
             doc_ref = db.collection('users').document(request.uid).collection('portfolio_analysis').document('latest')
             doc = doc_ref.get()
@@ -2716,6 +2717,43 @@ async def analyze_portfolio(request: PortfolioAnalysisRequest):
             continue
 
     raise HTTPException(status_code=500, detail="Failed to generate analysis.")
+
+# --- User Settings Endpoints ---
+
+class UserSettings(BaseModel):
+    settings: dict
+
+@app.post("/api/settings/{uid}")
+async def save_user_settings(uid: str, payload: UserSettings):
+    if not db:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        # Merge with existing settings or overwrite? Usually merge is safer for partial updates
+        # But for simplicity, we can just set/merge.
+        doc_ref = db.collection('users').document(uid).collection('settings').document('preferences')
+        print(f"DEBUG: Writing to users/{uid}/settings/preferences: {payload.settings}")
+        doc_ref.set(payload.settings, merge=True)
+        print("DEBUG: Write successful")
+        return {"status": "success", "settings": payload.settings}
+    except Exception as e:
+        print(f"Error saving settings for {uid}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/settings/{uid}")
+async def get_user_settings_endpoint(uid: str):
+    if not db:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        doc_ref = db.collection('users').document(uid).collection('settings').document('preferences')
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+        return {}
+    except Exception as e:
+        print(f"Error fetching settings for {uid}: {e}")
+        return {}
 
 if __name__ == "__main__":
     import uvicorn

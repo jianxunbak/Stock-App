@@ -99,12 +99,32 @@ export const calculatePortfolioTWR = async (portfolioItems, uid) => {
     }
 };
 
-export const analyzePortfolio = async (portfolioItems, metrics, uid) => {
+export const analyzePortfolio = async (portfolioItems, metrics, uid, forceRefresh = false) => {
     try {
-        const response = await axios.post(`${API_URL}/portfolio/analyze`, { items: portfolioItems, metrics, uid });
+        const response = await axios.post(`${API_URL}/portfolio/analyze`, { items: portfolioItems, metrics, uid, forceRefresh });
         return response.data;
     } catch (error) {
         console.error("Error analyzing portfolio:", error);
+        throw error;
+    }
+};
+
+export const fetchUserSettings = async (uid) => {
+    try {
+        const response = await axios.get(`${API_URL}/settings/${uid}`);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching user settings:", error);
+        return {};
+    }
+};
+
+export const saveUserSettings = async (uid, settings) => {
+    try {
+        const response = await axios.post(`${API_URL}/settings/${uid}`, { settings });
+        return response.data;
+    } catch (error) {
+        console.error("Error saving user settings:", error);
         throw error;
     }
 };

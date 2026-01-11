@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Trash2, Edit2, Check, X, AlertTriangle, ChevronDown, C
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import styles from './PortfolioPage.module.css';
 import { usePortfolio } from '../../hooks/usePortfolio';
-import { fetchStockData, fetchCurrencyRate, calculatePortfolioTWR, analyzePortfolio } from '../../services/api';
+import { fetchStockData, fetchCurrencyRate, calculatePortfolioTWR, analyzePortfolio, fetchUserSettings, saveUserSettings } from '../../services/api';
 
 
 
@@ -73,7 +73,7 @@ const CustomSelect = ({ value, onChange, options }) => {
     );
 };
 
-const CustomDatePicker = ({ value, onChange }) => {
+const CustomDatePicker = ({ value, onChange, triggerClassName }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef(null);
     const [viewDate, setViewDate] = useState(new Date(value || new Date()));
@@ -109,10 +109,11 @@ const CustomDatePicker = ({ value, onChange }) => {
     };
 
     const handleDayClick = (day) => {
-        const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-        // Format to YYYY-MM-DD
-        const formatted = newDate.toISOString().split('T')[0];
-        onChange(formatted);
+        // Construct date, ensuring we use the year and month from the current view
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth() + 1; // getMonth is 0-indexed
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        onChange(dateStr);
         setIsOpen(false);
     };
 
@@ -128,7 +129,10 @@ const CustomDatePicker = ({ value, onChange }) => {
         cells.push(<div key={`empty-${i}`} className={`${styles.dateCell} ${styles.empty}`}></div>);
     }
     for (let day = 1; day <= totalDays; day++) {
-        const currentDateStr = new Date(viewDate.getFullYear(), viewDate.getMonth(), day).toISOString().split('T')[0];
+        // Construct YYYY-MM-DD manually to match handleDayClick and avoid UTC shifts
+        const currentYear = viewDate.getFullYear();
+        const currentMonth = viewDate.getMonth() + 1;
+        const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const isSelected = value === currentDateStr;
         cells.push(
             <div
@@ -146,9 +150,9 @@ const CustomDatePicker = ({ value, onChange }) => {
 
     return (
         <div className={styles.datePickerContainer} ref={containerRef}>
-            <div className={styles.customSelectTrigger} onClick={() => setIsOpen(!isOpen)}>
+            <div className={triggerClassName || styles.customSelectTrigger} onClick={() => setIsOpen(!isOpen)}>
                 {value || 'Select Date'}
-                <Calendar size={16} color="var(--text-secondary)" />
+                {!triggerClassName && <Calendar size={16} color="var(--text-secondary)" />}
             </div>
             {isOpen && (
                 <div className={styles.datePickerPopup}>
@@ -650,7 +654,7 @@ const PortfolioPage = () => {
 
     }, [portfolio, liveData, currentRate, searchTicker]);
 
-    const handleAnalyzePortfolio = useCallback(async () => {
+    const handleAnalyzePortfolio = useCallback(async (force = false) => {
         if (portfolio.length === 0) {
             // Don't show error on auto-load, just return
             return;
@@ -662,7 +666,7 @@ const PortfolioPage = () => {
                 weightedGrowth: weightedGrowth.toFixed(2),
                 weightedPeg: weightedPeg.toFixed(2)
             };
-            const result = await analyzePortfolio(portfolio, metrics, currentUser?.uid);
+            const result = await analyzePortfolio(portfolio, metrics, currentUser?.uid, force);
             if (result && result.analysis) {
                 setAnalysis(result.analysis);
             }
@@ -736,8 +740,26 @@ const PortfolioPage = () => {
         if (t) navigate(`/analysis?ticker=${t}`);
     };
 
+    // Load User Settings (Hidden Columns)
+    useEffect(() => {
+        if (currentUser?.uid) {
+            fetchUserSettings(currentUser.uid).then(settings => {
+                if (settings && settings.hiddenColumns) {
+                    setHiddenColumns(settings.hiddenColumns);
+                }
+            });
+        }
+    }, [currentUser]);
+
     const toggleColumn = (key) => {
-        setHiddenColumns(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+        setHiddenColumns(prev => {
+            const newState = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+            // Save to backend
+            if (currentUser?.uid) {
+                saveUserSettings(currentUser.uid, { hiddenColumns: newState });
+            }
+            return newState;
+        });
     };
 
     const actionGroupContent = (
@@ -838,7 +860,11 @@ const PortfolioPage = () => {
                     {!hiddenColumns.includes('invDate') && (
                         <td>
                             {isEditing ? (
-                                <input type="date" className={styles.pInput} value={editValues.purchaseDate} onChange={(e) => setEditValues({ ...editValues, purchaseDate: e.target.value })} />
+                                <CustomDatePicker
+                                    value={editValues.purchaseDate}
+                                    onChange={(val) => setEditValues({ ...editValues, purchaseDate: val })}
+                                    triggerClassName={styles.editableDateTrigger}
+                                />
                             ) : (item.purchaseDate || 'N/A')}
                         </td>
                     )}
@@ -1532,7 +1558,7 @@ const PortfolioPage = () => {
                             <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>AI Portfolio Analysis</h2>
                             <button
                                 className={styles.tableActionButton}
-                                onClick={handleAnalyzePortfolio}
+                                onClick={() => handleAnalyzePortfolio(true)}
                                 disabled={analyzing}
                                 title="Ask Gemini"
                             >

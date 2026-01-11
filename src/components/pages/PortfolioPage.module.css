@@ -743,8 +743,8 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 0.9rem;
-    min-width: 1200px;
-    /* Ensures scroll is triggered */
+    table-layout: auto;
+    /* Removed fixed min-width to allow shrinking */
 }
 
 .table th,
@@ -1541,4 +1541,80 @@
     box-shadow: 0 6px 12px rgba(239, 68, 68, 0.3), inset 0 2px 4px rgba(239, 68, 68, 0.3);
     border: none;
     color: #EF4444;
+}
+
+/* Glassmorphism Input Style for Edit Rows */
+/* Glassmorphism Input Style for Edit Rows */
+.pInput {
+    /* Exact copy of .backButton:hover style */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none;
+    border-radius: 12px;
+
+    color: var(--text-primary) !important;
+    -webkit-text-fill-color: var(--text-primary) !important;
+    font-weight: 600;
+    /* Reduced from 700, slightly bold but readable, or just normal? User said "dont make... bold". So normal (400) or 500. Let's try 500/normal. I will set to default (remove or 500). Let's use 500 for slight weight or just inherit. User said "dont make... bold". I will use 'normal'. */
+    font-weight: normal;
+    text-align: center;
+
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.3s ease;
+    width: 100%;
+    min-width: 80px;
+
+    /* Hide spinners */
+    -moz-appearance: textfield;
+}
+
+.pInput::-webkit-outer-spin-button,
+.pInput::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.pInput:focus {
+    transform: scale(1.05);
+}
+
+/* Light Mode Override */
+[data-theme="light"] .pInput {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(96, 165, 250, 0.1)) !important;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.4);
+    color: var(--text-primary) !important;
+}
+
+/* Style for the Date Picker trigger in Edit Mode */
+.editableDateTrigger {
+    /* Exact copy of .backButton:hover style */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none !important;
+    border-radius: 12px;
+
+    color: var(--text-primary) !important;
+    font-weight: normal;
+    /* Match pInput */
+    text-align: center;
+
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.editableDateTrigger:hover {
+    transform: scale(1.05);
+}
+
+[data-theme="light"] .editableDateTrigger {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(96, 165, 250, 0.1)) !important;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.4);
+    color: var(--text-primary);
 }
