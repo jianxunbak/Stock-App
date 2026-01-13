@@ -1,3 +1,15 @@
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .container {
     min-height: 100vh;
     max-width: 100%;
@@ -124,13 +136,25 @@
     flex-direction: column;
     gap: 2rem;
     margin-bottom: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.topCard {
+    z-index: 50;
+    /* Ensure this card stays above others for the dropdown */
+    position: relative;
+    transform: none !important;
+    /* Prevent perspective issues if any */
+    perspective: none !important;
+    transform-style: flat !important;
 }
 
 /* Portfolio Card - Matching Analysis Page Cards */
 .portfolioCard {
     position: relative;
     transition: all 0.3s ease;
-    overflow: hidden;
+    overflow: visible;
     padding: 1.5rem;
     color: var(--text-primary);
     display: flex;
@@ -139,15 +163,181 @@
     border-left: 1px solid rgba(255, 255, 255, 0.4);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.05);
     border-radius: 30px;
     box-shadow:
         0 6px 12px rgba(96, 165, 250, 0.3),
         inset 0 2px 4px rgba(96, 165, 250, 0.5),
         inset 0 2px 4px rgba(96, 165, 250, 0.5);
-    z-index: 1;
+    z-index: 10;
     backdrop-filter: blur(1px) saturate(150%) brightness(1);
     -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+@media (min-width: 769px) {
+
+    /* Only apply hover scale on larger screens to avoid breaking fixed positioning on mobile */
+    .portfolioCard:hover {
+        outline: none;
+        background: transparent;
+        transform: scale(1.01);
+        border-radius: 60px;
+    }
+}
+
+
+.portfolioMainTitleTrigger {
+    font-size: 1.8rem !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    cursor: pointer !important;
+    height: auto !important;
+    min-height: unset !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.portfolioTitleInput {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #60a5fa;
+    color: var(--text-primary);
+    width: 100%;
+    min-width: 150px;
+    max-width: 100%;
+    outline: none;
+    padding: 0.25rem 0;
+}
+
+.headerRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1000;
+    /* Increased from 50 */
+    gap: 1rem;
+    flex-wrap: wrap;
+    transition: all 0.3s ease;
+}
+
+.expandedMenu {
+    align-items: flex-start;
+}
+
+.headerLeft {
+    flex: 1;
+    min-width: 0;
+    /* Allow shrinking */
+}
+
+/* Ensure actions don't shrink too much */
+.headerActions {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+    .headerRow {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .headerActions {
+        justify-content: flex-end;
+    }
+
+    .portfolioTitleInput {
+        font-size: 1.5rem;
+        width: 100%;
+    }
+
+    .portfolioMainTitleTrigger {
+        font-size: 1.5rem !important;
+        white-space: normal !important;
+        /* Allow wrapping */
+        text-align: left;
+    }
+}
+
+.roundActionBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    height: 2.8rem;
+    width: 2.8rem;
+    padding: 0;
+}
+
+.roundActionBtn:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1));
+    transform: scale(1.1);
+    border-radius: 18px;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none;
+}
+
+.roundActionBtn.danger:hover {
+    box-shadow: 0 6px 12px rgba(239, 68, 68, 0.5), inset 0 2px 4px rgba(239, 68, 68, 0.5);
+    color: #ef4444;
+}
+
+.dangerBtn {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    color: #EF4444 !important;
+}
+
+.dangerBtn:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+}
+
+.deleteOptionBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.deleteOptionBtn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+    opacity: 1;
 }
 
 [data-theme="light"] .portfolioCard {
@@ -166,12 +356,7 @@
     z-index: 1;
 }
 
-.portfolioCard:hover {
-    outline: none;
-    background: transparent;
-    transform: scale(1.01);
-    border-radius: 60px;
-}
+/* .portfolioCard:hover moved inside media query above */
 
 .portfolioCard>* {
     position: relative;
@@ -203,7 +388,7 @@
 .scoreSection {
     position: relative;
     transition: all 0.3s ease;
-    overflow: hidden;
+    overflow: visible;
     flex: 2;
     border-radius: 1rem;
     display: flex;
@@ -486,6 +671,37 @@
     width: 100%;
 }
 
+.allocationGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .allocationGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        min-width: 0;
+    }
+}
+
+.allocationColumn {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+}
+
+.allocationTitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
 .allocationContent {
     display: flex;
     flex-direction: column;
@@ -728,6 +944,7 @@
 
 .tableScroll::-webkit-scrollbar {
     height: 8px;
+    width: 8px;
 }
 
 .tableScroll::-webkit-scrollbar-track {
@@ -879,12 +1096,77 @@
 }
 
 .pInput {
-    background: rgba(0, 0, 0, 0.2) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    color: white !important;
-    padding: 4px !important;
-    border-radius: 4px;
+    /* Base Glass Style (Matches Back Button) */
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px;
+    color: var(--text-primary) !important;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 500;
     width: 100%;
+    min-width: 80px;
+    text-align: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+    /* Hide spinners */
+    -moz-appearance: textfield;
+    appearance: none;
+}
+
+.pInput::-webkit-outer-spin-button,
+.pInput::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+    display: none;
+    /* Force hide */
+}
+
+.editableDateTrigger {
+    /* Base Glass Style (Matches Back Button) */
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px;
+    color: var(--text-primary) !important;
+    /* Ensure color is explicit to override any blue link styles */
+    -webkit-text-fill-color: var(--text-primary) !important;
+
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    width: 100%;
+    min-width: 80px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* Hover Effect (Matches Back Button Hover) */
+.pInput:hover,
+.pInput:focus,
+.editableDateTrigger:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    transform: scale(1.05);
+    border-radius: 12px;
+    /* Keep same radius as base */
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border-color: transparent !important;
+    /* Or keep border? Back button removes/changes border */
+    outline: none;
 }
 
 .submitBtn {
@@ -915,12 +1197,12 @@
 }
 
 .submitBtn:hover {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1));
+    background: transparent !important;
     transform: scale(1.02);
     border-radius: 18px;
-    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
-    border: none;
-    color: var(--text-primary);
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+    border: 1px solid var(--primary);
+    color: var(--primary);
 }
 
 .error {
@@ -1300,11 +1582,19 @@
     margin: 0;
 }
 
+/* Force the first card container to be on top */
+.topCardContainer {
+    position: relative;
+    z-index: 100;
+    /* High z-index to stay above following cards */
+}
+
 /* Custom Select Dropdown Styles */
 /* Custom Select Dropdown Styles */
 .customSelectContainer {
     position: relative;
     width: 100%;
+    z-index: 1000;
 }
 
 .customSelectTrigger {
@@ -1326,31 +1616,153 @@
     background: rgba(255, 255, 255, 0.1);
 }
 
+.mobileModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100000;
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.mobileModalContent {
+    border-radius: 2rem;
+    width: 100%;
+    max-width: 600px;
+    max-height: calc(100vh - 4rem);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: rgba(15, 23, 42, 0.95);
+    /* Opaque background */
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 15px 35px rgba(0, 0, 0, 0.5),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    animation: slideIn 0.3s ease-out;
+    padding: 1.5rem;
+    min-height: 250px;
+    height: auto;
+    overflow-y: auto;
+}
+
+[data-theme="light"] .mobileModalContent {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+/* Standardized Scrollbar Styles */
+.mobileModalContent::-webkit-scrollbar,
+.customSelectOptionsList::-webkit-scrollbar,
+.datePickerPopup::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.mobileModalContent::-webkit-scrollbar-track,
+.customSelectOptionsList::-webkit-scrollbar-track,
+.datePickerPopup::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.mobileModalContent::-webkit-scrollbar-thumb,
+.customSelectOptionsList::-webkit-scrollbar-thumb,
+.datePickerPopup::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.3);
+    border-radius: 4px;
+}
+
+.mobileModalContent::-webkit-scrollbar-thumb:hover,
+.customSelectOptionsList::-webkit-scrollbar-thumb:hover,
+.datePickerPopup::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.5);
+}
+
+[data-theme="light"] .mobileModalContent::-webkit-scrollbar-track,
+[data-theme="light"] .customSelectOptionsList::-webkit-scrollbar-track,
+[data-theme="light"] .datePickerPopup::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .mobileModalContent::-webkit-scrollbar-thumb,
+[data-theme="light"] .customSelectOptionsList::-webkit-scrollbar-thumb,
+[data-theme="light"] .datePickerPopup::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.4);
+}
+
 .customSelectMenu {
     position: absolute;
     top: 100%;
     left: 0;
     width: 100%;
     margin-top: 0.5rem;
-    background: rgba(10, 10, 10, 0.85);
-    /* High opacity dark background for contrast */
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    padding: 0.5rem;
-    z-index: 1000;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(80px);
-    /* Very very blurred */
-    -webkit-backdrop-filter: blur(80px);
-    max-height: 200px;
-    overflow-y: auto;
-    animation: fadeIn 0.2s ease-out;
+    background: rgba(15, 23, 42, 0.95);
+    z-index: 9999 !important;
+
+    /* Ensure it beats any sibling card shadows or borders */
+
+    /* Opaque for desktop */
+    [data-theme="light"] & {
+        background: rgba(255, 255, 255, 0.95);
+    }
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    padding: 1.5rem;
+    z-index: 99999;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5),
+    inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+    inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    max-height: 400px;
+    animation: slideIn 0.3s ease-out;
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
 }
 
-[data-theme="light"] .customSelectMenu {
-    background: rgba(255, 255, 255, 0.85);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+.customSelectOptionsList {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 0.5rem;
+}
+
+
+[data-theme="light"] .customSelectMenu,
+[data-theme="light"] .mobileModalContent {
+    background: rgba(255, 255, 255, 0.90);
+    /* Increased opacity to 90% */
+    border-top: 1px solid rgb(255, 255, 255);
+    border-left: 1px solid rgb(255, 255, 255);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgb(0, 0, 0, 0.2);
+    backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+    /* Increased blur */
+    -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+    box-shadow:
+        15px 15px 35px rgba(0, 0, 0, 0.2),
+        -5px -5px 20px rgba(0, 0, 0, 0.1),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
 }
 
 .customSelectMenu:hover {
@@ -1368,52 +1780,46 @@
     position: absolute;
     top: 100%;
     left: 0;
-    width: 300px;
+    width: 350px;
+    /* Increased from 300px */
     max-width: 90vw;
-    /* Prevent overflow on small screens */
     margin-top: 0.5rem;
-    background: rgba(10, 10, 10, 0.85);
-    /* High opacity dark background */
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 1.5rem;
-    padding: 1rem;
+    background: transparent;
+    /* No darker grey perimeter */
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    padding: 1.5rem;
     z-index: 1000;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(80px);
-    /* Very very blurred */
-    -webkit-backdrop-filter: blur(80px);
+    box-shadow:
+        0 15px 35px rgba(0, 0, 0, 0.5),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    animation: fadeIn 0.2s ease-out;
+    animation: slideIn 0.3s ease-out;
 }
 
-@media (max-width: 768px) {
-
-    .datePickerPopup,
-    .customSelectMenu {
-        position: fixed !important;
-        /* Center on screen (or containing block) */
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        width: 300px !important;
-        max-width: 90vw !important;
-        max-height: 80vh !important;
-        z-index: 99999 !important;
-        overflow-y: auto !important;
-        border-radius: 1.5rem !important;
-        margin: 0 !important;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
-        /* Ensure visibility */
-    }
-
-    /* Disable hover scale on touch devices to prevent stuck state and conflicts */
-    .datePickerPopup:hover,
-    .customSelectMenu:hover {
-        transform: translate(-50%, -50%) !important;
-    }
+/* For mobile portal centering */
+.mobileModalContent .datePickerPopup {
+    position: static;
+    width: 100%;
+    max-width: unset;
+    box-shadow: none;
+    border: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+    margin: 0;
+    animation: none;
+    background: transparent;
 }
+
+
 
 [data-theme="light"] .datePickerPopup {
     background: rgba(255, 255, 255, 0.85);
@@ -1424,6 +1830,33 @@
 .datePickerPopup:hover {
     transform: scale(1.02);
     transition: transform 0.2s;
+}
+
+/* STRONG RESET for nested mobile modals to prevent double-window effect */
+.mobileModalContent .customSelectMenu,
+.mobileModalContent .datePickerPopup,
+[data-theme="light"] .mobileModalContent .customSelectMenu,
+[data-theme="light"] .mobileModalContent .datePickerPopup {
+    position: static;
+    width: 100%;
+    max-width: unset;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    /* Reset border radius to prevent clipping children */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0;
+    margin: 0;
+    animation: none;
+    background: transparent !important;
+    max-height: none;
+    transform: none !important;
+}
+
+.mobileModalContent .customSelectMenu:hover,
+.mobileModalContent .datePickerPopup:hover {
+    transform: none !important;
 }
 
 @keyframes fadeIn {
@@ -1474,6 +1907,10 @@
     border-radius: 50%;
     color: var(--text-primary);
     transition: all 0.2s;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .dateCell:hover:not(.empty) {
@@ -1501,6 +1938,9 @@
     color: var(--text-secondary);
     transition: all 0.2s;
     font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .customSelectOption:hover {
@@ -1551,59 +1991,17 @@
 }
 
 .secondaryButton:hover {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.144), rgba(239, 68, 68, 0.1)) !important;
-    /* Red tint for close */
+    background: transparent !important;
     transform: scale(1.02);
     border-radius: 18px;
-    box-shadow: 0 6px 12px rgba(239, 68, 68, 0.3), inset 0 2px 4px rgba(239, 68, 68, 0.3);
-    border: none;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+    border: 1px solid #EF4444;
     color: #EF4444;
 }
 
 /* Glassmorphism Input Style for Edit Rows */
 /* Glassmorphism Input Style for Edit Rows */
-.pInput {
-    /* Exact copy of .backButton:hover style */
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
-    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
-    border: none;
-    border-radius: 12px;
-
-    color: var(--text-primary) !important;
-    -webkit-text-fill-color: var(--text-primary) !important;
-    font-weight: 600;
-    /* Reduced from 700, slightly bold but readable, or just normal? User said "dont make... bold". So normal (400) or 500. Let's try 500/normal. I will set to default (remove or 500). Let's use 500 for slight weight or just inherit. User said "dont make... bold". I will use 'normal'. */
-    font-weight: normal;
-    text-align: center;
-
-    padding: 0.4rem 0.6rem;
-    font-size: 0.9rem;
-    outline: none;
-    transition: all 0.3s ease;
-    width: 100%;
-    min-width: 80px;
-
-    /* Hide spinners */
-    -moz-appearance: textfield;
-    appearance: none;
-}
-
-.pInput::-webkit-outer-spin-button,
-.pInput::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-.pInput:focus {
-    transform: scale(1.05);
-}
-
-/* Light Mode Override */
-[data-theme="light"] .pInput {
-    background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(96, 165, 250, 0.1)) !important;
-    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.4);
-    color: var(--text-primary) !important;
-}
+/* .pInput definition moved/merged above */
 
 /* Style for the Date Picker trigger in Edit Mode */
 .editableDateTrigger {
@@ -1636,12 +2034,63 @@
     box-shadow: 0 6px 12px rgba(96, 165, 250, 0.4);
     color: var(--text-primary);
 }
+
+/* Portfolio Input Styles - Matching Search Bar in TopNav */
+.portfolioInputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.1),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.portfolioInputWrapper:focus-within {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border-color: rgba(96, 165, 250, 0.5);
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.3), inset 0 2px 4px rgba(96, 165, 250, 0.3);
+}
+
+.portfolioInput {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    width: 240px;
+    outline: none;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.portfolioIconLeft {
+    padding-left: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+}
+
 .chartFootnote {
     margin-top: 1.5rem;
     padding: 0 1rem;
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+@media (min-width: 1024px) {
+    .chartFootnote {
+        min-height: 120px;
+        justify-content: flex-start;
+    }
 }
 
 .footnoteList {
@@ -1658,5 +2107,155 @@
         flex-wrap: wrap;
         justify-content: center;
         gap: 0.75rem;
+    }
+}
+
+.customSelectGroupLabel {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-top: 0.5rem;
+}
+
+.customSelectGroupLabel:first-child {
+    margin-top: 0;
+}
+
+.portfolioTypeSmallSelect {
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-secondary);
+    border-radius: 1.5rem;
+    padding: 0 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    height: 2.8rem;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.portfolioTypeSmallSelect:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    transform: scale(1.1);
+    border-radius: 18px;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none !important;
+    color: var(--text-primary);
+}
+
+:global(body.light-mode) .portfolioTypeSmallSelect {
+    background: transparent !important;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.1),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.5),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.8) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.8) !important;
+}
+
+.typeSelectorContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* TypeSelector styles matching customSelectMenu EXACTLY */
+.typeSelectorMenu {
+    position: absolute;
+    /* Use exact background/border/shadow/blur from customSelectMenu */
+    background: rgba(15, 23, 42, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    /* Match customSelectMenu radius */
+    padding: 1rem;
+    /* Slightly less padding as it has fewer items */
+    min-width: 140px;
+    /* Slightly wider */
+    z-index: 999999;
+    box-shadow:
+        0 15px 35px rgba(0, 0, 0, 0.5),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    animation: slideUp 0.2s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    [data-theme="light"] & {
+        background: rgba(255, 255, 255, 0.95);
+        border-color: rgba(0, 0, 0, 0.1);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.typeOption {
+    padding: 0.8rem 1rem;
+    color: var(--text-secondary);
+    /* Start with secondary color like unselected options */
+    cursor: pointer;
+    border-radius: 1rem;
+    /* Match customSelectOption radius */
+    transition: all 0.3s ease;
+    text-align: left;
+    /* Align like custom select options */
+    font-size: 1rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+
+    [data-theme="light"] & {
+        color: var(--text-secondary);
+    }
+}
+
+/* Match customSelectOption hover/selected state */
+.typeOption:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    color: var(--text-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+
+    [data-theme="light"] & {
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(96, 165, 250, 0.1));
+        color: #2563eb;
+        box-shadow: 0 4px 12px rgba(96, 165, 250, 0.15);
     }
 }

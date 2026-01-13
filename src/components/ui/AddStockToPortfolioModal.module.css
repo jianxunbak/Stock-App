@@ -260,13 +260,29 @@
 .checkbox {
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
     flex-shrink: 0;
+}
+
+[data-theme="light"] .checkbox {
+    border-color: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.customSelectOption:hover .checkbox {
+    border-color: #ffffff;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="light"] .customSelectOption:hover .checkbox {
+    border-color: #000000;
+    background: rgba(0, 0, 0, 0.1);
 }
 
 .checkbox.checked {
@@ -395,4 +411,20 @@
     to {
         transform: rotate(360deg);
     }
+}
+
+.customSelectGroupLabel {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-top: 0.5rem;
+}
+
+.customSelectGroupLabel:first-child {
+    margin-top: 0;
 }

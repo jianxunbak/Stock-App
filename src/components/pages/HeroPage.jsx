@@ -71,19 +71,17 @@ const HeroPage = () => {
     };
 
     // --- Background Prefetching Strategy ---
-    const { portfolio } = usePortfolio();
+    const { portfolioList } = usePortfolio();
 
     // Silently pre-fetch portfolio data in background when user is idle on Hero Page
     useEffect(() => {
-        if (currentUser && portfolio.length > 0) {
-            const uniqueTickers = [...new Set(portfolio.map(p => p.ticker))];
+        const firstPortfolioItems = portfolioList?.[0]?.portfolio || [];
+        if (currentUser && firstPortfolioItems.length > 0) {
+            const uniqueTickers = [...new Set(firstPortfolioItems.map(p => p.ticker))];
 
             // Wait 5s (increased from 1s) after load to allow user to search comfortably first
             const timer = setTimeout(() => {
-                // If user has navigated away or started searching, we might want to skip, 
-                // but since this is inside a timeout, we check if component is still mounted implicitly by cleanup.
-
-                console.log("HeroPage: Starting background prefetch for portfolio...");
+                console.log("HeroPage: Starting background prefetch for first portfolio...");
 
                 uniqueTickers.forEach((ticker, index) => {
                     // Stagger requests every 500ms (slower) to avoid clogging network
@@ -99,7 +97,7 @@ const HeroPage = () => {
 
             return () => clearTimeout(timer);
         }
-    }, [currentUser, portfolio.length]);
+    }, [currentUser, portfolioList]);
     // ---------------------------------------
 
     return (

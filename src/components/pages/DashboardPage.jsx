@@ -15,7 +15,6 @@ import Modal from '../ui/Modal';
 import WatchlistModal from '../ui/WatchlistModal';
 import AddStockToPortfolioModal from '../ui/AddStockToPortfolioModal';
 import { usePortfolio } from '../../hooks/usePortfolio';
-import { useTestPortfolio } from '../../hooks/useTestPortfolio';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import UserProfileModal from '../ui/UserProfileModal';
@@ -35,8 +34,7 @@ const DashboardPage = () => {
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showAddPortfolioModal, setShowAddPortfolioModal] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-    const { addToPortfolio: addToMainPortfolio } = usePortfolio();
-    const { portfolioList, addStockToTestPortfolio } = useTestPortfolio();
+    const { portfolioList, addStockToPortfolio } = usePortfolio();
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -60,19 +58,34 @@ const DashboardPage = () => {
     });
 
     // Collapsible Cards State
-    const [openCards, setOpenCards] = useState({
-        overview: true,
-        growth: true,
-        profitability: true,
-        moat: true,
-        debt: true,
-        valuation: true,
-        support: true,
-        financials: true
+    // Collapsible Cards State
+    const [openCards, setOpenCards] = useState(() => {
+        const saved = localStorage.getItem('analysis_card_states');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.error("Failed to parse saved card states", e);
+            }
+        }
+        return {
+            overview: true,
+            growth: true,
+            profitability: true,
+            moat: true,
+            debt: true,
+            valuation: true,
+            support: true,
+            financials: true
+        };
     });
 
     const toggleCard = (card) => {
-        setOpenCards(prev => ({ ...prev, [card]: !prev[card] }));
+        setOpenCards(prev => {
+            const newState = { ...prev, [card]: !prev[card] };
+            localStorage.setItem('analysis_card_states', JSON.stringify(newState));
+            return newState;
+        });
     };
 
     // Persistence: Load ticker from localStorage or URL on mount
@@ -147,11 +160,7 @@ const DashboardPage = () => {
 
         try {
             const promises = portfolioIds.map(async (id) => {
-                if (id === 'main') {
-                    return addToMainPortfolio(stockData);
-                } else {
-                    return addStockToTestPortfolio(id, stockData);
-                }
+                return addStockToPortfolio(id, stockData);
             });
 
             await Promise.all(promises);

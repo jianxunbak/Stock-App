@@ -83,7 +83,14 @@ const CustomSelect = ({ value, onChange, options, placeholder, isMobile, multipl
                         Select All
                     </div>
                 )}
-                {options.map(opt => {
+                {options.map((opt, idx) => {
+                    if (opt.isGroup) {
+                        return (
+                            <div key={`group-${idx}`} className={styles.customSelectGroupLabel}>
+                                {opt.label}
+                            </div>
+                        );
+                    }
                     const optValue = opt.value || opt;
                     const optLabel = opt.label || opt;
                     const isSelected = isOptionSelected(optValue);
@@ -207,7 +214,7 @@ const CustomDatePicker = ({ value, onChange, isMobile }) => {
 // --- Main Modal Component ---
 
 const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioList = [], isMobile, currentRate = 1 }) => {
-    const [selectedPortfolioIds, setSelectedPortfolioIds] = useState(['main']);
+    const [selectedPortfolioIds, setSelectedPortfolioIds] = useState([]);
     const [shares, setShares] = useState('');
     const [cost, setCost] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -215,9 +222,18 @@ const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioLis
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Initial default selection: first portfolio in list
+    useEffect(() => {
+        if (isOpen && portfolioList.length > 0 && selectedPortfolioIds.length === 0) {
+            setSelectedPortfolioIds([portfolioList[0].id]);
+        }
+    }, [isOpen, portfolioList]);
+
     const portfolioOptions = [
-        { value: 'main', label: 'Main Portfolio' },
-        ...portfolioList.map(p => ({ value: p.id, label: p.name }))
+        { label: 'Main Portfolios', isGroup: true },
+        ...portfolioList.filter(p => (p.type || 'main') === 'main').map(p => ({ value: p.id, label: p.name })),
+        { label: 'Test Portfolios', isGroup: true },
+        ...portfolioList.filter(p => p.type === 'test').map(p => ({ value: p.id, label: p.name }))
     ];
 
     const handleSubmit = async () => {

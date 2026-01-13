@@ -94,7 +94,11 @@ export const calculatePortfolioTWR = async (portfolioItems, uid) => {
         const response = await axios.post(`${API_URL}/portfolio/twr`, { items: portfolioItems, uid });
         return response.data;
     } catch (error) {
-        console.error("Error calculating TWR:", error);
+        if (error.response) {
+            console.error("Error calculating TWR:", error.response.status, error.response.data);
+        } else {
+            console.error("Error calculating TWR:", error.message);
+        }
         return null;
     }
 };
