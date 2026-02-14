@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, googleProvider, storage } from '../firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import LoadingScreen from '../components/ui/LoadingScreen/LoadingScreen';
 
 const AuthContext = createContext();
 
@@ -108,7 +109,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {loading ? <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>Loading App...</div> : children}
+            {loading ? <LoadingScreen fullScreen={true} /> : children}
         </AuthContext.Provider>
     );
 };

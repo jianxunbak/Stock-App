@@ -189,12 +189,13 @@ const SearchBar = ({
                         >
                             <input
                                 ref={inputRef}
-                                type="text"
+                                type="search"
                                 className="search-bar-input"
                                 placeholder={placeholder}
                                 value={searchValue}
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyDown}
+                                enterKeyHint="search"
                                 style={{ fontSize: fontSize }}
                             />
                             <div className="search-bar-actions">

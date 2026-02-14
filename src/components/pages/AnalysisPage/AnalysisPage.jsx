@@ -30,6 +30,7 @@ import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
 import StockOverviewCard from '../../cards/StockOverviewCard/StockOverviewCard';
 import Button from '../../ui/Button';
 import StockInfoModal from '../../ui/Modals/StockInfoModal';
+import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
 
 import styles from './AnalysisPage.module.css';
 
@@ -542,14 +543,7 @@ const AnalysisPage = () => {
                     )
                 }
             </div >
-            {
-                (loading || initialLoading) && (
-                    <div className={styles.loadingOverlay}>
-                        <div className={styles.spinner}></div>
-                        <div className={styles.loadingText}>Loading Data...</div>
-                    </div>
-                )
-            }
+            {(loading || initialLoading) && <LoadingScreen fullScreen={true} message="Loading Data..." />}
         </div >
     );
 };

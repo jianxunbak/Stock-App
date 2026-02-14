@@ -17,6 +17,7 @@ import TopNav from '../../ui/Navigation/TopNav';
 import WatchlistModal from '../../ui/Modals/WatchlistModal';
 import UserProfileModal from '../../ui/Modals/UserProfileModal';
 import { fetchStockData } from '../../../services/api';
+import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
 
 const HeroPage = () => {
     const [ticker, setTicker] = useState('');
@@ -208,10 +209,7 @@ const HeroPage = () => {
             )}
 
             {(isValidating || isLoggingIn) && (
-                <div className={styles.loadingOverlay}>
-                    <div className={styles.spinner}></div>
-                    <div className={styles.loadingText}>{isValidating ? 'Validating Ticker...' : 'Logging in...'}</div>
-                </div>
+                <LoadingScreen fullScreen={true} message={isValidating ? 'Validating Ticker...' : 'Logging in...'} />
             )}
         </div>
     );

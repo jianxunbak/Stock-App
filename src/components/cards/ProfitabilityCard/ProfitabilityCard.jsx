@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus, Activity } from 'lucide-react';
 import CardToggleButton from '../CardToggleButton/CardToggleButton';
 import MetricCard from '../../ui/MetricCard/MetricCard';
 import { useStockData } from '../../../hooks/useStockData';

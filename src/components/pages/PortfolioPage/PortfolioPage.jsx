@@ -18,6 +18,7 @@ import WatchlistModal from '../../ui/Modals/WatchlistModal';
 import UserProfileModal from '../../ui/Modals/UserProfileModal';
 import LogoutConfirmationModal from '../../ui/Modals/LogoutConfirmationModal';
 import Button from '../../ui/Button';
+import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
 
 // Refactored Components
 import PortfolioSummaryCard from '../../cards/PortfolioSummaryCard/PortfolioSummaryCard';
@@ -766,7 +767,7 @@ const PortfolioPage = () => {
         if (currentUser?.uid) saveUserSettings(currentUser.uid, { hiddenColumns: newState });
     };
 
-    const logoContainerContent = (<TopNavLogo customTitle={isMobile ? null : "My Portfolio"} />);
+    const logoContainerContent = (<TopNavLogo />);
     const backButtonContent = (
         <Button
             onClick={() => navigate('/')}
@@ -1390,7 +1391,7 @@ const PortfolioPage = () => {
                 </Window>
             )}
 
-            {portfolioLoading || isLoadingData ? <div className={styles.loadingOverlay}><div className={styles.spinner}></div></div> : null}
+            {portfolioLoading || isLoadingData ? <LoadingScreen fullScreen={true} message="Loading Data..." /> : null}
 
             {/* Search Error Window */}
             <Window
@@ -1567,7 +1568,7 @@ const PortfolioSelectWindow = ({ isOpen, onClose, portfolioList, currentPortfoli
                                                 borderRadius: '4px',
                                                 padding: '4px 8px',
                                                 color: 'var(--neu-text-primary)',
-                                                width: '100%',
+                                                flex: 1,
                                                 outline: 'none'
                                             }}
                                             onKeyDown={(e) => {
@@ -1576,20 +1577,20 @@ const PortfolioSelectWindow = ({ isOpen, onClose, portfolioList, currentPortfoli
                                             }}
                                         />
                                         <Button
-                                            variant="icon"
                                             onClick={saveEdit}
                                             style={{ color: 'var(--neu-success)' }}
                                             title="Save"
+                                            variant="text"
                                         >
-                                            <Check size={24} />
+                                            OK
                                         </Button>
                                         <Button
-                                            variant="icon"
                                             onClick={cancelEdit}
-                                            style={{ color: 'var(--neu-text-secondary)' }} // Matching footer cancel style
+                                            style={{ color: 'var(--neu-text-secondary)' }}
                                             title="Cancel"
+                                            variant="text"
                                         >
-                                            <X size={24} />
+                                            Cancel
                                         </Button>
                                     </div>
                                 ) : (

@@ -1,4 +1,5 @@
 import { AlertTriangle, Plus, Edit2, Trash2, Briefcase, ChevronRight, Check, X } from 'lucide-react';
+import Button from '../../ui/Button';
 import StockHeader from '../../ui/StockHeader/StockHeader';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
 import StockHealthCard from '../../ui/StockHealthCard/StockHealthCard';
@@ -114,18 +115,22 @@ const PortfolioSummaryCard = ({
                                 if (e.key === 'Escape') setIsRenaming(false);
                             }}
                         />
-                        <div
+                        <Button
+                            variant="icon"
                             onClick={onRenameSubmit}
-                            style={{ cursor: 'pointer', color: 'var(--neu-success)', display: 'flex', padding: 4 }}
+                            style={{ color: 'var(--neu-success)' }}
+                            title="Confirm Rename"
                         >
                             <Check size={24} />
-                        </div>
-                        <div
+                        </Button>
+                        <Button
+                            variant="icon"
                             onClick={() => setIsRenaming(false)}
-                            style={{ cursor: 'pointer', color: 'var(--neu-text-secondary)', display: 'flex', padding: 4 }}
+                            style={{ color: 'var(--neu-text-secondary)' }}
+                            title="Cancel Rename"
                         >
                             <X size={24} />
-                        </div>
+                        </Button>
                     </div>
                 ) : (
                     <StockHeader
