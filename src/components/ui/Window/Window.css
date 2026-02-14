@@ -1,0 +1,438 @@
+.window-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+    pointer-events: auto;
+}
+
+.window-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--neu-app-bg);
+    z-index: -1;
+    opacity: 0;
+    pointer-events: auto;
+    transition: opacity 0.4s ease;
+}
+
+.window-overlay.open {
+    opacity: 0.9;
+}
+
+.window-wrapper.resizing {
+    cursor: col-resize !important;
+}
+
+.window-wrapper.resizing * {
+    user-select: none !important;
+}
+
+/* Window content scroll area */
+/* Window content scroll area */
+/* Window content scroll area */
+.window-card {
+    overflow: visible !important;
+    max-height: 100%;
+    height: 100% !important;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Window Content Structure */
+.window-card .styled-card-content {
+    padding: 1rem;
+    overflow: visible;
+    /* Clips content to rounding */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    border-radius: var(--neu-radius-lg);
+    background: transparent;
+    position: relative;
+}
+
+/* Sticky Header for Window Modals - Acts as the "Blank Band" */
+.window-card .styled-card-header {
+    position: sticky;
+    top: -1rem;
+    /* Offset the 1rem padding of .styled-card-content */
+    z-index: 150;
+    background: var(--neu-bg);
+    /* margin: -1rem -1rem 1rem -1rem; */
+    /* Negate side padding, push content down */
+    /* padding: 1.25rem 1.25rem 1rem; */
+    padding-bottom: 1rem;
+    border-bottom: none;
+    box-shadow: none;
+}
+
+/* Ensure controls container doesn't overlap title */
+.window-card .styled-card-controls-container {
+    background: transparent;
+    z-index: 160;
+}
+
+/* Correctly position the Absolute Close Button within the sticky header context */
+.window-card .styled-card-close-btn {
+    position: static !important;
+    /* Flow naturally in header flexbox */
+}
+
+.window-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto !important;
+    color: var(--neu-text-secondary);
+    min-height: 0;
+    /* padding: 0.5rem 1rem 1.5rem; */
+    /* Balanced bottom/side padding */
+    scrollbar-gutter: stable;
+}
+
+/* Custom Scrollbar - Synced with TableChart */
+.window-content::-webkit-scrollbar {
+    width: 6px;
+    /* Slimmer, more elegant themed scrollbar */
+    height: 6px;
+}
+
+.window-content::-webkit-scrollbar-track {
+    background: transparent;
+    /* Cleaner themed look */
+}
+
+.window-content::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+    border-radius: 10px;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.window-content::-webkit-scrollbar-thumb:hover {
+    background: var(--neu-text-tertiary);
+}
+
+[data-theme="light"] .window-content::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+}
+
+[data-theme="light"] .window-content::-webkit-scrollbar-thumb:hover {
+    background: var(--neu-text-tertiary);
+}
+
+/* Watchlist Table - Centered content */
+.watchlist-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 1rem;
+    position: relative;
+    scrollbar-gutter: stable;
+}
+
+.watchlist-table-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.watchlist-table-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.watchlist-table-scroll::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+    border-radius: 10px;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.watchlist-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--neu-text-tertiary);
+}
+
+.watchlist-table-wrapper {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.watchlist-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    table-layout: fixed;
+    /* Forces columns to follow px/percent widths strictly */
+    min-width: 0;
+}
+
+.watchlist-table th {
+    text-align: center;
+    padding: 0.75rem 1rem 0.75rem 0.3rem;
+    /* Extra right padding for resize handle and sort icon */
+    color: var(--neu-text-tertiary);
+    font-weight: 600;
+    border-bottom: none;
+    border-right: none;
+    white-space: nowrap;
+    overflow: hidden;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--neu-bg);
+    text-overflow: ellipsis;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+    min-width: 0;
+}
+
+.watchlist-table th:hover {
+    background-color: var(--neu-app-bg);
+}
+
+.watchlist-th-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+    display: block;
+}
+
+.watchlist-th-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.watchlist-th-content svg {
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.watchlist-table th:first-child .watchlist-th-content {
+    justify-content: flex-start;
+}
+
+.watchlist-table th:first-child {
+    text-align: left;
+    padding-left: 0.75rem;
+    padding-right: 1.25rem;
+    /* Extra space for icons */
+}
+
+.watchlist-table th:last-child {
+    border-right: none;
+}
+
+.resize-handle {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 24px;
+    cursor: col-resize;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    opacity: 0;
+    color: var(--neu-text-tertiary);
+}
+
+.watchlist-table th:hover .resize-handle {
+    opacity: 1;
+}
+
+.resize-handle:hover {
+    color: var(--neu-brand);
+}
+
+/* Hide the old vertical line */
+.resize-handle::after {
+    display: none;
+}
+
+.watchlist-table td {
+    padding: 0.75rem 1.25rem 0.75rem 0.75rem;
+    /* Match th padding for alignment */
+    border-bottom: 1px solid var(--neu-border-subtle);
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    min-width: 0;
+}
+
+.watchlist-table td:first-child {
+    text-align: left;
+    padding-left: 0.75rem;
+    padding-right: 1.25rem;
+    min-width: 0;
+}
+
+.watchlist-instrument-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-content: flex-start;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+.watchlist-icon-placeholder {
+    width: 12px;
+    flex-shrink: 0;
+}
+
+.watchlist-instrument-info {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.watchlist-table tr:last-child td {
+    border-bottom: none;
+}
+
+.watchlist-ticker {
+    font-weight: 700;
+    color: var(--neu-text-primary);
+}
+
+.watchlist-company {
+    font-size: 0.75rem;
+    color: var(--neu-text-tertiary);
+}
+
+/* Notes Input Field */
+.watchlist-notes-input {
+    background: var(--neu-bg);
+    border: none;
+    border-radius: var(--neu-radius-sm);
+    padding: 0.4rem 0.6rem;
+    color: var(--neu-text-secondary);
+    font-size: 0.75rem;
+    width: 100%;
+    max-width: 150px;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+    outline: none;
+    transition: var(--neu-transition-default);
+}
+
+
+
+.watchlist-signal {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.watchlist-signal.buy {
+    background: rgba(43, 194, 83, 0.1);
+    color: var(--neu-success);
+}
+
+.watchlist-signal.hold {
+    background: rgba(245, 158, 11, 0.1);
+    color: #F59E0B;
+    /* Amber/Orange */
+}
+
+.watchlist-signal.sell {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--neu-danger);
+}
+
+
+/* User Details - Vertical Layout */
+.user-details-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    /* Left align */
+    gap: 1.5rem;
+    padding: 1rem 0;
+    width: 100%;
+}
+
+.user-profile-header {
+    display: flex;
+    flex-direction: column;
+    /* Vertical stack photo and name */
+    align-items: flex-start;
+    gap: 1rem;
+    width: 100%;
+}
+
+.user-avatar-container {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--neu-text-tertiary);
+    border: 3px solid var(--neu-app-bg);
+    /* Add slight border to define edges */
+    overflow: hidden;
+    /* Ensure image stays circular */
+}
+
+.user-avatar-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.user-info {
+    text-align: left;
+}
+
+.user-info h3 {
+    margin: 0;
+    color: var(--neu-text-primary);
+}
+
+.user-info p {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: var(--neu-text-tertiary);
+}
+
+/* User Actions - Same Row with Icons only */
+.user-actions-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 1.5rem;
+    width: 100%;
+}

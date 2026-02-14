@@ -1,0 +1,239 @@
+/* --- FinancialStatementsTable --- */
+
+/* FinancialStatementsTable Styles */
+
+.fs-table-body-content {
+    position: relative;
+    width: 100%;
+    min-height: 100px;
+}
+
+.fs-table-title {
+    font-size: 1.5rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--neu-text-primary);
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.fs-etf-message {
+    padding: 3rem;
+    text-align: center;
+    color: var(--neu-text-secondary);
+    font-style: italic;
+    background: rgba(163, 177, 198, 0.05);
+    border-radius: var(--neu-radius-md);
+    margin-top: 3rem;
+}
+
+.fs-table-wrapper {
+    display: flex;
+    flex-direction: column;
+    margin-top: 1.5rem;
+    /* Gap for the absolute title */
+    width: 100%;
+}
+
+.fs-table-wrapper.resizing {
+    cursor: col-resize;
+    user-select: none;
+}
+
+.fs-table-scroll-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    border-radius: var(--neu-radius-md);
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+    /* Cross-browser scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: var(--neu-border-subtle) transparent;
+}
+
+.fs-table-scroll-container::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.fs-table-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fs-table-scroll-container::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+    border-radius: 10px;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.fs-table-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: var(--neu-text-tertiary);
+}
+
+/* Light mode specific refinements if needed */
+[data-theme="light"] .fs-table-scroll-container::-webkit-scrollbar-thumb {
+    background-color: rgba(163, 177, 198, 0.5);
+}
+
+[data-theme="light"] .fs-table-scroll-container::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(163, 177, 198, 0.8);
+}
+
+.fs-table-element {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    color: var(--neu-text-primary);
+    table-layout: fixed;
+}
+
+.fs-th,
+.fs-td {
+    padding: 0.75rem 1.25rem 0.75rem 0.75rem;
+    /* Reserved space for resizing/sorting icons */
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    border-right: none;
+    /* Removed individual borders for cleaner look */
+}
+
+.fs-th:last-child,
+.fs-td:last-child {
+    border-right: none;
+}
+
+/* First Column: Sticky, Opaque, and Wrapping */
+.fs-th:first-child,
+.fs-td-sticky {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: var(--neu-bg) !important;
+    text-align: left !important;
+    max-width: none;
+    /* Allow resizing to control width */
+    padding-left: 0.75rem;
+    padding-right: 1.25rem;
+    border-right: 1px solid var(--neu-border-subtle) !important;
+}
+
+[data-theme="dark"] .fs-th:first-child,
+[data-theme="dark"] .fs-td-sticky {
+    background-color: #1A1D21 !important;
+    /* Force solid dark background */
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.fs-th {
+    color: var(--neu-text-tertiary);
+    font-weight: 600;
+    border-bottom: none;
+    /* Borderless header like watchlist */
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.fs-th:hover {
+    background-color: var(--neu-app-bg);
+}
+
+.watchlist-th-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+    display: block;
+}
+
+.watchlist-th-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.watchlist-th-content svg {
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+/* Resize Handle Support */
+.resize-handle {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 100%;
+    /* Full height for better grab */
+    cursor: col-resize;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    opacity: 0;
+    color: var(--neu-text-tertiary);
+}
+
+.fs-th:hover .resize-handle {
+    opacity: 0.5;
+}
+
+.resize-handle:hover {
+    opacity: 1;
+    color: var(--neu-brand);
+}
+
+.fs-th:first-child .watchlist-th-content {
+    justify-content: flex-start;
+}
+
+.fs-td-sticky {
+    font-weight: 500;
+}
+
+/* Resize handle style inherited from global or defined here matching global */
+.fs-resize-handle {
+    display: none;
+    /* Using global .resize-handle if possible, but let's define for fs- specificity if needed */
+}
+
+.fs-tr {
+    border-bottom: 1px solid rgba(163, 177, 198, 0.1);
+}
+
+.fs-row-total {
+    background: rgba(163, 177, 198, 0.03);
+    font-weight: 700;
+}
+
+.fs-row-total .fs-td {
+    color: var(--neu-text-primary);
+}
+
+.fs-val-negative {
+    color: var(--neu-error) !important;
+}
+
+@media (max-width: 768px) {
+
+    .fs-th,
+    .fs-td {
+        padding: 0.6rem 0.75rem;
+        font-size: 0.8rem;
+    }
+}

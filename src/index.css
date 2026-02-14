@@ -1,95 +1,72 @@
-* {
-  box-sizing: border-box;
-}
-
-/* Tailwind directives removed */
+@import './styles/design-tokens.css';
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
 
-  /* Dark Mode Defaults */
-  --bg-primary: #080a12;
-  --bg-secondary: #161e29;
-  --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
-  --border-color: #374151;
-  --input-bg: #1f2937;
-  --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --glass-bg: rgba(255, 255, 255, 0.1);
-  --glass-border: rgba(255, 255, 255, 0.2);
+    /* Aliasing old variables to new tokens for compatibility */
+    --bg-primary: var(--neu-app-bg);
+    --bg-secondary: var(--neu-bg);
+    --text-primary: var(--neu-text-primary);
+    --text-secondary: var(--neu-text-secondary);
+    --text-tertiary: var(--neu-text-tertiary);
 
-  color-scheme: light dark;
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
+    /* These might still be needed for parts not yet updated */
+    --text-muted: var(--neu-text-tertiary);
+    --border-color: var(--neu-border-subtle);
+    --input-bg: var(--neu-bg);
+    --card-shadow: var(--neu-card-shadow);
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: var(--neu-border-subtle);
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+    color-scheme: light dark;
+    color: var(--neu-text-primary);
+    background-color: var(--neu-app-bg);
 
-[data-theme="light"] {
-  --bg-primary: #f3f4f6;
-  /* Light gray background */
-  --bg-secondary: #ffffff;
-  /* White cards */
-  --text-primary: #111827;
-  /* Dark text */
-  --text-secondary: #4b5563;
-  /* Gray text */
-  --text-muted: #9ca3af;
-  --border-color: #e5e7eb;
-  --input-bg: #ffffff;
-  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  /* More opaque for light mode */
-  --glass-border: rgba(0, 0, 0, 0.1);
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease;
+    margin: 0;
+    width: 100%;
+    min-height: 100vh;
+    background-color: var(--neu-app-bg);
+    color: var(--neu-text-primary);
+    transition: background-color 0.4s ease, color 0.4s ease;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+#root {
+    width: 100%;
 }
 
+* {
+    box-sizing: border-box;
+    outline: none !important;
+}
+
+/* Base Headings - Resetting to be cleaner */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    margin: 0;
+    color: var(--neu-text-primary);
+}
+
+/* Remove default button styles that might clash with our neumorphic buttons */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-
-button:hover {
-  border-color: #646cff;
-}
-
-button:focus,
-button:focus-visible {
-  outline: none;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
 }

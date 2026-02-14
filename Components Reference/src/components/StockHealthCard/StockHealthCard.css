@@ -1,0 +1,351 @@
+/* --- Stock Health Card (Based on ExpandableCard) --- */
+
+/* 2. Background Layer */
+.stock-health-bg {
+    display: none;
+}
+
+.stock-health-wrapper.transparent {
+    overflow: visible !important;
+}
+
+/* 3. Header Section */
+.stock-health-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+    width: 100%;
+}
+
+.stock-health-header-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+}
+
+/* --- Health Score Specifics --- */
+
+/* Score Ring */
+/* Score Ring */
+.score-ring-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    /* Removed background & shadow for clean look */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ... (lines 39-85 skipped for brevity in prompt, but in tool use I replacing specific blocks) ... */
+/* changing logic to match ReplaceFileContent usage: better to target specific blocks */
+
+/* I'll target the blocks specifically */
+
+.score-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+    z-index: 2;
+}
+
+.score-label-group {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    /* margin-top: 0.5rem; */
+}
+
+.health-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--neu-text-primary);
+    margin: 0;
+}
+
+.health-subtitle {
+    font-size: 0.875rem;
+    color: var(--neu-text-secondary);
+    /* margin-top: 0.25rem; */
+}
+
+/* Expand Button */
+.expand-btn-wrapper {
+    flex-shrink: 0;
+    margin-left: 1rem;
+}
+
+/* --- Body Section (Expandable) --- */
+.stock-health-body-wrapper {
+    /* margin-top: 0.5rem; */
+    padding-top: 0.5rem;
+}
+
+.health-checklist {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    /* gap: 0.25rem 0.5rem; */
+    width: 100%;
+    /* margin-top: 0.25rem; */
+}
+
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    /* padding: 0.25rem 0.5rem; */
+    border-radius: var(--neu-radius-sm);
+    /* background: var(--neu-bg); REMOVED */
+    min-width: 0;
+    min-height: 1.5rem;
+    /* Ensure sufficient height prevents cropping */
+    overflow: hidden;
+}
+
+
+
+/* Status Indicators */
+.status-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    border-radius: 50%;
+}
+
+.status-pass {
+    color: var(--neu-success);
+}
+
+.status-fail {
+    color: var(--neu-error);
+}
+
+.status-warn {
+    color: var(--neu-color-favorite);
+}
+
+.item-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--neu-text-secondary);
+    flex: 1;
+    text-align: left;
+    text-overflow: ellipsis;
+}
+
+/* --- Summary Mode --- */
+.summary-health {
+    padding: 0;
+    width: 100%;
+}
+
+.summary-health-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+    /* Add horizontal padding for solo view */
+}
+
+.summary-health-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.summary-ring-group {
+    display: flex;
+    flex-direction: column;
+    /* Stacked */
+    align-items: flex-start;
+    /* Align left */
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.summary-ring-wrapper {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.summary-score {
+    position: absolute;
+    font-size: 1.75rem;
+    /* Increased from 1.5rem */
+    font-weight: 900;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.summary-grading {
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* --- STACKING OVERRIDES (When multiple components exist) --- */
+.stock-summary-container.stacked .summary-health {
+    flex: 0 0 auto;
+}
+
+.stock-summary-container.stacked .summary-health-content {
+    padding: 0;
+    gap: 0.125rem;
+    align-items: flex-start;
+}
+
+.stock-summary-container.stacked .summary-health-title {
+    display: none !important;
+    /* Hide non-key info */
+}
+
+.stock-summary-container.stacked .summary-grading {
+    display: none !important;
+    /* Remove grading word as requested */
+}
+
+.stock-summary-container.stacked .summary-ring-wrapper {
+    transform: scale(0.85);
+    /* Slightly smaller for narrower card */
+    transform-origin: left center;
+    width: 68px;
+    /* 80 * 0.85 */
+    height: 68px;
+}
+
+.stock-summary-container.stacked .summary-ring-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Collapsed overrides from generic card */
+.expandable-card.is-collapsed .summary-health {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* Align top */
+    align-items: flex-start;
+}
+
+
+@media (max-width: 500px) {
+    .stock-health-header {
+        align-items: flex-start;
+        position: relative;
+        /* Context for absolute button */
+    }
+
+    .expand-btn-wrapper {
+        position: absolute;
+        top: 0;
+        right: 0;
+        margin: 0;
+    }
+
+    .stock-health-header-content {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0;
+        /* Reduced to tightly pack title -> circle -> subtitle */
+        flex: 1;
+        width: 100%;
+    }
+
+    .score-label-group {
+        display: contents;
+    }
+
+    .health-title {
+        grid-row: 1;
+        width: 100%;
+        margin-bottom: 0;
+        /* Remove margin */
+        font-size: 0.9rem;
+    }
+
+    .score-ring-wrapper {
+        grid-row: 2;
+        justify-self: start;
+        margin: 0.25rem 0 0 0;
+    }
+
+    .health-subtitle {
+        grid-row: 3;
+        /* margin-top: 0.25rem; */
+        /* Small gap between circle and text */
+        width: 80px;
+        /* Match circle width */
+        text-align: center;
+        /* Center relative to circle */
+        justify-self: start;
+    }
+
+    /* Checklist vertical scroll */
+    .health-checklist {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        /* Separates stacked items */
+        max-height: 160px;
+        /* Approx 4-5 items */
+        overflow-y: auto;
+        padding-right: 0.5rem;
+        padding-bottom: 0.5rem;
+        /* Reduced space */
+        mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    }
+
+    .checklist-item {
+        width: 100%;
+        box-sizing: border-box;
+        flex-shrink: 0;
+        /* Prevent shrinking */
+    }
+
+    .item-label {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    /* Scroll for more indicator */
+    .scroll-hint {
+        display: block !important;
+        /* Force show on mobile */
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--neu-text-secondary);
+        margin-top: 0.5rem;
+        /* Move down below the list */
+        padding-bottom: 0.5rem;
+        position: relative;
+        z-index: 10;
+        opacity: 0.8;
+        pointer-events: none;
+        font-weight: 500;
+    }
+}
+
+.scroll-hint {
+    display: none;
+    /* Hide by default */
+}

@@ -1,0 +1,357 @@
+.allocationGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .allocationGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        min-width: 0;
+    }
+}
+
+.allocationColumn {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+}
+
+.allocationTitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    /* Reduced from 1.5rem */
+    text-align: center;
+}
+
+.allocationContent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    /* Reduced from 2rem */
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .allocationContent {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        /* Reduced from 2rem */
+        align-items: center;
+    }
+}
+
+.allocationChart {
+    width: 100%;
+    position: relative;
+}
+
+.allocationList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 420px;
+    /* Constrain width to keep Name and Value closer */
+    margin: 0 auto;
+    padding-top: 1rem;
+}
+
+.allocationItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.allocationItem:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(5px);
+}
+
+.allocationNameGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.allocationColorDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.allocationName {
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.allocationStats {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.allocationAmount {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.allocationPct {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+/* Donut Chart Styles */
+.donutChartContainer {
+    width: 320px;
+    height: 320px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.donutChartContainer::before {
+    content: '';
+    position: absolute;
+    width: 170px;
+    height: 170px;
+    background: var(--neu-bg);
+    border-radius: 50%;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark), inset -2px -2px 5px var(--neu-shadow-light);
+    pointer-events: none;
+}
+
+.chartCenterText {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.centerValue {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.centerLabel {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.2rem;
+}
+
+/* Enhanced List Styles */
+.allocationList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.allocationRow {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem 0;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0;
+    box-shadow: none;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.allocationRow:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.02);
+    box-shadow: none;
+}
+
+.assetInfo {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.assetIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.assetName {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+
+.assetValue,
+.assetPct {
+    text-align: right;
+    font-weight: 600;
+}
+
+.assetValue {
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+
+.assetPct {
+    font-size: 0.8rem;
+}
+
+/* Tooltip Styles matching BaseChart */
+.chartTooltip {
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-sm);
+    padding: 0.75rem 1rem;
+    box-shadow: var(--neu-card-shadow);
+    border: none;
+    z-index: 50;
+    position: relative;
+    min-width: 150px;
+}
+
+.tooltipHeader {
+    font-size: 0.75rem;
+    color: var(--neu-text-secondary);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--neu-shadow-dark);
+    padding-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.tooltipItems {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.tooltipItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tooltipLabel {
+    font-weight: 500;
+    opacity: 0.8;
+    font-size: 0.8rem;
+}
+
+.tooltipValue {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.targetText {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-left: 0.5rem;
+    font-weight: 400;
+    opacity: 0.8;
+}
+
+.legendContainer {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    width: 100%;
+}
+
+.legendItem {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.legendDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.summaryContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    height: 100%;
+    gap: 0.5rem;
+    padding-left: 0;
+    padding-top: 0;
+}
+
+.summaryHeaderTitle {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.summaryChartsRow {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.summaryChart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.summaryLabel {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 600;
+}

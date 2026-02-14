@@ -1,0 +1,341 @@
+.card {
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    padding: 1.5rem;
+    color: var(--text-primary);
+    gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+[data-theme="light"] .card {
+    background: transparent;
+    box-shadow:
+        /* 1. Main Drop Shadow (Bottom & Right) - The strong one */
+        15px 15px 35px rgba(0, 0, 0, 0.2),
+        /* 2. Tiny Drop Shadow (Top & Left) - The subtle one */
+        -5px -5px 20px rgba(0, 0, 0, 0.1),
+        /* Smaller offset, smaller blur, lower opacity */
+
+        /* 3. Highlight (Inner/Inset) - Keep as is */
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+
+        /* 4. Shadow (Inner/Inset) - Keep as is */
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgb(255, 255, 255);
+    border-left: 1px solid rgb(255, 255, 255);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgb(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    z-index: 1;
+}
+
+.card:hover {
+    outline: none;
+    background: transparent;
+    transform: translateY(-10px) scale(1.01);
+    border-radius: 60px;
+}
+
+/* Ensure content sits above the background effects */
+.card>* {
+    position: relative;
+    z-index: 1;
+}
+
+.loading {
+    padding: 1.5rem;
+    background-color: var(--bg-secondary);
+    border-radius: 0.5rem;
+    height: 16rem;
+}
+
+
+
+.metricsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: left;
+    margin-top: 2.5rem;
+}
+
+.title {
+    font-size: 1.5rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.section {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0;
+    margin-bottom: 0.1rem;
+}
+
+.label {
+    font-size: 1.1rem;
+    line-height: 1.1;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+.valuationLabel {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+h4 {
+    margin: 0;
+}
+
+.methodValue {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #4ade80;
+    margin: 0;
+}
+
+.valueContainer {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+.valueDetail {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.intrinsicValue {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+    color: #4ade80;
+    margin: 0;
+    text-align: left;
+
+}
+
+.statusBadge {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+    margin: 0;
+    text-align: center;
+}
+
+.statusUndervalued {
+    color: #4ade80;
+}
+
+.statusOvervalued {
+    color: #f87171;
+}
+
+.statusFair {
+    color: #facc15;
+}
+
+.diffText {
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    color: var(--text-secondary);
+}
+
+.priceValue.positive {
+    color: #4ade80;
+}
+
+.priceValue.negative {
+    color: #f87171;
+}
+
+.assumptionsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+}
+
+.assumptionRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.assumptionRow:last-child {
+    border-bottom: none;
+}
+
+.assumptionKey {
+    color: var(--text-secondary);
+}
+
+.assumptionValue {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.valueRow {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    /* justify-content: space-evenly; */
+    align-items: left;
+    gap: 2.5rem
+}
+
+.valuationContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: left;
+    /* flex-grow: 1; */
+}
+
+.priceValue {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    text-align: left;
+
+}
+
+.differenceSection {
+    margin: 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.statusContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.differenceValue {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+    margin: 0;
+    text-align: left;
+}
+
+.undervalued {
+    color: #4ade80;
+}
+
+.overvalued {
+    color: #f87171;
+}
+
+.warningNote {
+    color: #f87171;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+    font-weight: 500;
+    padding: 0.75rem;
+    background: rgba(248, 113, 113, 0.1);
+    border-radius: 0.5rem;
+    border: 1px solid rgba(248, 113, 113, 0.2);
+    text-align: center;
+}
+
+.etfMessage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px dashed var(--border-color);
+}
+
+.methodSelector {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.preferredBadge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    background: #4ade80;
+    color: white;
+    border-radius: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-left: 0.5rem;
+}
+
+.preferredFootnote {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: rgba(74, 222, 128, 0.1);
+    border-radius: 12px;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.footnoteHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #4ade80;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.methodDropdown {
+    min-width: 180px;
+}
+
+.methodButton {
+    transition: all 0.2s ease;
+}

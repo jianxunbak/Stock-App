@@ -1,0 +1,172 @@
+/* --- Price Chart Component --- */
+
+.price-chart-container {
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    outline: none;
+}
+
+.chart-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    text-align: left;
+    align-items: flex-start;
+}
+
+.chart-title {
+    font-size: 1.1rem;
+    /* Slightly smaller to fit */
+    font-weight: 700;
+    color: var(--neu-text-primary);
+    margin: 0;
+    line-height: 1.1;
+}
+
+.chart-subtitle {
+    font-size: 0.75rem;
+    color: var(--neu-text-secondary);
+    text-align: left;
+}
+
+/* Time Period Selector */
+.time-period-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    /* Reset margin */
+    padding: 0;
+    /* Reset padding */
+}
+
+.pill-btn {
+    flex-shrink: 0;
+}
+
+
+/* Legend / Tags Section */
+.chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    /* Restore margin */
+    min-height: 0;
+}
+
+.legend-tag {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.15rem 0.5rem;
+    /* Tighter padding */
+    /* background: var(--neu-bg); REMOVED */
+    border-radius: var(--neu-radius-sm);
+    /* box-shadow: var(--neu-card-shadow); REMOVED */
+    font-size: 0.75rem;
+    color: var(--neu-text-secondary);
+    font-weight: 500;
+    transition: var(--neu-transition-default);
+}
+
+.tag-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--tag-color);
+    box-shadow: 0 0 5px var(--tag-color);
+}
+
+.tag-remove-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--neu-text-tertiary);
+    padding: 2px;
+    margin-left: 0.25rem;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.tag-remove-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--neu-error);
+}
+
+/* --- Summary Mode --- */
+.summary-chart {
+    flex: 0 0 auto;
+    width: 100%;
+    /* Default to full width for solo */
+    height: 60px;
+    /* Larger solo height */
+}
+
+.summary-chart-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    height: 100%;
+    width: 100%;
+}
+
+.summary-chart-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.summary-chart-inner {
+    width: 100%;
+    height: 100%;
+    outline: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Remove Blue Outlines on Chart click */
+.summary-chart-inner *:focus,
+.summary-chart-inner *:active {
+    outline: none !important;
+}
+
+/* --- STACKING OVERRIDES (When multiple components exist) --- */
+.stock-summary-container.stacked .summary-chart {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 140px;
+    /* Fill the dashboard right side */
+}
+
+.stock-summary-container.stacked .summary-chart-title {
+    display: block;
+    font-size: 0.7rem;
+    /* padding-left: 0.5rem; */
+}
+
+.stock-summary-container.stacked .summary-chart-content {
+    gap: 0.25rem;
+    height: 100%;
+    justify-content: center;
+}
+
+/* Collapsed overrides from generic card */
+.expandable-card.is-collapsed .summary-chart {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* Align top */
+    align-items: flex-start;
+    padding: 0;
+    width: 100%;
+}

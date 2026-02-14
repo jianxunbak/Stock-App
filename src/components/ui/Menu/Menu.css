@@ -1,0 +1,102 @@
+.menu-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-trigger-btn {
+    transition: all 0.2s ease;
+}
+
+/* Active state managed by Button component but kept for trigger sync */
+.menu-trigger-btn.active {
+    filter: brightness(1.05);
+}
+
+.menu-dropdown-wrapper {
+    position: absolute;
+    z-index: 1000;
+    min-width: 0;
+}
+
+/* Placements */
+.menu-dropdown-wrapper.bottom-right {
+    top: calc(100% + 0.75rem);
+    right: 0;
+}
+
+.menu-dropdown-wrapper.bottom-left {
+    top: calc(100% + 0.75rem);
+    left: 0;
+}
+
+.menu-dropdown-wrapper.top-right {
+    bottom: calc(100% + 0.75rem);
+    right: 0;
+}
+
+.menu-dropdown-wrapper.top-left {
+    bottom: calc(100% + 0.75rem);
+    left: 0;
+}
+
+/* --- Horizontal Expansion Mode (Search Bar Style) --- */
+.menu-dropdown-wrapper.horizontal {
+    /* Override vertical placement to align with trigger */
+    top: 50% !important;
+    bottom: auto !important;
+    min-height: 100%;
+    /* Match trigger height */
+}
+
+/* Right-aligned expansion (grows to left) */
+.menu-dropdown-wrapper.horizontal.bottom-right,
+.menu-dropdown-wrapper.horizontal.top-right {
+    right: 0;
+    left: auto;
+    transform-origin: center right;
+}
+
+/* Left-aligned expansion (grows to right) */
+.menu-dropdown-wrapper.horizontal.bottom-left,
+.menu-dropdown-wrapper.horizontal.top-left {
+    left: 0;
+    right: auto;
+    transform-origin: center left;
+}
+
+
+.menu-content-container:not(.transparent) {
+    /* Background and shadow are handled by CardAnimator */
+    box-shadow: none !important;
+}
+
+.menu-content-container.transparent {
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+/* Items Grid */
+.menu-items-grid {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.menu-items-grid.vertical {
+    flex-direction: column;
+}
+
+.menu-items-grid.horizontal {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-width: max-content;
+}
+
+/* Variant styles if needed */
+.menu-content-container.glass {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}

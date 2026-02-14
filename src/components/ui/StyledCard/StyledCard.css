@@ -1,0 +1,226 @@
+/* 1. The Container - Layout and Padding ONLY */
+.styled-card-container {
+    position: relative;
+    width: 100%;
+    background: transparent;
+    box-shadow: none;
+    border-radius: var(--neu-radius-lg);
+    color: var(--neu-text-primary);
+}
+
+.styled-card-container.transparent {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* 2. Content Layout */
+.styled-card-content {
+    padding: var(--neu-padding-sm);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+}
+
+.styled-card-content.transparent {
+    padding: 0;
+}
+
+.expandable-card>.styled-card-content>.styled-card-header {
+    justify-content: flex-end;
+    position: absolute;
+    top: var(--neu-padding-sm);
+    right: var(--neu-padding-sm);
+    width: auto;
+    background: transparent;
+    padding: 0;
+    z-index: 100;
+    /* Ensure the main toggle/menu is always on top */
+}
+
+.expandable-card>.styled-card-content {
+    padding: 0;
+    height: 100%;
+}
+
+.styled-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 25;
+    /* Always above absolute summaries/charts */
+}
+
+.styled-card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.styled-card-controls-container {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    flex-shrink: 0;
+}
+
+.styled-card-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.styled-card-close-btn {
+    display: flex;
+    opacity: 0.8;
+    color: var(--neu-text-primary);
+    transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+.styled-card-close-btn svg {
+    stroke: currentColor !important;
+}
+
+.styled-card-close-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+    color: var(--neu-error);
+}
+
+
+
+/* Standard card buttons now inherit global raised style from ButtonShared.css */
+
+/* Custom Scrollbar - Synced with TableChart */
+.side-drawer-content::-webkit-scrollbar,
+.watchlist-table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.side-drawer-content::-webkit-scrollbar-track,
+.watchlist-table-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.side-drawer-content::-webkit-scrollbar-thumb,
+.watchlist-table-wrapper::-webkit-scrollbar-thumb {
+    background-color: var(--neu-border-subtle);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.3s ease;
+}
+
+.side-drawer-content::-webkit-scrollbar-thumb:hover,
+.watchlist-table-wrapper::-webkit-scrollbar-thumb:hover {
+    background-color: var(--neu-text-tertiary);
+}
+
+/* Pressed State: Revert to standard neumorphic (pressed) */
+.styled-card-root .neu-btn-base.pressed-latch,
+.styled-card-root .neu-btn-base:active,
+.styled-card-root .neu-btn-base.active {
+    background: var(--neu-btn-bg-pressed);
+    box-shadow: var(--neu-card-shadow-inset-deep);
+    border: 1px solid transparent;
+    /* Maintain size to prevent layout shift */
+}
+
+/* Hover State: Revert to standard neumorphic (raised) */
+.styled-card-root .neu-btn-base:hover:not(.pressed-latch):not(.active) {
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow-hover, var(--neu-card-shadow));
+    /* Fallback to standard shadow if hover not defined */
+    border: 1px solid transparent;
+    filter: brightness(1.03);
+}
+
+/* Responsive Controls Menu */
+.styled-card-responsive-menu {
+    position: relative;
+    display: inline-block;
+}
+
+/* The wrapper positions the dropdown */
+.styled-card-menu-dropdown-wrapper {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.75rem;
+    /* Little more space */
+    z-index: 1000;
+    min-width: 0;
+    /* Allow shrinking to content */
+    transform-origin: top right;
+}
+
+/* The actual dropdown card style comes from CardAnimator, but we can override specifics if needed */
+.styled-card-menu-dropdown {
+    /* Ensure it looks like a floating card */
+    box-shadow: var(--neu-card-shadow-hover) !important;
+    /* Make it pop */
+    /* Remove white border as requested */
+    border: none !important;
+}
+
+/* Menu Items */
+.styled-card-menu-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Button overrides INSIDE the menu */
+/* Button overrides INSIDE the menu */
+.styled-card-menu-item>button {
+    width: auto !important;
+    min-width: 160px !important;
+    /* Slightly wider for menu alignment */
+    height: var(--neu-btn-height) !important;
+    /* Forces 2.22rem alignment */
+    padding: 0 1.25rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    font-size: var(--neu-text-sm) !important;
+    /* 0.85rem */
+
+    /* Restore standard raised look by removing flat overrides */
+    background: var(--neu-bg) !important;
+    box-shadow: var(--neu-card-shadow) !important;
+    border: none !important;
+}
+
+.styled-card-menu-item>button:active,
+.styled-card-menu-item>button.pressed-latch,
+.styled-card-menu-item>button.active {
+    background: var(--neu-btn-bg-pressed) !important;
+    box-shadow: var(--neu-card-shadow-inset-deep) !important;
+    border: 1px solid transparent !important;
+}
+
+@media (hover: hover) {
+    .styled-card-menu-item>button:hover:not(:active):not(.pressed-latch):not(.active) {
+        background: var(--neu-bg) !important;
+        box-shadow: var(--neu-card-shadow-hover) !important;
+        border: 1px solid transparent !important;
+    }
+}
+
+/* Ensure focus doesn't stick as a raised state */
+.styled-card-menu-item>button:focus:not(:active):not(.pressed-latch):not(:hover) {
+    background: var(--neu-bg) !important;
+    box-shadow: var(--neu-card-shadow) !important;
+    border: none !important;
+}
+
+/* Ensure icons inside menu buttons are sized correctly */
+.styled-card-menu-item>button svg {
+    width: 20px;
+    height: 20px;
+}

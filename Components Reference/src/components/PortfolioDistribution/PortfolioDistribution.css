@@ -1,0 +1,233 @@
+.portfolio-distribution-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.chart-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3rem;
+    flex-wrap: wrap;
+}
+
+.donut-chart-container {
+    width: 250px;
+    height: 250px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-tooltip {
+    background: var(--neu-bg);
+    padding: 1rem;
+    border-radius: var(--neu-radius-md);
+    box-shadow: var(--neu-card-shadow-hover, var(--neu-card-shadow));
+    border: 1px solid var(--neu-border-subtle);
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+    z-index: 1000 !important;
+}
+
+.tooltip-name {
+    display: block;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+    margin-bottom: 0.25rem;
+    font-size: 0.95rem;
+}
+
+.tooltip-value {
+    display: block;
+    color: var(--neu-text-secondary);
+    font-size: 0.85rem;
+}
+
+.chart-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.donut-chart-container::before {
+    content: '';
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    background: var(--neu-bg);
+    border-radius: 50%;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark), inset -2px -2px 5px var(--neu-shadow-light);
+}
+
+.center-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--neu-text-primary);
+    line-height: 1.2;
+}
+
+.center-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--neu-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.legend-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-width: 180px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.95rem;
+    color: var(--neu-text-secondary);
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--neu-radius-sm);
+    transition: var(--neu-transition-default);
+    cursor: default;
+}
+
+.legend-item:hover {
+    background: var(--neu-shadow-dark);
+    color: var(--neu-text-primary);
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.legend-percentage {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--neu-text-primary);
+}
+
+.breakdown-section {
+    width: 100%;
+}
+
+.breakdown-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.breakdown-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-md);
+    box-shadow: 2px 2px 5px var(--neu-shadow-dark), -2px -2px 5px var(--neu-shadow-light);
+    transition: var(--neu-transition-default);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.breakdown-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 4px 4px 10px var(--neu-shadow-dark), -4px -4px 10px var(--neu-shadow-light);
+}
+
+.asset-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.asset-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.8rem;
+}
+
+.asset-names {
+    display: flex;
+    flex-direction: column;
+}
+
+.asset-ticker {
+    font-weight: 700;
+    color: var(--neu-text-primary);
+}
+
+.asset-name {
+    font-size: 0.8rem;
+    color: var(--neu-text-secondary);
+}
+
+.asset-value,
+.asset-allocation,
+.asset-change {
+    text-align: right;
+    font-weight: 600;
+}
+
+.asset-value {
+    color: var(--neu-text-primary);
+}
+
+.asset-allocation {
+    color: var(--neu-text-secondary);
+}
+
+.asset-change.positive {
+    color: var(--neu-success);
+}
+
+.asset-change.negative {
+    color: var(--neu-error);
+}
+
+@media (max-width: 600px) {
+    .chart-section {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .breakdown-row {
+        grid-template-columns: 1.5fr 1fr 1fr;
+    }
+
+    .asset-change {
+        display: none;
+    }
+}

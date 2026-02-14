@@ -1,0 +1,157 @@
+/* --- CONTAINER STYLES (Matched to StockOverviewCard) --- */
+.stock-summary-container {
+    width: 100%;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Default vertical stack when only 1 section */
+.stock-summary-container:not(.stacked) {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.portfolio-details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+    /* Increased padding to clear absolute positioned controls */
+}
+
+/* DASHBOARD GRID: 2 Columns when stacked */
+.stock-summary-container.stacked {
+    display: grid !important;
+    grid-template-columns: calc((100% - 0.25rem) / 2) 1fr !important;
+    grid-auto-rows: min-content !important;
+    column-gap: 0.25rem !important;
+    row-gap: 0.25rem !important;
+    align-items: flex-start !important;
+    width: 100% !important;
+}
+
+/* Force chart to the right column and span both possible rows on the left */
+.stock-summary-container.stacked .price-chart-summary {
+    grid-column: 2 !important;
+    grid-row: 1 / span 2 !important;
+}
+
+/* Left side components just flow into column 1 */
+.stock-summary-container.stacked .stock-header-summary,
+.stock-summary-container.stacked .stock-health-summary {
+    grid-column: 1 !important;
+    width: 100%;
+}
+
+/* --- ADAPTED FROM StockOverviewCard.css --- */
+
+/* STACKING OVERRIDES */
+.stock-summary-container.stacked .summary-info {
+    flex: 0 0 auto;
+    gap: 0rem;
+    padding: 0;
+}
+
+.stock-summary-container.stacked .summary-info .summary-name {
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+.stock-summary-container.stacked .summary-info .summary-ticker {
+    font-size: 0.75rem;
+}
+
+.stock-summary-container.stacked .summary-info .summary-price {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.stock-summary-container.stacked .summary-change {
+    display: none !important;
+}
+
+/* Collapsed overrides from generic card */
+.expandable-card.is-collapsed .stock-summary-container:not(.stacked) {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.critical-risk-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 8px;
+    color: var(--neu-error);
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    animation: pulse-border-red 2s infinite;
+}
+
+@keyframes pulse-border-red {
+    0% {
+        border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    50% {
+        border-color: rgba(239, 68, 68, 0.6);
+    }
+
+    100% {
+        border-color: rgba(239, 68, 68, 0.2);
+    }
+}
+
+.health-section-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+.active-item {
+    color: var(--neu-accent) !important;
+}
+
+.active-item svg {
+    color: var(--neu-accent) !important;
+}
+
+.danger-item {
+    color: var(--neu-error) !important;
+}
+
+.danger-item svg {
+    color: var(--neu-error) !important;
+}
+
+/* Removed .expandable-card-title-container { display: none } to allow spacer to work */
+
+.health-section-wrapper {
+    margin-top: -0.5rem;
+}
+
+.portfolio-details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+}
+
+/* ... existing code ... */
+
+/* Simplified overrides - let ExpandableCard handle positioning */
+.portfolio-summary-card {
+    position: relative;
+}
+
+/* Ensure body actions are visible but let them flow naturally or use specific tweaks if needed,
+   but DO NOT force absolute top:0 right:0 which breaks the flow */
+.portfolio-summary-card .expandable-card-body-actions {
+    /* Optional: Specific tweaks if needed, otherwise leave empty to use ExpandableCard defaults */
+}

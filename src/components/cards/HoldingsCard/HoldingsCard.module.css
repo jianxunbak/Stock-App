@@ -1,0 +1,378 @@
+/* Card Container */
+.card {
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    padding: 1.5rem;
+    color: var(--text-primary);
+    gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+
+    /* Glass Effect (Dark Mode Default) */
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+[data-theme="light"] .card {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    /* Reset glass borders for light mode if managed globally or differently */
+}
+
+/* Header Styles */
+.summaryInfo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    height: 100%;
+    padding-left: 0;
+    padding-top: 0;
+}
+
+.summaryName {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.summaryCount {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+}
+
+/* Table container adjustments */
+.tableScroll {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 1rem;
+    /* Rounded corners for the table area */
+    /* background: rgba(0,0,0,0.2); Optional: darken table background */
+}
+
+
+.tableScroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.tableScroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tableScroll::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+    border-radius: 10px;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.tableScroll::-webkit-scrollbar-thumb:hover {
+    background: var(--neu-text-tertiary);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    table-layout: fixed;
+    /* Needed for resizing */
+}
+
+.table th,
+.table td {
+    padding: 0.75rem 1.25rem 0.75rem 0.75rem;
+    /* 1.25rem right padding for resize/sort icons safe zone */
+    text-align: center;
+    border-bottom: 1px solid var(--neu-border-subtle);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: inherit;
+    min-width: 0;
+}
+
+/* Header Styles */
+.table th {
+    font-weight: 600;
+    color: var(--neu-text-tertiary);
+    text-transform: none;
+    /* Matches watchlist */
+    font-size: 0.85rem;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--neu-bg);
+    border-bottom: none;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.table th:hover {
+    background-color: var(--neu-app-bg);
+}
+
+/* First Column Left Align */
+/* First Column Left Align */
+.table td:first-child {
+    text-align: left;
+    padding-left: 0.75rem;
+    padding-right: 1.25rem;
+}
+
+.table th:first-child {
+    text-align: left;
+    padding-left: 0.75rem;
+    padding-right: 1.25rem;
+}
+
+/* Ticker alignment */
+.tickerCell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-start;
+}
+
+.iconPlaceholder {
+    width: 14px;
+    /* Matches Chevron size */
+    flex-shrink: 0;
+}
+
+/* Ticker specific */
+.tickerApi {
+    color: var(--text-primary);
+    font-weight: 700;
+    cursor: pointer;
+    /* Font inherited */
+}
+
+/* Remove mono class usage effect or redefine it to be same font but maybe tabular figures */
+.mono {
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+}
+
+
+.subRow {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.subRow td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.categoryBadge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.boldValue {
+    font-weight: 700;
+}
+
+.actions {
+    text-align: center;
+}
+
+.actionsContent {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.iconBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.iconBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+/* Specific hover for the delete button */
+.iconBtn:has(svg[color="#EF4444"]):hover,
+.iconBtn:has(svg[stroke="#EF4444"]):hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #EF4444;
+}
+
+/* Specific hover for check/success button */
+.iconBtn:has(svg[color="#10B981"]):hover {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10B981;
+}
+
+.pInput {
+    background: var(--neu-bg) !important;
+    border: none !important;
+    border-radius: var(--neu-radius-sm, 12px);
+    color: var(--neu-text-primary) !important;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    transition: all 0.2s ease;
+    box-shadow: var(--neu-card-shadow-inset);
+    -moz-appearance: textfield;
+    appearance: none;
+    outline: none;
+    margin: 0 auto;
+}
+
+.pInput::-webkit-outer-spin-button,
+.pInput::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+    display: none;
+}
+
+.editableDateTrigger,
+.editableSelectTrigger {
+    background: var(--neu-bg) !important;
+    border: none !important;
+    border-radius: var(--neu-radius-sm, 12px);
+    color: var(--neu-text-primary) !important;
+    -webkit-text-fill-color: var(--neu-text-primary) !important;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--neu-card-shadow-inset);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0 auto;
+}
+
+.pInput:hover,
+.pInput:focus,
+.editableDateTrigger:hover,
+.editableSelectTrigger:hover {
+    background: var(--neu-bg) !important;
+    box-shadow: var(--neu-card-shadow-inset), 0 0 0 1px var(--neu-border-subtle);
+    transform: none;
+    border-radius: var(--neu-radius-sm, 12px);
+    outline: none;
+}
+
+.modalFooter {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    width: 100%;
+}
+
+.secondaryButton {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.submitBtn {
+    background: #60a5fa;
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+/* Resize Handle Support */
+.resize-handle {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    opacity: 0;
+    color: var(--neu-text-tertiary);
+}
+
+.table th:hover .resize-handle {
+    opacity: 0.5;
+}
+
+.resize-handle:hover {
+    opacity: 1;
+    color: var(--neu-brand);
+}
+
+.watchlist-th-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+    display: block;
+}
+
+.watchlist-th-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Override for first column left-align */
+.table th:first-child .watchlist-th-content {
+    justify-content: flex-start;
+}

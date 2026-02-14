@@ -1,0 +1,204 @@
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.datePickerContainer {
+    position: relative;
+    width: 100%;
+}
+
+.customSelectTrigger {
+    background: var(--neu-bg);
+    border: none;
+    color: var(--neu-text-primary);
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--neu-radius-sm, 8px);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: var(--neu-transition-default, all 0.2s ease);
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+}
+
+.customSelectTrigger:hover {
+    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark),
+        inset -3px -3px 7px var(--neu-shadow-light);
+}
+
+.desktopDropdownWrapper {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    /* Right aligned to stay within window bounds */
+    width: 350px;
+    margin-top: 0.5rem;
+    z-index: 10000;
+}
+
+.datePickerPopup,
+[data-theme="light"] .datePickerPopup {
+    /* Layout handled here, style handled by CardAnimator */
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.dateHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.iconBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.iconBtn:hover {
+    background: var(--neu-shadow-medium);
+    color: var(--neu-text-primary);
+    transform: scale(1.1);
+}
+
+.dateGrid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.25rem;
+    text-align: center;
+}
+
+.dayName {
+    font-size: 0.75rem;
+    color: var(--neu-text-secondary);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.dateCell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--neu-text-primary);
+}
+
+.dateCell:hover:not(.empty) {
+    background: var(--neu-shadow-medium);
+    transform: scale(1.1);
+    font-weight: 600;
+}
+
+.dateCell.selected {
+    background: #60a5fa;
+    color: #fff;
+    font-weight: 600;
+}
+
+.dateCell.empty {
+    cursor: default;
+}
+
+/* Mobile Modal Styles */
+.mobileModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.mobileModalContent {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.95);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+[data-theme="light"] .mobileModalContent {
+    background: rgba(255, 255, 255, 0.95);
+    border-top: 1px solid rgb(255, 255, 255);
+}
+
+/* STRONG RESET for nested mobile modals */
+.mobileModalContent .datePickerPopup,
+[data-theme="light"] .mobileModalContent .datePickerPopup {
+    position: static;
+    width: 100%;
+    max-width: unset;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0;
+    margin: 0;
+    animation: none;
+    background: transparent !important;
+    transform: none !important;
+}

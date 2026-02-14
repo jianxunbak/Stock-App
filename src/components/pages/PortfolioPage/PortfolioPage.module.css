@@ -1,0 +1,2458 @@
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.container {
+    min-height: 100vh;
+    max-width: 100%;
+    color: var(--text-primary);
+    padding: 0 1rem 6rem 1rem;
+    position: relative;
+    background-color: var(--neu-app-bg);
+
+    /* For absolute positioning of title */
+    /* Light Theme Override */
+    /* Light Theme Override handled by CSS variables now */
+}
+
+/* Remove outlines for everything in Portfolio Page */
+.container * {
+    outline: none !important;
+}
+
+.container *:focus {
+    outline: none !important;
+}
+
+
+
+@media (min-width: 768px) {
+    .container {
+        padding: 0 2rem 6rem 2rem;
+    }
+}
+
+
+
+
+/* Back Button - Exact Copy from DashboardPage */
+.backButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 100;
+    padding: 0.5rem 1.25rem !important;
+    height: auto !important;
+    width: auto !important;
+    border-radius: 12px !important;
+}
+
+.backButton:hover {
+    transform: translateX(-4px);
+}
+
+/* Add Button - Styled like Watchlist Button */
+.addButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    padding: 0.4rem 0.8rem;
+    border-radius: 1.5rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    height: 2.8rem;
+}
+
+.addButton:hover {
+    background: transparent;
+    transform: scale(1.1);
+    border-radius: 20px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+}
+
+/* Main Page Layout */
+.pageGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: flex-start;
+    padding-bottom: 2rem;
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .pageGrid {
+        display: flex;
+    }
+}
+
+.colSpan3,
+.colSpan2,
+.colSpan1 {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    transition: flex 0.3s ease, width 0.3s ease;
+}
+
+.expandedWrapper {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+}
+
+.collapsedWrapper {
+    flex: 0 0 auto !important;
+    width: auto !important;
+}
+
+@media (min-width: 1024px) {
+
+    .colSpan3,
+    .colSpan2,
+    .colSpan1 {
+        flex: 0 0 auto;
+        width: auto;
+    }
+}
+
+
+.topCard {
+    z-index: 50;
+    /* Ensure this card stays above others for the dropdown */
+    position: relative;
+    /* transform: none !important; - Removed to allow FluidCard animations */
+    perspective: none !important;
+    transform-style: flat !important;
+}
+
+/* Portfolio Card - Matching Analysis Page Cards */
+.portfolioCard {
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: visible;
+    padding: 1.5rem;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    z-index: 10;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+@media (min-width: 769px) {
+
+    /* Only apply hover scale on larger screens to avoid breaking fixed positioning on mobile */
+    .portfolioCard:hover {
+        outline: none;
+        background: transparent;
+        transform: translateY(-10px) scale(1.01);
+        border-radius: 60px;
+    }
+}
+
+
+.portfolioMainTitleTrigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0.5rem 1.5rem;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    min-width: 200px;
+}
+
+.portfolioMainTitleTrigger:hover {
+    background: transparent;
+    transform: scale(1.02);
+    border-radius: 20px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+}
+
+.portfolioTitleInput {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #60a5fa;
+    color: var(--text-primary);
+    width: 100%;
+    min-width: 150px;
+    max-width: 100%;
+    outline: none;
+    padding: 0.25rem 0;
+}
+
+.headerRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1000;
+    /* Increased from 50 */
+    gap: 1rem;
+    flex-wrap: wrap;
+    transition: all 0.3s ease;
+}
+
+.portfolioListItem:hover {
+    background: rgba(var(--neu-bg-rgb), 0.5) !important;
+}
+
+.expandedMenu {
+    align-items: flex-start;
+}
+
+.headerLeft {
+    flex: 1;
+    min-width: 0;
+    /* Allow shrinking */
+}
+
+/* Ensure actions don't shrink too much */
+.headerActions {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+    .headerRow {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .headerActions {
+        justify-content: flex-end;
+    }
+
+    .portfolioTitleInput {
+        font-size: 1.5rem;
+        width: 100%;
+    }
+
+    .portfolioMainTitleTrigger {
+        font-size: 1.4rem;
+        white-space: normal;
+        /* Allow wrapping */
+        width: 100%;
+        /* Full width on mobile */
+        justify-content: center;
+        /* Center text */
+    }
+}
+
+.roundActionBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    height: 2.8rem;
+    width: 2.8rem;
+    padding: 0;
+}
+
+.roundActionBtn:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1));
+    transform: scale(1.1);
+    border-radius: 18px;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none;
+}
+
+.roundActionBtn.danger:hover {
+    box-shadow: 0 6px 12px rgba(239, 68, 68, 0.5), inset 0 2px 4px rgba(239, 68, 68, 0.5);
+    color: #ef4444;
+}
+
+.dangerBtn {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    color: #EF4444 !important;
+}
+
+.dangerBtn:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+}
+
+.deleteOptionBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.deleteOptionBtn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+    opacity: 1;
+}
+
+[data-theme="light"] .portfolioCard {
+    background: transparent;
+    box-shadow:
+        15px 15px 35px rgba(0, 0, 0, 0.2),
+        -5px -5px 20px rgba(0, 0, 0, 0.1),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgb(255, 255, 255);
+    border-left: 1px solid rgb(255, 255, 255);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgb(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    z-index: 1;
+}
+
+/* .portfolioCard:hover moved inside media query above */
+
+.portfolioCard>* {
+    position: relative;
+    z-index: 1;
+}
+
+/* --- Top Zone Layout (Overview Style) --- */
+.topZone {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .topZone {
+        flex-direction: row;
+    }
+}
+
+.detailsSection {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.scoreSection {
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: visible;
+    flex: 2;
+    border-radius: 1rem;
+    display: flex;
+    flex-direction: column;
+    color: var(--text-primary);
+    align-self: stretch;
+}
+
+.scoreHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+.scoreTitle {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.totalScore {
+    font-size: 2.5rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.totalScore:hover {
+    transform: scale(1.1);
+}
+
+.scoreGreen {
+    color: #10B981;
+}
+
+.scoreYellow {
+    color: #F59E0B;
+}
+
+.scoreRed {
+    color: #EF4444;
+}
+
+.criteriaList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    overflow-y: auto;
+    max-height: 250px;
+    padding-right: 0.5rem;
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.criteriaList::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
+}
+
+.scrollIndicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.scrollIcon {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(3px);
+    }
+
+    60% {
+        transform: translateY(1.5px);
+    }
+}
+
+.criteriaList::-webkit-scrollbar {
+    width: 6px;
+}
+
+.criteriaList::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.criteriaList::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.criteriaList:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.criteriaItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.criteriaName {
+    color: var(--text-secondary);
+}
+
+.criteriaStatus {
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    min-width: 140px;
+    text-align: center;
+    display: inline-block;
+}
+
+.pass {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #10B981;
+}
+
+.fail {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #EF4444;
+}
+
+.pending {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #F59E0B;
+}
+
+.scrollIndicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.scrollIcon {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(3px);
+    }
+
+    60% {
+        transform: translateY(1.5px);
+    }
+}
+
+.companyName {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.priceContainer {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.change {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.badgesContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    align-items: center;
+}
+
+.badge {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background-color: transparent;
+    padding: 0.25rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--border-color);
+    min-height: 1.5rem;
+}
+
+.badgeLabel {
+    color: var(--text-secondary);
+}
+
+.badgeValue {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.warningTooltip {
+    font-size: 0.8rem;
+    color: #EF4444;
+    text-align: center;
+    margin-top: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.warningTooltip:hover {
+    text-decoration: underline;
+}
+
+/* internal grid for Card 1 (Summary) */
+.summaryGrid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.5rem;
+    width: 100%;
+}
+
+@media (min-width: 640px) {
+    .summaryGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .summaryGrid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.chartsGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+    width: 100%;
+}
+
+.allocationGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .allocationGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        min-width: 0;
+    }
+}
+
+.allocationColumn {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+}
+
+.allocationTitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.allocationContent {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
+    .allocationContent {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 5rem;
+        align-items: center;
+    }
+}
+
+.allocationChart {
+    width: 100%;
+    position: relative;
+}
+
+.allocationList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.allocationItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.allocationItem:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(5px);
+}
+
+.allocationNameGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.allocationColorDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.allocationName {
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.allocationStats {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.allocationAmount {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.allocationPct {
+    font-size: 0.75rem;
+}
+
+.dashboardCard {
+    text-align: center;
+    padding: 1rem;
+    transition: all 0.3s ease;
+}
+
+.dashboardCard:hover {
+    transform: translateY(-10px) scale(1.01);
+}
+
+
+.dashboardCard h3 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.bigValue {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0.5rem 0;
+    background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subValue {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.statusBadge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.pos {
+    color: #10B981;
+}
+
+.neg {
+    color: #EF4444;
+}
+
+.criticalBadge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 0.5rem;
+    color: #ef4444;
+    font-size: 0.75rem;
+    font-weight: 600;
+    animation: criticalBadgePulse 2s infinite;
+}
+
+@keyframes criticalBadgePulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.criticalAlert {
+    display: none;
+}
+
+
+
+/* Alerts */
+.alertSection {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.alertItem {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #EF4444;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 0.8rem;
+}
+
+.chartCard {
+    min-height: 400px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+.chartCard:hover {
+    transform: translateY(-10px) scale(1.01);
+}
+
+
+.chartCard h3 {
+    margin-bottom: 1rem;
+    text-align: left;
+    color: var(--text-secondary);
+}
+
+/* Table */
+.tableHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.tableHeader.expandedMenu {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.tableHeader.expandedMenu .tableActionButton {
+    height: 2.2rem;
+    width: 2.2rem;
+}
+
+.tableHeader.expandedMenu .tableActionButton svg {
+    width: 16px;
+    height: 16px;
+}
+
+.tableTitle {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.tableContainer {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.tableScroll {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.tableScroll::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.tableScroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.tableScroll::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.3);
+    border-radius: 4px;
+}
+
+.tableScroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.5);
+}
+
+[data-theme="light"] .tableScroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .tableScroll::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.4);
+}
+
+[data-theme="light"] .tableScroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.6);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    table-layout: auto;
+    /* Removed fixed min-width to allow shrinking */
+}
+
+.table th,
+.table td {
+    padding: 1rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+}
+
+.table th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    text-align: center;
+}
+
+.tickerApi {
+    color: #60a5fa;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.subRow {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.subRow td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.categoryBadge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.boldValue {
+    font-weight: 700;
+}
+
+.actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+
+.iconBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    border-radius: 50%;
+    display: flex;
+    /* Ensure centering */
+    align-items: center;
+    justify-content: center;
+}
+
+.iconBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    transform: scale(1.1);
+    /* Slight pop */
+}
+
+/* Specific hover for the delete button (usually has Trash icon inside) */
+.iconBtn:has(svg[color="#EF4444"]):hover,
+.iconBtn:has(svg[stroke="#EF4444"]):hover {
+    background: rgba(239, 68, 68, 0.2);
+    /* Red tint */
+    color: #EF4444;
+}
+
+/* Specific hover for check/success button */
+.iconBtn:has(svg[color="#10B981"]):hover {
+    background: rgba(16, 185, 129, 0.2);
+    /* Green tint */
+    color: #10B981;
+}
+
+/* Modal Form */
+.addForm {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem 0;
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.formGroup label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.formGroup input,
+.formGroup select {
+    background: var(--neu-bg);
+    border: none;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--neu-radius-sm, 8px);
+    color: var(--neu-text-primary);
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+    outline: none;
+    transition: var(--neu-transition-default, all 0.2s ease);
+    font-size: 0.9rem;
+}
+
+.formGroup input:focus {
+    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark),
+        inset -3px -3px 7px var(--neu-shadow-light);
+}
+
+.pInput {
+    /* Base Glass Style (Matches Back Button) */
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px;
+    color: var(--text-primary) !important;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    width: 100%;
+    min-width: 80px;
+    text-align: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+    /* Hide spinners */
+    -moz-appearance: textfield;
+    appearance: none;
+}
+
+.pInput::-webkit-outer-spin-button,
+.pInput::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+    display: none;
+    /* Force hide */
+}
+
+.editableDateTrigger {
+    /* Base Glass Style (Matches Back Button) */
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px;
+    color: var(--text-primary) !important;
+    /* Ensure color is explicit to override any blue link styles */
+    -webkit-text-fill-color: var(--text-primary) !important;
+
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    width: 100%;
+    min-width: 80px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* Hover Effect (Matches Back Button Hover) */
+.pInput:hover,
+.pInput:focus,
+.editableDateTrigger:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    transform: scale(1.05);
+    border-radius: 12px;
+    /* Keep same radius as base */
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border-color: transparent !important;
+    /* Or keep border? Back button removes/changes border */
+    outline: none;
+}
+
+.submitBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    height: 2.8rem;
+    padding: 0 1rem;
+    border-radius: 1.5rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    width: 100%;
+}
+
+.submitBtn:hover {
+    background: transparent !important;
+    transform: scale(1.02);
+    border-radius: 18px;
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+}
+
+.error {
+    color: #EF4444;
+    font-size: 0.9rem;
+}
+
+/* Header Buttons (from Dashboard/Hero) */
+.watchlistButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    background: transparent;
+    padding: 0 0.6rem;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-left: 0;
+    height: 2.8rem;
+    width: 2.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+.watchlistButton:hover {
+    background: transparent;
+    border: none;
+    transform: scale(1.1);
+    border-radius: 20px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+}
+
+.userButton {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1.5rem;
+    transition: transform 0.2s;
+    height: 2.5rem;
+}
+
+.userButton:hover {
+    background: transparent;
+    transform: scale(1.1);
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border-radius: 20px;
+}
+
+.userButton:focus {
+    outline: none;
+}
+
+.userAvatarSmall {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--glass-border);
+}
+
+.userAvatarSmall:hover {
+    transform: scale(1.1);
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border-radius: 20px;
+}
+
+.userAvatarPlaceholder {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background-color: #3b82f6;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1rem;
+    border: 2px solid var(--glass-border);
+}
+
+.userAvatarPlaceholder:hover {
+    transform: scale(1.1);
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border-radius: 20px;
+}
+
+/* SEARCH INPUT */
+.searchInput {
+    width: 240px;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    /* Left padding for icon space */
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    opacity: 1;
+    cursor: text;
+    position: relative;
+    right: auto;
+    height: 2.5rem;
+    color: var(--text-secondary);
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+.searchInput:focus {
+    outline: none;
+    border: 1px solid rgb(73, 71, 194);
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    color: var(--text-primary);
+}
+
+.searchIcon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+    /* Let clicks pass through to input */
+    z-index: 2;
+}
+
+
+/* Loading Overlay */
+.loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #3b82f6;
+    animation: spin 1s ease-in-out infinite;
+}
+
+.loadingText {
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+[data-theme="light"] .loadingText {
+    color: rgba(0, 0, 0, 0.50);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.starIcon {
+    color: #F59E0B;
+}
+
+/* Comparison Styles */
+.comparisonControls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: center;
+    padding-left: 0;
+    /* Removed padding */
+}
+
+.tickerInput {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    width: 120px;
+    height: 2rem;
+    /* Explicit height */
+    box-sizing: border-box;
+}
+
+.tickerInput:focus {
+    outline: none;
+    border: 1px solid rgb(73, 71, 194);
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+}
+
+.addButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    /* Pill shape */
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    height: 2rem;
+    /* Explicit height matching input */
+    line-height: inherit;
+    padding: 0 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    box-sizing: border-box;
+}
+
+.addButton:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1));
+    transform: scale(1.05);
+    /* Slightly smaller scale effect than back button to fit context */
+    border-radius: 1rem;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none;
+    color: var(--text-primary);
+}
+
+.activeComparisons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-left: 0;
+    /* Removed padding */
+}
+
+.comparisonTag {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.removeButton {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.metricLabel {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0;
+    margin-bottom: 0.1rem;
+}
+
+.title {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.tableActionButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    padding: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    height: 2.8rem;
+    width: 2.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+.tableActionButton:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1));
+    transform: scale(1.1);
+    border-radius: 18px;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none;
+}
+
+/* Dark mode friendly native inputs */
+/* Dark mode friendly native inputs */
+.formGroup input[type="date"] {
+    color-scheme: dark;
+    /* This makes native picker dark in compatible browsers */
+    color: var(--text-primary);
+}
+
+.formGroup input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.8;
+    cursor: pointer;
+}
+
+/* Hide Spinners for number input */
+.formGroup input[type=number]::-webkit-inner-spin-button,
+.formGroup input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Force the first card container to be on top */
+.topCardContainer {
+    position: relative;
+    z-index: 100;
+    /* High z-index to stay above following cards */
+}
+
+/* Custom Select Dropdown Styles */
+/* Custom Select Dropdown Styles */
+.customSelectContainer {
+    position: relative;
+    width: 100%;
+    z-index: 1000;
+}
+
+.customSelectTrigger {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.75rem;
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.customSelectTrigger:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.mobileModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100000;
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.mobileModalContent {
+    border-radius: 2rem;
+    width: 100%;
+    max-width: 600px;
+    max-height: calc(100vh - 4rem);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: rgba(15, 23, 42, 0.95);
+    /* Opaque background */
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 15px 35px rgba(0, 0, 0, 0.5),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    animation: slideIn 0.3s ease-out;
+    padding: 1.5rem;
+    min-height: 250px;
+    height: auto;
+    overflow-y: auto;
+}
+
+[data-theme="light"] .mobileModalContent {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+/* Standardized Scrollbar Styles */
+.mobileModalContent::-webkit-scrollbar,
+.customSelectOptionsList::-webkit-scrollbar,
+.datePickerPopup::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.mobileModalContent::-webkit-scrollbar-track,
+.customSelectOptionsList::-webkit-scrollbar-track,
+.datePickerPopup::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.mobileModalContent::-webkit-scrollbar-thumb,
+.customSelectOptionsList::-webkit-scrollbar-thumb,
+.datePickerPopup::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.3);
+    border-radius: 4px;
+}
+
+.mobileModalContent::-webkit-scrollbar-thumb:hover,
+.customSelectOptionsList::-webkit-scrollbar-thumb:hover,
+.datePickerPopup::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.5);
+}
+
+[data-theme="light"] .mobileModalContent::-webkit-scrollbar-track,
+[data-theme="light"] .customSelectOptionsList::-webkit-scrollbar-track,
+[data-theme="light"] .datePickerPopup::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .mobileModalContent::-webkit-scrollbar-thumb,
+[data-theme="light"] .customSelectOptionsList::-webkit-scrollbar-thumb,
+[data-theme="light"] .datePickerPopup::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.4);
+}
+
+.customSelectMenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    margin-top: 0.5rem;
+    background: rgba(15, 23, 42, 0.95);
+    z-index: 9999 !important;
+
+    /* Ensure it beats any sibling card shadows or borders */
+
+    /* Opaque for desktop */
+    [data-theme="light"] & {
+        background: rgba(255, 255, 255, 0.95);
+    }
+
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    padding: 1.5rem;
+    z-index: 99999;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5),
+    inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+    inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    max-height: 400px;
+    animation: slideIn 0.3s ease-out;
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+}
+
+.customSelectOptionsList {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 0.5rem;
+}
+
+
+[data-theme="light"] .customSelectMenu,
+[data-theme="light"] .mobileModalContent {
+    background: rgba(255, 255, 255, 0.90);
+    /* Increased opacity to 90% */
+    border-top: 1px solid rgb(255, 255, 255);
+    border-left: 1px solid rgb(255, 255, 255);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgb(0, 0, 0, 0.2);
+    backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+    /* Increased blur */
+    -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+    box-shadow:
+        15px 15px 35px rgba(0, 0, 0, 0.2),
+        -5px -5px 20px rgba(0, 0, 0, 0.1),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.customSelectMenu:hover {
+    transform: scale(1.02);
+    transition: transform 0.2s;
+}
+
+/* Custom Date Picker Styles */
+.datePickerContainer {
+    position: relative;
+    width: 100%;
+}
+
+.datePickerPopup {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 350px;
+    /* Increased from 300px */
+    max-width: 90vw;
+    margin-top: 0.5rem;
+    background: transparent;
+    /* No darker grey perimeter */
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    padding: 1.5rem;
+    z-index: 1000;
+    box-shadow:
+        0 15px 35px rgba(0, 0, 0, 0.5),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease-out;
+}
+
+/* For mobile portal centering */
+.mobileModalContent .datePickerPopup {
+    position: static;
+    transform: none;
+    margin: 0 auto;
+    width: 100%;
+    max-width: unset;
+    box-shadow: none;
+    border: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+    margin: 0;
+    animation: none;
+    background: transparent;
+}
+
+/* Fix for double container on mobile TypeSelector */
+.mobileModalContent .typeSelectorMenu {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    margin-bottom: 0;
+    box-shadow: none !important;
+    background: transparent !important;
+    border: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0;
+    margin-top: 1rem;
+}
+
+
+
+[data-theme="light"] .datePickerPopup {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.datePickerPopup:hover {
+    transform: scale(1.02);
+    transition: transform 0.2s;
+}
+
+/* STRONG RESET for nested mobile modals to prevent double-window effect */
+.mobileModalContent .customSelectMenu,
+.mobileModalContent .datePickerPopup,
+[data-theme="light"] .mobileModalContent .customSelectMenu,
+[data-theme="light"] .mobileModalContent .datePickerPopup {
+    position: static;
+    width: 100%;
+    max-width: unset;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    /* Reset border radius to prevent clipping children */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0;
+    margin: 0;
+    animation: none;
+    background: transparent !important;
+    max-height: none;
+    transform: none !important;
+}
+
+.mobileModalContent .customSelectMenu:hover,
+.mobileModalContent .datePickerPopup:hover {
+    transform: none !important;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dateHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.dateHeader button:hover {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    transform: scale(1.1);
+}
+
+.dateGrid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.2rem;
+    text-align: center;
+}
+
+.dayName {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    padding-bottom: 0.5rem;
+}
+
+.dateCell {
+    padding: 0.4rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 50%;
+    color: var(--text-primary);
+    transition: all 0.2s;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dateCell:hover:not(.empty) {
+    background: #3b82f6;
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.dateCell.selected {
+    background: #3b82f6;
+    color: white;
+}
+
+.dateCell.empty {
+    cursor: default;
+}
+
+
+
+.customSelectOption {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.customSelectOption:hover {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    transform: translateX(5px);
+}
+
+.customSelectOption.selected {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+}
+
+.modalFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.secondaryButton {
+    /* Style matching existing buttons but maybe slightly less prominent if desired, 
+       but user requested "same size" and aligned. 
+       We can reuse .submitBtn class or make a shared one. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    height: 2.8rem;
+    padding: 0 1rem;
+    border-radius: 1.5rem;
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.secondaryButton:hover {
+    background: transparent !important;
+    transform: scale(1.02);
+    border-radius: 18px;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+    border: 1px solid #EF4444;
+    color: #EF4444;
+}
+
+/* Glassmorphism Input Style for Edit Rows */
+/* Glassmorphism Input Style for Edit Rows */
+/* .pInput definition moved/merged above */
+
+/* Style for the Date Picker trigger in Edit Mode */
+.editableDateTrigger {
+    /* Exact copy of .backButton:hover style */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none !important;
+    border-radius: 12px;
+
+    color: var(--text-primary) !important;
+    font-weight: normal;
+    /* Match pInput */
+    text-align: center;
+
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.editableDateTrigger:hover {
+    transform: scale(1.05);
+}
+
+
+
+/* Portfolio Input Styles - Matching Search Bar in TopNav */
+.portfolioInputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.1),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.portfolioInputWrapper:focus-within {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    border-color: rgba(96, 165, 250, 0.5);
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.3), inset 0 2px 4px rgba(96, 165, 250, 0.3);
+}
+
+.portfolioInput {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    width: 240px;
+    outline: none;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.portfolioIconLeft {
+    padding-left: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+}
+
+.chartFootnote {
+    margin-top: 1.5rem;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+@media (min-width: 1024px) {
+    .chartFootnote {
+        min-height: 120px;
+        justify-content: flex-start;
+    }
+}
+
+.footnoteList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .footnoteList {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+}
+
+.customSelectGroupLabel {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-top: 0.5rem;
+}
+
+.customSelectGroupLabel:first-child {
+    margin-top: 0;
+}
+
+.portfolioTypeSmallSelect {
+    background: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-secondary);
+    border-radius: 1.5rem;
+    padding: 0 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    height: 2.8rem;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.2),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.portfolioTypeSmallSelect:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    transform: scale(1.1);
+    border-radius: 18px;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    border: none !important;
+    color: var(--text-primary);
+}
+
+:global(body.light-mode) .portfolioTypeSmallSelect {
+    background: transparent !important;
+    box-shadow:
+        0 5px 10px rgba(0, 0, 0, 0.1),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.5),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.8) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.8) !important;
+}
+
+.typeSelectorContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* TypeSelector styles matching customSelectMenu EXACTLY */
+.typeSelectorMenu {
+    position: absolute;
+    /* Use exact background/border/shadow/blur from customSelectMenu */
+    background: rgba(15, 23, 42, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    /* Match customSelectMenu radius */
+    padding: 1rem;
+    /* Slightly less padding as it has fewer items */
+    min-width: 140px;
+    /* Slightly wider */
+    z-index: 999999;
+    box-shadow:
+        0 15px 35px rgba(0, 0, 0, 0.5),
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    animation: slideUp 0.2s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    [data-theme="light"] & {
+        background: rgba(255, 255, 255, 0.95);
+        border-color: rgba(0, 0, 0, 0.1);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.typeOption {
+    padding: 0.8rem 1rem;
+    color: var(--text-secondary);
+    /* Start with secondary color like unselected options */
+    cursor: pointer;
+    border-radius: 1rem;
+    /* Match customSelectOption radius */
+    transition: all 0.3s ease;
+    text-align: left;
+    /* Align like custom select options */
+    font-size: 1rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+
+    [data-theme="light"] & {
+        color: var(--text-secondary);
+    }
+}
+
+/* Match customSelectOption hover/selected state */
+.typeOption:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    color: var(--text-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+
+    [data-theme="light"] & {
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(96, 165, 250, 0.1));
+        color: #2563eb;
+        box-shadow: 0 4px 12px rgba(96, 165, 250, 0.15);
+    }
+}
+
+/* Button-like styles for editable fields */
+.pInput,
+.editableDateTrigger,
+.editableSelectTrigger {
+    background: var(--neu-bg) !important;
+    border: none !important;
+    color: var(--neu-text-primary) !important;
+    border-radius: var(--neu-radius-sm, 8px) !important;
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    height: 2.2rem !important;
+    outline: none !important;
+    cursor: pointer !important;
+    transition: var(--neu-transition-default, all 0.2s ease) !important;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light) !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    text-align: center !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    max-width: 140px !important;
+    margin: 0 auto !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.pInput:focus,
+.editableDateTrigger:hover,
+.editableSelectTrigger:hover,
+.pInput:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.144), rgba(255, 255, 255, 0.1)) !important;
+    transform: scale(1.05) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 6px 12px rgba(96, 165, 250, 0.5), inset 0 2px 4px rgba(96, 165, 250, 0.5) !important;
+    border: none !important;
+}
+
+.summaryCard,
+.statCard {
+    position: relative;
+    padding: 1.5rem;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+    z-index: 10;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    transition: all 0.3s ease;
+}
+
+.summaryCard:hover,
+.statCard:hover {
+    outline: none;
+    background: transparent;
+    transform: translateY(-10px) scale(1.01);
+    border-radius: 60px;
+}
+
+/* --- Column Toggle Window --- */
+.columnToggleGrid {
+    display: flex;
+    flex-direction: column;
+}
+
+.columnToggleItem {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.4rem 0;
+    /* Minimal vertical padding, no horizontal padding */
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.columnToggleItem:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.columnToggleCheck {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 4px;
+    border: 2px solid var(--neu-border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    color: transparent;
+    /* Icon invisible when not active */
+}
+
+[data-theme="light"] .columnToggleCheck {
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+.columnToggleItem.active .columnToggleCheck {
+    background: transparent;
+    border-color: var(--neu-brand);
+    color: var(--text-primary);
+    /* Checkmark matches the selected text color */
+}
+
+.columnToggleLabel {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--neu-text-secondary);
+}
+
+.columnToggleItem.active .columnToggleLabel {
+    color: var(--text-primary);
+    /* Use site primary text color */
+    font-weight: 600;
+}

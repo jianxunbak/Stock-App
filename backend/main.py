@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 import firebase_admin
 from firebase_admin import credentials, firestore
 import concurrent.futures
+import math
 
 # Load .env from the project root (one level up from backend/)
 env_path = pathlib.Path(__file__).parent.parent / '.env'
@@ -485,364 +486,236 @@ def calculate_intrinsic_value(ticker, info, financials, balance_sheet, cashflow,
                               growth_estimates, beta=None, raw_growth_estimates_data=None,
                               revenue_estimates_data=None, history=None, stock_obj=None):
     try:
-        # --- 1. Determine Method ---
+        # --- 1. Basic Inputs ---
+        current_price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+        shares_outstanding = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding") or 1
+        
+        if not current_price or not shares_outstanding:
+            return {
+                "status": "Error", "intrinsicValue": 0, "currentPrice": current_price,
+                "method": "N/A", "assumptions": {}, "growthRateNext5Y": None,
+                "allMethods": [],
+                "growthNote": "Error: Missing price or share data"
+            }
+
         sector = info.get("sector", "")
         industry = info.get("industry", "")
         country = info.get("country", "United States")
-        
         is_financial = "Financial" in sector or "Bank" in industry or "Insurance" in industry
         
-        # Check Consistency (Reuse logic or simple check)
+        # Enhanced growth helper
+        enhanced_growth, growth_note = get_next_5y_growth(stock_obj, ticker, info)
+        growth_rate_1_5 = min(max(enhanced_growth, -0.10), 0.35)
+        growth_rate_6_10 = min(growth_rate_1_5, 0.15)
+        growth_rate_11_20 = 0.06 if "China" in country else 0.04
+
+        # Discount Rate
+        beta_val = beta if beta else 1.0
+        def get_discount_rate(beta, country):
+            if "China" in country:
+                if beta < 0.8: return 0.08
+                if beta < 1.0: return 0.09
+                if beta < 1.2: return 0.10
+                return 0.11
+            else:
+                if beta < 0.8: return 0.054
+                if beta < 0.95: return 0.057
+                if beta < 1.05: return 0.060
+                if beta < 1.15: return 0.063
+                if beta < 1.25: return 0.066
+                if beta < 1.35: return 0.069
+                if beta < 1.45: return 0.072
+                if beta < 1.55: return 0.075
+                return 0.078
+        discount_rate = get_discount_rate(beta_val, country)
+
+        # Cash / Debt
+        total_debt = 0
+        cash_and_equivalents = 0
+        if not balance_sheet.empty:
+            total_debt = balance_sheet.loc["Total Debt"].iloc[0] if "Total Debt" in balance_sheet.index else 0
+            if "Cash And Cash Equivalents" in balance_sheet.index:
+                cash_and_equivalents = balance_sheet.loc["Cash And Cash Equivalents"].iloc[0]
+            elif "Cash Cash Equivalents And Short Term Investments" in balance_sheet.index:
+                cash_and_equivalents = balance_sheet.loc["Cash Cash Equivalents And Short Term Investments"].iloc[0]
+
+        # --- 2. Define Calculation Methods ---
+        results = []
+
+        # Helper to get current values
+        current_ni = net_income_series.iloc[0] if not net_income_series.empty else 0
+        current_ocf = op_cash_flow_series.iloc[0] if not op_cash_flow_series.empty else 0
+        
+        def calculate_dcf_variant(base_val, name, metric_label):
+            future_vals = []
+            curr = base_val
+            for _ in range(5): curr *= (1 + growth_rate_1_5); future_vals.append(curr)
+            for _ in range(5): curr *= (1 + growth_rate_6_10); future_vals.append(curr)
+            for _ in range(10): curr *= (1 + growth_rate_11_20); future_vals.append(curr)
+            
+            pv_sum = sum(v / ((1 + discount_rate)**(i+1)) for i, v in enumerate(future_vals))
+            equity_val = pv_sum + cash_and_equivalents - total_debt
+            iv = equity_val / shares_outstanding
+            
+            return {
+                "method": name,
+                "intrinsicValue": max(0, iv),
+                "assumptions": {
+                    f"Current {metric_label}": f"${base_val/1e9:.2f}B",
+                    "Growth Rate (Yr 1-5)": f"{growth_rate_1_5*100:.2f}%",
+                    "Growth Rate (Yr 6-10)": f"{growth_rate_6_10*100:.2f}%",
+                    "Growth Rate (Yr 11-20)": f"{growth_rate_11_20*100:.2f}%",
+                    "Discount Rate": f"{discount_rate*100:.2f}%",
+                    "Beta": f"{beta_val:.2f}",
+                    "Cash & Equivalents": f"${cash_and_equivalents/1e9:.2f}B",
+                    "Total Debt": f"${total_debt/1e9:.2f}B",
+                    "Shares Outstanding": f"{shares_outstanding/1e9:.2f}B",
+                    "Growth Note": growth_note
+                },
+                "explanation": f"The {name} method is the gold standard for mature companies. It calculates the present value of all future cash the business is expected to generate."
+            }
+
+        # DCF Variants
+        capex = 0
+        if not cashflow.empty:
+            if "Capital Expenditure" in cashflow.index: capex = abs(cashflow.loc["Capital Expenditure"].iloc[0])
+            elif "Capital Expenditures" in cashflow.index: capex = abs(cashflow.loc["Capital Expenditures"].iloc[0])
+        fcf = current_ocf - capex
+        
+        results.append(calculate_dcf_variant(fcf, "Discounted Free Cash Flow (DFCF)", "Free Cash Flow"))
+        results.append(calculate_dcf_variant(current_ocf, "Discounted Operating Cash Flow (DOCF)", "Operating Cash Flow"))
+        results.append(calculate_dcf_variant(current_ni, "Discounted Net Income (DNI)", "Net Income"))
+
+        # PB Method
+        book_value = info.get("bookValue")
+        if not book_value and not balance_sheet.empty:
+            equity = balance_sheet.loc["Stockholders Equity"].iloc[0] if "Stockholders Equity" in balance_sheet.index else 0
+            book_value = equity / shares_outstanding
+        
+        mean_pb = info.get("priceToBook") or 1.5
+        pb_iv = (book_value * mean_pb) if book_value else 0
+        results.append({
+            "method": "Mean Price-to-Book (PB)",
+            "intrinsicValue": pb_iv,
+            "assumptions": {
+                "Current Book Value Per Share": f"${book_value:.2f}" if book_value else "N/A",
+                "Assumed PB Ratio": f"{mean_pb:.2f}"
+            },
+            "explanation": "Preferred for Financials and Banks. Their value is primarily derived from their balance sheet assets rather than cash flow projections."
+        })
+
+        # PSG Method
+        revenue_per_share = info.get("revenuePerShare") or ((revenue_series.iloc[0]/shares_outstanding) if not revenue_series.empty else 0)
+        growth_rate_whole = growth_rate_1_5 * 100
+        if revenue_estimates_data:
+            for row in revenue_estimates_data:
+                if row.get("period") == "+1y":
+                    val = row.get("growth")
+                    if val is not None: growth_rate_whole = float(val) * 100
+                    break
+        psg_iv = revenue_per_share * growth_rate_whole * 0.20
+        results.append({
+            "method": "Price to Sales Growth (PSG)",
+            "intrinsicValue": psg_iv,
+            "assumptions": {
+                "Sales Per Share (TTM)": f"${revenue_per_share:.2f}",
+                "Projected Sales Growth": f"{growth_rate_whole:.2f}%",
+                "Fair PSG Constant": "0.20"
+            },
+            "explanation": "Best for high-growth tech companies with negative earnings. It values current sales momentum relative to future growth potential."
+        })
+
+        # Graham Number
+        eps = info.get("trailingEps") or 0
+        graham_iv = 0
+        if eps > 0 and book_value and book_value > 0:
+            graham_iv = math.sqrt(22.5 * eps * book_value)
+        results.append({
+            "method": "Graham Number",
+            "intrinsicValue": graham_iv,
+            "assumptions": {
+                "Trailing EPS": f"${eps:.2f}",
+                "Book Value Per Share": f"${book_value:.2f}" if book_value else "N/A",
+                "Graham Multiplier": "22.5"
+            },
+            "explanation": "A conservative 'Margin of Safety' metric developed by Benjamin Graham. It identifies stocks that are trading at a low multiple of both earnings and book value."
+        })
+
+        # --- 3. Determine Recommended Method ---
         def is_consistent(series):
             if len(series) < 3: return False
-            # Check if generally increasing (allow one dip)
-            increases = 0
-            for i in range(len(series)-1):
-                if series.iloc[i] >= series.iloc[i+1] * 0.9: # series is desc, so i is newer. newer >= older
-                    increases += 1
+            increases = sum(1 for i in range(len(series)-1) if series.iloc[i] >= series.iloc[i+1] * 0.9)
             return increases >= len(series) - 2
 
         rev_consistent = is_consistent(revenue_series)
         ni_consistent = is_consistent(net_income_series)
         ocf_consistent = is_consistent(op_cash_flow_series)
         
-        # Speculative Check: High Rev Growth (>15%) but Negative NI or OCF
         rev_cagr = 0
         if len(revenue_series) >= 3:
             rev_cagr = (revenue_series.iloc[0] / revenue_series.iloc[-1])**(1/len(revenue_series)) - 1
-        
-        current_ni = net_income_series.iloc[0] if not net_income_series.empty else 0
-        current_ocf = op_cash_flow_series.iloc[0] if not op_cash_flow_series.empty else 0
-        
         is_speculative = (rev_cagr > 0.15) and (current_ni < 0 or current_ocf < 0) and not is_financial
 
-        method = "Discounted Free Cash Flow (DFCF)" # Default
-        
-        if is_financial:
-            method = "Mean Price-to-Book (PB)"
-        elif is_speculative:
-            method = "Price to Sales Growth (PSG)"
+        recommended_name = "Discounted Free Cash Flow (DFCF)"
+        if is_financial: recommended_name = "Mean Price-to-Book (PB)"
+        elif is_speculative: recommended_name = "Price to Sales Growth (PSG)"
         else:
             if rev_consistent and ni_consistent and ocf_consistent:
-                if current_ocf > 1.5 * current_ni:
-                    method = "Discounted Free Cash Flow (DFCF)"
-                else:
-                    method = "Discounted Operating Cash Flow (DOCF)"
-            elif rev_consistent and ni_consistent:
-                method = "Discounted Net Income (DNI)"
-            else:
-                method = "Discounted Free Cash Flow (DFCF)" # Fallback
+                recommended_name = "Discounted Free Cash Flow (DFCF)" if current_ocf > 1.5 * current_ni else "Discounted Operating Cash Flow (DOCF)"
+            elif rev_consistent and ni_consistent: recommended_name = "Discounted Net Income (DNI)"
 
-        # --- 2. Assumptions ---
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-        shares_outstanding = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding") or 1
+        # Find the recommended result
+        recommended = next((r for r in results if r["method"] == recommended_name), results[0])
         
-        if not current_price or not shares_outstanding:
-            return {
-                "status": "Error", 
-                "intrinsicValue": 0, 
-                "currentPrice": current_price,
-                "differencePercent": 0, 
-                "method": "N/A", 
-                "assumptions": {},
-                "growthRateNext5Y": None,
-                "growthNote": "Error: Missing price or share data"
-            }
-        
-        # 1. Use the new enhanced growth helper
-        enhanced_growth, growth_note = get_next_5y_growth(stock_obj, ticker, info)
+        # --- 4. Finalize ---
+        def clean_numeric(val):
+            try:
+                if math.isnan(val) or math.isinf(val): return 0
+                return float(val)
+            except: return 0
 
-        # Discount Rate (WACC / Cost of Equity)
-        # Simplified based on Beta and Risk Free Rate (approx 4%) + Risk Premium (5%)
-        # Or lookup table based on Beta/Country
-        def get_discount_rate(beta, country):
-            # Base rates
-            risk_free = 0.04
-            erp = 0.05 # Equity Risk Premium
-            
-            if "China" in country:
-                # Higher risk
-                # Map beta to discount rate table provided by user previously
-                # < 0.8: 8.5%, 0.8-0.9: 9.3%, etc.
-                if beta < 0.8: return 0.08
-                if beta < 1.0: return 0.09
-                if beta < 1.2: return 0.10
-                return 0.11
-                
-            else: # US / Default
-                if beta < 0.80: return 0.054
-                
-                if beta < 0.85: return 0.054 # < 0.8
-                if beta < 0.95: return 0.057 # ~0.9
-                if beta < 1.05: return 0.060 # ~1.0
-                if beta < 1.15: return 0.063 # ~1.1
-                if beta < 1.25: return 0.066 # ~1.2
-                if beta < 1.35: return 0.069 # ~1.3
-                if beta < 1.45: return 0.072 # ~1.4
-                if beta < 1.55: return 0.075 # ~1.5
-                return 0.078 # > 1.5 (Assuming typo in user prompt, following progression)
-
-        beta_val = beta if beta else 1.0
-        discount_rate = get_discount_rate(beta_val, country)
-        
-        # Growth Rate (Yr 1-5)
-        # Use our enhanced logic as the primary driver for growth_rate_1_5
-        growth_rate_1_5 = enhanced_growth
-        
-        # We still cap it for safety in DCF
-        growth_rate_1_5 = min(max(growth_rate_1_5, -0.10), 0.35) # Expanded upper cap slightly to 35%
-        
-        # Growth Rate (Yr 6-10) - Same but capped at 15%
-        growth_rate_6_10 = min(growth_rate_1_5, 0.15)
-        
-        # Growth Rate (Yr 11-20) - 4% US, 6% China
-        growth_rate_11_20 = 0.06 if "China" in country else 0.04
-
-        # Balance Sheet Items
-        total_debt = 0
-        cash_and_equivalents = 0
-        if not balance_sheet.empty:
-            if "Total Debt" in balance_sheet.index:
-                total_debt = balance_sheet.loc["Total Debt"].iloc[0]
-            if "Cash And Cash Equivalents" in balance_sheet.index:
-                cash_and_equivalents = balance_sheet.loc["Cash And Cash Equivalents"].iloc[0]
-            elif "Cash Cash Equivalents And Short Term Investments" in balance_sheet.index:
-                cash_and_equivalents = balance_sheet.loc["Cash Cash Equivalents And Short Term Investments"].iloc[0]
-
-        # --- 3. Calculate ---
-        intrinsic_value = 0
-        assumptions = {}
-        
-        if method == "Mean Price-to-Book (PB)":
-            # Inputs: Current BVPS, Historical PB
-            book_value = info.get("bookValue")
-            if not book_value and not balance_sheet.empty:
-                 equity = balance_sheet.loc["Stockholders Equity"].iloc[0] if "Stockholders Equity" in balance_sheet.index else 0
-                 book_value = equity / shares_outstanding
-            
-            # Calculate Historical PB
-            historical_pbs = []
-            if not balance_sheet.empty and not financials.empty and history is not None and not history.empty:
-                try:
-                    # Get Equity
-                    equity_series = None
-                    if "Stockholders Equity" in balance_sheet.index:
-                        equity_series = balance_sheet.loc["Stockholders Equity"]
-                    
-                    # Get Shares
-                    shares_series = None
-                    if "Basic Average Shares" in financials.index:
-                        shares_series = financials.loc["Basic Average Shares"]
-                    elif "Diluted Average Shares" in financials.index:
-                        shares_series = financials.loc["Diluted Average Shares"]
-                    
-                    if equity_series is not None and shares_series is not None:
-                        # Calculate BVPS for each period
-                        # Align indices (dates)
-                        common_dates = equity_series.index.intersection(shares_series.index)
-                        for date in common_dates:
-                            eq = equity_series.loc[date]
-                            sh = shares_series.loc[date]
-                            if sh > 0:
-                                bvps = eq / sh
-                                # Find price
-                                # history index is DatetimeIndex (tz-aware usually), date is Timestamp (tz-naive usually)
-                                ts = pd.Timestamp(date)
-                                if ts.tz is None:
-                                    ts = ts.tz_localize("UTC")
-                                
-                                # Convert to history tz
-                                if history.index.tz is not None:
-                                    ts = ts.tz_convert(history.index.tz)
-                                else:
-                                    ts = ts.tz_localize(None) # Make naive if history is naive
-                                
-                                # Find closest price (on or before)
-                                idx = history.index.get_indexer([ts], method='pad')[0]
-                                if idx != -1:
-                                    price = history.iloc[idx]['Close']
-                                    if bvps > 0:
-                                        pb = price / bvps
-                                        historical_pbs.append(pb)
-                except Exception as e:
-                    print(f"Error calculating historical PB: {e}")
-
-            # Calculate Mean PB
-            mean_pb = 1.5 # Default fallback
-            current_pb = info.get("priceToBook")
-            
-            if historical_pbs:
-                # Filter outliers?
-                valid_pbs = [pb for pb in historical_pbs if 0 < pb < 100] # Simple filter
-                if valid_pbs:
-                    mean_pb = sum(valid_pbs) / len(valid_pbs)
-                elif current_pb:
-                     mean_pb = current_pb
-            elif current_pb:
-                mean_pb = current_pb
-            
-            intrinsic_value = book_value * mean_pb
-            assumptions = {
-                "Current Book Value Per Share": f"${book_value:.2f}",
-                "Mean PB Ratio": f"{mean_pb:.2f}",
-                "Growth Note": growth_note
-            }
-            # No early return here anymore
-
-        elif method == "Price to Sales Growth (PSG)":
-            # Intrinsic Value = Sales Per Share * Projected Growth Rate * 0.20
-            
-            # 1. Sales Per Share (TTM)
-            sales_per_share = info.get("revenuePerShare")
-            if not sales_per_share:
-                # Fallback to manual calculation
-                sales_per_share = (revenue_series.iloc[0] / shares_outstanding) if not revenue_series.empty else 0
-            
-            # 2. Projected Growth Rate (Sales growth (year/est))
-            growth_rate_whole = growth_rate_1_5 * 100 # Default fallback
-            
-            if revenue_estimates_data:
-                # Look for period "+1y" and "growth" column
-                for row in revenue_estimates_data:
-                    if row.get("period") == "+1y":
-                        val = row.get("growth")
-                        if val is not None:
-                            try:
-                                growth_rate_whole = float(val) * 100 # Convert decimal to percentage (0.06 -> 6.0)
-                            except: pass
-                        break
-
-            intrinsic_value = sales_per_share * growth_rate_whole * 0.20
-            assumptions = {
-                "Sales Per Share (TTM)": f"${sales_per_share:.2f}",
-                "Projected Sales Growth": f"{growth_rate_whole:.2f}%",
-                "Fair PSG Constant": "0.20",
-                "Growth Note": growth_note
-            }
-
-        else: # DCF / DOCF / DNI
-            # Base Metric
-            base_value = 0
-            metric_name = ""
-            
-            if "Free Cash Flow" in method:
-                # FCF = OCF - CapEx
-                capex = 0
-                if "Capital Expenditure" in cashflow.index:
-                    capex = abs(cashflow.loc["Capital Expenditure"].iloc[0])
-                elif "Capital Expenditures" in cashflow.index:
-                    capex = abs(cashflow.loc["Capital Expenditures"].iloc[0])
-                
-                base_value = current_ocf - capex
-                metric_name = "Free Cash Flow"
-            elif "Operating Cash Flow" in method:
-                base_value = current_ocf
-                metric_name = "Operating Cash Flow"
-            elif "Net Income" in method:
-                base_value = current_ni
-                metric_name = "Net Income"
-            
-            # Projection
-            future_values = []
-            current_val = base_value
-            
-            # Yr 1-5
-            for i in range(5):
-                current_val *= (1 + growth_rate_1_5)
-                future_values.append(current_val)
-            
-            # Yr 6-10
-            for i in range(5):
-                current_val *= (1 + growth_rate_6_10)
-                future_values.append(current_val)
-                
-            # Yr 11-20
-            for i in range(10):
-                current_val *= (1 + growth_rate_11_20)
-                future_values.append(current_val)
-                
-            # Discount
-            present_value_sum = 0
-            for i, val in enumerate(future_values):
-                pv = val / ((1 + discount_rate) ** (i + 1))
-                present_value_sum += pv
-                
-            # Equity Value
-            equity_value = present_value_sum + cash_and_equivalents - total_debt
-            intrinsic_value = equity_value / shares_outstanding
-            
-            assumptions = {
-                f"Current {metric_name}": f"${base_value/1e9:.2f}B",
-                "Growth Rate (Yr 1-5)": f"{growth_rate_1_5*100:.2f}%",
-                "Growth Note": growth_note,
-                "Growth Rate (Yr 6-10)": f"{growth_rate_6_10*100:.2f}%",
-                "Growth Rate (Yr 11-20)": f"{growth_rate_11_20*100:.2f}%",
-                "Discount Rate": f"{discount_rate*100:.2f}%",
-                "Total Debt": f"${total_debt/1e9:.2f}B",
-                "Cash & Equivalents": f"${cash_and_equivalents/1e9:.2f}B",
-                "Shares Outstanding": f"{shares_outstanding/1e9:.2f}B",
-                "Beta": f"{beta_val:.2f}"
-            }
-
-        # Finalize
-        # Formula: ((Stock Price / Intrinsic Value) - 1) * 100
-        # We return the decimal here, frontend handles * 100
-        diff_percent = ((current_price / intrinsic_value) - 1) if intrinsic_value and intrinsic_value != 0 else 0
-        
+        # Create response
+        diff_percent = ((current_price / recommended["intrinsicValue"]) - 1) if recommended["intrinsicValue"] > 0 else 0
         status = "Fairly Valued"
         if diff_percent > 0.15: status = "Overvalued"
         elif diff_percent < -0.15: status = "Undervalued"
-        
-        # Prepare raw values for frontend conversion
-        def clean_numeric(val):
-            try:
-                import math
-                v = float(val)
-                if math.isnan(v): return 0
-                return v
-            except:
-                return 0
-
-        raw_base_value = clean_numeric(base_value) if 'base_value' in locals() else 0
-        raw_sales_per_share = clean_numeric(sales_per_share) if 'sales_per_share' in locals() else 0
-        raw_book_value = clean_numeric(book_value) if 'book_value' in locals() else 0
 
         return {
-            "method": method,
-            "intrinsicValue": intrinsic_value,
+            "method": recommended["method"],
+            "intrinsicValue": recommended["intrinsicValue"],
             "currentPrice": current_price,
             "differencePercent": diff_percent,
             "status": status,
-            "assumptions": assumptions,
+            "assumptions": recommended["assumptions"],
+            "allMethods": results,
+            "recommendedMethod": recommended["method"],
+            "preferredMethodExplanation": recommended["explanation"],
             "raw_assumptions": {
-                "base_value": raw_base_value,
+                "base_value": clean_numeric(current_ocf), # Legacy
                 "total_debt": clean_numeric(total_debt),
                 "cash_and_equivalents": clean_numeric(cash_and_equivalents),
                 "shares_outstanding": clean_numeric(shares_outstanding),
-                "sales_per_share": raw_sales_per_share,
-                "book_value": raw_book_value
+                "sales_per_share": clean_numeric(revenue_per_share),
+                "book_value": clean_numeric(book_value)
             },
             "growthRateNext5Y": growth_rate_1_5,
             "growthNote": growth_note
         }
 
     except Exception as e:
-        print(f"Error calculating intrinsic value for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
         return {
-            "status": "Error", 
-            "intrinsicValue": 0, 
+            "status": "Error", "intrinsicValue": 0, "method": "Error", "assumptions": {},
+            "allMethods": [],
             "currentPrice": info.get("currentPrice") or info.get("regularMarketPrice") or 0,
-            "differencePercent": 0, 
-            "method": "Error", 
-            "assumptions": {},
-            "growthRateNext5Y": None,
             "growthNote": f"Exception: {str(e)}"
         }
 
-def get_stock_data(ticker: str):
+def get_stock_data(ticker: str, force_refresh: bool = False):
     # --- PROPOSED CACHING LOGIC START ---
     try:
-        if db:
+        if db and not force_refresh:
             cache_ref = db.collection('stock_cache').document(ticker)
             doc = cache_ref.get()
             
@@ -1987,6 +1860,7 @@ class PortfolioItem(BaseModel):
 class PortfolioTWRRequest(BaseModel):
     items: List[PortfolioItem]
     uid: Optional[str] = None
+    comparison_tickers: List[str] = []
 
 @app.post("/api/portfolio/twr")
 async def get_portfolio_twr(payload: PortfolioTWRRequest):
@@ -1999,7 +1873,10 @@ async def get_portfolio_twr(payload: PortfolioTWRRequest):
     # Generate a hash of the input items to detect ANY changes (edits/adds/deletes)
     # We stringify the sorted items to ensure consistency
     import hashlib
-    items_str = json.dumps([item.dict() for item in items], sort_keys=True, default=str)
+    items_str = json.dumps({
+        "items": [item.dict() for item in items],
+        "comparison_tickers": payload.comparison_tickers
+    }, sort_keys=True, default=str)
     input_hash = hashlib.md5(items_str.encode()).hexdigest()
 
     if db and uid:
@@ -2031,8 +1908,11 @@ async def get_portfolio_twr(payload: PortfolioTWRRequest):
             print(f"Cache Read Error: {e}")
 
     # Calculate
-    result = await calculate_portfolio_twr(items)
+    result = await calculate_portfolio_twr(items, payload.comparison_tickers)
     
+    # Process for JSON safety (NaN -> None)
+    result = clean_nan(result)
+
     # Save to Cache
     if db and uid and result:
         try:
@@ -2048,7 +1928,7 @@ async def get_portfolio_twr(payload: PortfolioTWRRequest):
             
     return result
 
-async def calculate_portfolio_twr(items: List[PortfolioItem]):
+async def calculate_portfolio_twr(items: List[PortfolioItem], comparison_tickers: List[str] = []):
     """
     Calculates Time Weighted Returns (TWR) for the portfolio and individual stocks
     using the GIPS standard with Start-of-Day (SOD) flows.
@@ -2094,8 +1974,10 @@ async def calculate_portfolio_twr(items: List[PortfolioItem]):
              
         # Determine global time range
         min_date = min(flows_by_date.keys())
+        # Always start at least 1 day before the first transaction to show the 0 point
+        start_date = min_date - pd.Timedelta(days=1)
         end_date = pd.Timestamp.now().normalize()
-        all_dates = pd.date_range(start=min_date, end=end_date, freq='D')
+        all_dates = pd.date_range(start=start_date, end=end_date, freq='D')
         
         # 2. Fetch Adjusted History (Total Return)
         # Fetch 7 days prior to capture Friday close for weekend/holiday purchases
@@ -2104,7 +1986,9 @@ async def calculate_portfolio_twr(items: List[PortfolioItem]):
         history_map = {}
         ticker_currencies = {}
         
-        for ticker in processed_tickers:
+        all_fetch_tickers = processed_tickers.union(set(comparison_tickers))
+        
+        for ticker in all_fetch_tickers:
             try:
                 # Reuse ticker object
                 obj = yf.Ticker(ticker)
@@ -2206,9 +2090,10 @@ async def calculate_portfolio_twr(items: List[PortfolioItem]):
         
         last_known_prices = {t: 0.0 for t in processed_tickers}
 
-        # We also want to calculate Individual TWRs in the same loop or separate?
-        # Let's do separate tracking for individual TWRs to keep logic clean.
+        # Ticker Level Loops
         ticker_states = {t: {'shares': 0.0, 'twr': 1.0, 'v_prev': 0.0} for t in processed_tickers}
+        comp_starts = {t: None for t in comparison_tickers}
+        comp_last_prices = {t: 0.0 for t in comparison_tickers}
         
         chart_data = [] # To store daily performance
 
@@ -2285,10 +2170,38 @@ async def calculate_portfolio_twr(items: List[PortfolioItem]):
                 portfolio_twr *= (1 + r)
             
             # Record Daily Cummulative TWR
-            chart_data.append({
+            entry = {
                 "date": date.strftime("%Y-%m-%d"),
                 "value": (portfolio_twr - 1) * 100
-            })
+            }
+
+            # Comparison Tickers
+            for ct in comparison_tickers:
+                price = 0.0
+                if ct in history_map and not history_map[ct].empty:
+                    if date in history_map[ct].index:
+                        price = history_map[ct].loc[date]
+                        comp_last_prices[ct] = price
+                    elif comp_last_prices[ct] > 0:
+                        price = comp_last_prices[ct]
+                    else:
+                        try:
+                            idx = history_map[ct].index.get_indexer([date], method='pad')[0]
+                            if idx != -1:
+                                price = history_map[ct].iloc[idx]
+                                comp_last_prices[ct] = price
+                        except:
+                            pass
+                
+                if price > 0:
+                    if comp_starts[ct] is None:
+                        comp_starts[ct] = price
+                    entry[f"val_{ct}"] = (price / comp_starts[ct] - 1) * 100
+                elif comp_starts[ct] is not None:
+                    # If we had a start but no current price, use last known growth
+                    entry[f"val_{ct}"] = (comp_last_prices[ct] / comp_starts[ct] - 1) * 100 if comp_last_prices[ct] > 0 else 0
+
+            chart_data.append(entry)
 
             # Update Prev for next day
             v_prev_close = v_end_today
@@ -2354,7 +2267,7 @@ async def get_chart(ticker: str, timeframe: str):
             "1M": {"fetch_period": "60d", "interval": "30m", "display_points": 260},  # yfinance 30m limit is 60 days
             "3M": {"fetch_period": "6mo", "interval": "1h", "display_points": None},  # Show last 3 months
             "6M": {"fetch_period": "2y", "interval": "1h", "display_points": 960},  # Fetch 2y, show 6M (~960 hours = 6mo * 30d * 6.5h/day)
-            "YTD": {"fetch_period": "2y", "interval": "1d", "display_points": None},  # Fetch 2y, filter to YTD
+            "YTD": {"fetch_period": "1y", "interval": "1d", "display_points": None},  # User requested 1 year duration
             "1Y": {"fetch_period": "3y", "interval": "1d", "display_points": 252},  # Fetch 3y, show 1Y (~252 trading days)
             "5Y": {"fetch_period": "10y", "interval": "1wk", "display_points": 260},  # Fetch 10y, show 5Y (~260 weeks)
             "All": {"fetch_period": "max", "interval": "1mo", "display_points": None}  # Show all
@@ -2373,9 +2286,9 @@ async def get_chart(ticker: str, timeframe: str):
         if config["display_points"]:
             history = history.tail(config["display_points"])
         elif timeframe == "YTD":
-            # Filter to year-to-date
-            current_year = pd.Timestamp.now().year
-            history = history[history.index.year == current_year]
+            # Filter to year-to-date (Changed to 1Y per request)
+            # Just use the fetched period (1y) directly
+            pass 
         elif timeframe in ["1D", "5D", "1M", "3M"]:
             # For these timeframes, show the most recent data
             # Calculate based on timeframe
@@ -2416,9 +2329,9 @@ async def get_chart(ticker: str, timeframe: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stock/{ticker}")
-async def read_stock(ticker: str):
-    print(f"\n--- [API] Received request for {ticker} ---")
-    data = get_stock_data(ticker)
+async def read_stock(ticker: str, refresh: bool = False):
+    print(f"\n--- [API] Received request for {ticker} (Refresh: {refresh}) ---")
+    data = get_stock_data(ticker, force_refresh=refresh)
     return clean_nan(data)
 
 @app.get("/api/evaluate_moat/{ticker}")

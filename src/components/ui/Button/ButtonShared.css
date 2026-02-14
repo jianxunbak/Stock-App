@@ -1,0 +1,103 @@
+/* --- Shared Neumorphic Button Styles --- */
+
+/* Base container for all buttons */
+.neu-btn-base {
+    height: var(--neu-btn-height);
+    /* Allow expansion */
+    width: var(--neu-btn-min-width);
+    /* Fit content */
+    border: none;
+    cursor: pointer;
+    outline: none;
+    transition: background var(--neu-transition-default),
+        box-shadow var(--neu-transition-default),
+        color var(--neu-transition-default),
+        filter var(--neu-transition-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.75rem;
+    box-sizing: border-box;
+
+    /* Base Style */
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow);
+    border-radius: var(--neu-radius-sm);
+}
+
+/* Icon Variant: Force Square */
+.neu-btn-base[data-variant="icon"] {
+    width: var(--neu-btn-height) !important;
+    min-width: var(--neu-btn-height) !important;
+    padding: 0 !important;
+}
+
+/* Base text styles */
+.neu-text-base {
+    font-size: var(--neu-text-sm);
+    font-weight: var(--neu-font-bold);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--neu-text-secondary);
+    transition: filter 0.3s ease;
+}
+
+/* Icon styles */
+.neu-btn-base svg {
+    stroke: var(--neu-text-secondary);
+    /* Unified Grey Color */
+    stroke-width: var(--neu-icon-stroke);
+    /* UNIFIED FILTER: Combine dark shadow and light highlight to handle zoom correctly */
+    /* Added 1px blur to the light highlight to prevent ghosting */
+    filter: var(--neu-filter-icon-default) drop-shadow(0rem 1px 1px rgba(255, 255, 255, 0.4));
+    transition: all var(--neu-transition-default);
+    /* animation: icon-shine var(--neu-anim-speed-slow) ease-in-out infinite; REMOVED */
+    height: var(--neu-icon-size) !important;
+    width: var(--neu-icon-size) !important;
+    min-width: var(--neu-icon-size) !important;
+    min-height: var(--neu-icon-size) !important;
+}
+
+/* Hover: Lifting Pop - Exclude when pressed */
+.neu-btn-base:hover:not(.pressed-latch):not(.active) {
+    box-shadow: var(--neu-card-shadow-hover);
+    filter: brightness(1.03);
+}
+
+/* Speed up shimmer on hover */
+.neu-btn-base:hover:not(.pressed-latch):not(.active) .neu-text-base {
+    animation-duration: var(--neu-anim-speed-fast);
+    filter: drop-shadow(0rem 0.125rem 0.1875rem rgba(0, 0, 0, 0.15)) brightness(1.1);
+}
+
+.neu-btn-base:hover:not(.pressed-latch):not(.active) svg {
+    animation-duration: var(--neu-anim-speed-fast);
+    stroke: var(--neu-text-secondary);
+}
+
+/* Pressed/Active State */
+.neu-btn-base.pressed-latch,
+.neu-btn-base.active {
+    background: var(--neu-btn-bg-pressed);
+    box-shadow: var(--neu-card-shadow-inset-deep);
+}
+
+.neu-btn-base.pressed-latch .neu-text-base,
+.neu-btn-base.active .neu-text-base {
+    animation-play-state: paused;
+    stroke: var(--neu-text-secondary);
+    filter: none;
+}
+
+/* --- Variants --- */
+
+.neu-btn-base.pressed-latch svg,
+.neu-btn-base.active svg {
+    animation-play-state: paused;
+    stroke: var(--neu-text-secondary);
+    filter: none;
+}

@@ -1,0 +1,209 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    width: 100%;
+    position: relative;
+    z-index: 100;
+}
+
+.leftSection {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.rightSection {
+    display: flex;
+    align-items: center;
+}
+
+/* Logo Styles */
+.logoContainer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.titleText {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: var(--neu-bg-metallic-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+    display: none;
+    animation: shine 15s linear infinite;
+    background-size: 200% auto;
+}
+
+@media (min-width: 600px) {
+    .titleText {
+        display: block;
+    }
+}
+
+.titleIcon {
+    color: var(--neu-text-metallic-start);
+    display: block;
+}
+
+
+
+/* New Navigation Action Buttons */
+.navActionButton svg {
+    display: block;
+}
+
+.starIcon {
+    color: inherit;
+    transition: all 0.3s ease;
+}
+
+/* Search Box */
+/* Search Bar - No extra CSS needed as it is self-contained */
+
+/* Action Group */
+.actionGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.desktopActions {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+    .desktopActions {
+        display: flex;
+    }
+}
+
+/* Currency Selector */
+.currencyContainer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    height: 2.22rem;
+    /* Exact Button height match */
+    width: 2.22rem;
+    border-radius: var(--neu-radius-sm);
+    overflow: visible;
+}
+
+.currencyContainer.expanded {
+    width: 5.8rem;
+    /* Further tightened width */
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow);
+}
+
+.animationWrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.currencyButton {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: var(--neu-card-shadow) !important;
+    border-radius: var(--neu-radius-sm) !important;
+}
+
+.currencyText {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--neu-text-secondary);
+}
+
+.currencyOptions {
+    position: absolute;
+    /* Lock to container to prevent sliding overlap */
+    right: 0;
+    display: flex;
+    gap: 0.15rem;
+    padding: 0 0.3rem;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+.currencyOption {
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--neu-radius-sm);
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--neu-text-secondary);
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.currencyOption:hover {
+    box-shadow: var(--neu-card-shadow-hover, var(--neu-card-shadow));
+    transform: translateY(-1px);
+    color: var(--neu-text-primary);
+}
+
+.activeCurrency {
+    background: var(--neu-btn-bg-pressed);
+    box-shadow: var(--neu-card-shadow-inset);
+    color: var(--neu-text-primary);
+}
+
+.pressedCurrency {
+    background: var(--neu-btn-bg-pressed) !important;
+    box-shadow: var(--neu-card-shadow-inset-deep) !important;
+    transform: scale(0.98);
+}
+
+/* User Avatar */
+.userAvatarSmall {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--neu-radius-sm);
+    object-fit: cover;
+}
+
+.userAvatarPlaceholder {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--neu-radius-sm);
+    background: var(--neu-bg-metallic-text);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+/* Mobile Actions */
+.mobileActions {
+    display: flex;
+    align-items: center;
+}
+
+@media (min-width: 768px) {
+    .mobileActions {
+        display: none;
+    }
+}

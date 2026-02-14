@@ -1,0 +1,21 @@
+.fluid-card-container {
+    width: 100%;
+    margin: 1rem auto;
+    perspective: 1000px;
+}
+
+/* FluidCard is now strictly a layout/animation wrapper.
+   The visual card styling is handled by internal components using StyledCard. */
+.fluid-card-content {
+    background: transparent;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+    overflow: visible;
+}
+
+[data-theme="light"] .fluid-card-content {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}

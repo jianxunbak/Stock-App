@@ -1,0 +1,352 @@
+.profileGrid {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-height: 450px;
+    gap: 0;
+    /* overflow: hidden; */
+    /* Removing this to prevent clipping the internal scrollbar */
+    border-radius: 1.5rem;
+    box-sizing: border-box;
+}
+
+.leftCol {
+    flex: 0 0 320px;
+    max-width: 320px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 1.5rem;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    align-items: center;
+}
+
+.rightCol {
+    flex: 1;
+    padding: 1.5rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+/* Standard Themed Scrollbar */
+.rightCol::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.rightCol::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.rightCol::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+    border-radius: 10px;
+    border: none;
+    transition: background-color 0.3s ease;
+}
+
+.rightCol::-webkit-scrollbar-thumb:hover {
+    background: var(--neu-text-tertiary);
+}
+
+[data-theme="light"] .rightCol::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+}
+
+[data-theme="light"] .rightCol::-webkit-scrollbar-thumb:hover {
+    background: var(--neu-text-tertiary);
+}
+
+.divider {
+    display: none;
+}
+
+.userProfileHeader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.25rem;
+}
+
+.avatarContainer {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow);
+    border: 2px solid var(--neu-border-subtle);
+    overflow: hidden;
+}
+
+.avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.userInfo h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: var(--neu-text-primary);
+    font-weight: 700;
+}
+
+.userInfo p {
+    margin: 0.25rem 0 0;
+    font-size: 0.9rem;
+    color: var(--neu-text-secondary);
+}
+
+.sectionTitle {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--neu-text-primary);
+    font-weight: 600;
+}
+
+.sectionHeader {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.themeToggleWrapper {
+    width: 100%;
+    max-width: 200px;
+}
+
+.preferenceLabel {
+    font-size: 0.85rem;
+    color: var(--neu-brand);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.settingsScroll {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+
+.settingsGroup h5 {
+    margin: 0 0 1.25rem;
+    font-size: 0.85rem;
+    color: var(--neu-brand);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+}
+
+.togglesGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.25rem;
+}
+
+.toggleRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 1.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--neu-border-subtle);
+    border-radius: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggleRow:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--neu-text-tertiary);
+    transform: translateY(-1px);
+}
+
+.cardLabel {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--neu-text-secondary);
+}
+
+.customToggle {
+    width: 44px;
+    height: 24px;
+    background: var(--neu-bg);
+    border-radius: 20px;
+    position: relative;
+    box-shadow: inset 2px 2px 4px var(--neu-shadow-dark),
+        inset -2px -2px 4px var(--neu-shadow-light);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.customToggle.active {
+    background: #4ade80 !important;
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggleKnob {
+    width: 18px;
+    height: 18px;
+    background: var(--neu-text-secondary);
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.customToggle.active .toggleKnob {
+    left: 23px;
+    background: white;
+}
+
+[data-theme="light"] .toggleRow {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .leftCol {
+    background: rgba(0, 0, 0, 0.025);
+}
+
+@media (max-width: 850px) {
+    .profileGrid {
+        flex-direction: column;
+        min-height: auto;
+        overflow: visible;
+        /* Allow whole modal to scroll on mobile */
+    }
+
+    .leftCol {
+        max-width: none;
+        width: 100%;
+        flex: none;
+        border-radius: 1.5rem;
+        align-items: flex-start;
+    }
+
+    .rightCol {
+        padding: 1.5rem;
+        overflow-y: visible;
+        /* Use global modal scroll on mobile */
+    }
+
+    .userProfileHeader {
+        text-align: left;
+        align-items: flex-start;
+    }
+}
+
+/* Override Window component internal scrolling to prevent nested scrollbars */
+.windowContentOverride {
+    overflow-y: visible !important;
+}
+
+/* Add spacing between menu button and close button in the header */
+:global(.window-card) :global(.styled-card-controls-container) {
+    gap: 0.4rem !important;
+}
+
+.editProfileForm {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+.avatarOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    border-radius: 50%;
+}
+
+.avatarContainer:hover .avatarOverlay {
+    opacity: 1;
+}
+
+.editInputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    width: 100%;
+}
+
+.editInputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    width: 100%;
+}
+
+.profileInput {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    background: var(--neu-bg);
+    border: none;
+    border-radius: 0.5rem;
+    color: var(--neu-text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    outline: none;
+    transition: all 0.2s;
+    text-align: center;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+}
+
+.profileInput:focus {
+    color: var(--neu-brand);
+}
+
+.editActions {
+    display: flex;
+    gap: 0.8rem;
+    width: 100%;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+
+[data-theme="light"] .profileInput {
+    background: var(--neu-bg);
+    color: var(--neu-text-primary);
+}
+
+[data-theme="light"] .profileInput:focus {
+    background: var(--neu-bg);
+    color: var(--neu-brand);
+}
+
+@media (max-width: 850px) {
+    .windowContentOverride {
+        overflow-y: auto !important;
+    }
+}

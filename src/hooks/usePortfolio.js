@@ -10,6 +10,7 @@ export const usePortfolio = (portfolioId) => {
     const [portfolio, setPortfolio] = useState([]);
     const [portfolioList, setPortfolioList] = useState([]);
     const [analysis, setAnalysis] = useState('');
+    const [notes, setNotes] = useState('');
     const [comparisonStocks, setComparisonStocks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [listLoading, setListLoading] = useState(true);
@@ -20,6 +21,7 @@ export const usePortfolio = (portfolioId) => {
         if (!currentUser || !portfolioId) {
             setPortfolio([]);
             setAnalysis('');
+            setNotes('');
             setComparisonStocks([]);
             setLoading(false);
             return;
@@ -29,6 +31,7 @@ export const usePortfolio = (portfolioId) => {
         // Clear previous data while loading new portfolio to prevent stale data flash
         setPortfolio([]);
         setAnalysis('');
+        setNotes('');
         setComparisonStocks([]);
 
         const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
@@ -36,10 +39,12 @@ export const usePortfolio = (portfolioId) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setAnalysis(data.analysis || '');
+                setNotes(data.notes || '');
                 setPortfolio(data.portfolio || []);
                 setComparisonStocks(data.comparisonStocks || []);
             } else {
                 setAnalysis('');
+                setNotes('');
                 setPortfolio([]);
                 setComparisonStocks([]);
             }
@@ -151,38 +156,7 @@ export const usePortfolio = (portfolioId) => {
         return () => unsubscribe();
     }, [currentUser]);
 
-    // 2. Fetch Data for CURRENT Portfolio
-    useEffect(() => {
-        if (!currentUser || !portfolioId) {
-            setPortfolio([]);
-            setAnalysis('');
-            setLoading(false);
-            return;
-        }
 
-        setLoading(true);
-        // Clear previous data while loading new portfolio to prevent stale data flash
-        setPortfolio([]);
-        setAnalysis('');
-
-        const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
-        const unsubscribe = onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setAnalysis(data.analysis || '');
-                setPortfolio(data.portfolio || []);
-            } else {
-                setAnalysis('');
-                setPortfolio([]);
-            }
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching portfolio data:", error);
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [currentUser, portfolioId]);
 
     const addStockToPortfolio = async (targetId, item) => {
         if (!currentUser || !targetId) return;
@@ -341,10 +315,24 @@ export const usePortfolio = (portfolioId) => {
         }
     };
 
+    const saveNotes = async (newNotes) => {
+        if (!currentUser || !portfolioId) return;
+        try {
+            const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
+            await updateDoc(docRef, {
+                notes: newNotes,
+                updatedAt: new Date().toISOString()
+            });
+        } catch (error) {
+            console.error("Error saving notes:", error);
+        }
+    };
+
     return {
         portfolio,
         portfolioList,
         analysis,
+        notes,
         loading,
         listLoading,
         addToPortfolio,
@@ -358,6 +346,7 @@ export const usePortfolio = (portfolioId) => {
         copyItemsFromPortfolio,
         clearPortfolio,
         comparisonStocks,
-        updateComparisonStocks
+        updateComparisonStocks,
+        saveNotes
     };
 };

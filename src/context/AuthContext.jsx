@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, googleProvider } from '../firebase';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { auth, googleProvider, storage } from '../firebase';
+import { signInWithPopup, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const AuthContext = createContext();
 
@@ -18,6 +19,31 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         return signOut(auth);
+    };
+
+    const updateUserProfile = async (displayName, photoURL) => {
+        if (!auth.currentUser) throw new Error("No user logged in");
+
+        await updateProfile(auth.currentUser, {
+            displayName,
+            photoURL
+        });
+
+        // Manually update local state to reflect changes immediately
+        setCurrentUser(prev => ({
+            ...prev,
+            displayName,
+            photoURL
+        }));
+    };
+
+    const uploadProfilePicture = async (file) => {
+        if (!auth.currentUser) throw new Error("No user logged in");
+
+        const storageRef = ref(storage, `profile_pictures/${auth.currentUser.uid}`);
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+        return downloadURL;
     };
 
     // useEffect(() => {
@@ -75,6 +101,8 @@ export const AuthProvider = ({ children }) => {
         currentUser,
         login,
         logout,
+        updateUserProfile,
+        uploadProfilePicture,
         loading
     };
 

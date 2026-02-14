@@ -1,0 +1,123 @@
+/* --- Left Section: Info Stack --- */
+.stock-info-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 0.25rem;
+    flex: 1;
+    text-align: left;
+}
+
+.stock-company-name {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--neu-text-primary);
+    line-height: 1.2;
+    margin: 0;
+    letter-spacing: -0.02em;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    /* Allow wrapping */
+    white-space: normal;
+    word-break: break-word;
+    /* Ensure clear text wrap */
+}
+
+.stock-name-row {
+    display: flex;
+    align-items: flex-start;
+    /* Align top so text wraps nicely next to button */
+    gap: 1rem;
+    flex-wrap: nowrap;
+    /* Prevent buttons from dropping */
+    width: 100%;
+}
+
+.stock-inline-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.stock-ticker-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+    white-space: nowrap;
+    /* Keep ticker on one line */
+}
+
+.stock-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    /* Added space between title/ticker and price */
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.current-price {
+    font-size: clamp(1.8rem, 6vw, 3rem);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--neu-text-primary);
+    transition: color 0.3s ease;
+}
+
+.current-price.positive {
+    color: var(--neu-success);
+    text-shadow: 0 0 20px rgba(43, 194, 83, 0.15);
+}
+
+.current-price.negative {
+    color: var(--neu-error);
+    text-shadow: 0 0 20px rgba(224, 73, 73, 0.15);
+}
+
+.price-change-block {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.price-change-block.positive {
+    color: var(--neu-success);
+    filter: drop-shadow(0 0 4px rgba(43, 194, 83, 0.2));
+}
+
+.price-change-block.negative {
+    color: var(--neu-error);
+    filter: drop-shadow(0 0 4px rgba(224, 73, 73, 0.2));
+}
+
+
+
+/* --- Summary Styles moved to SummaryCard.css --- */
+@media (max-width: 768px) {
+    .current-price {
+        font-size: 2.5rem;
+    }
+
+    .stock-company-name {
+        font-size: 1.5rem;
+    }
+
+    .stock-price-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .current-price {
+        font-size: 1.8rem;
+    }
+}

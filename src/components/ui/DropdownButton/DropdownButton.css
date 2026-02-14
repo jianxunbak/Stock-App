@@ -1,0 +1,81 @@
+.dropdown-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+/* Base style for the toggle button is handled by passed Button component or custom button */
+
+/* Dropdown Menu Styles */
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    margin-top: 6px;
+    z-index: 1000;
+    min-width: 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: visible;
+}
+
+.dropdown-item {
+    background: transparent;
+    border: none;
+    color: var(--neu-text-secondary);
+    padding: 0.4rem 0.65rem;
+    text-align: left;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: inherit;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    width: 100%;
+}
+
+.dropdown-item-content {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+}
+
+.dropdown-item:hover {
+    background: var(--neu-bg-hover);
+    color: var(--neu-text-primary);
+}
+
+.dropdown-item.active {
+    background: var(--neu-bg-secondary, rgba(0, 0, 0, 0.05));
+    color: var(--neu-text-primary);
+    font-weight: 600;
+}
+
+/* Indicator dot for items that need it */
+.dropdown-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background-color: currentColor;
+    /* Default to text color if not overridden */
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: var(--neu-shadow-dark);
+    opacity: 0.1;
+    margin: 4px 6px;
+}
+
+.dropdown-header {
+    padding: 0.5rem 0.65rem 0.25rem 0.65rem;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--neu-text-tertiary);
+    font-weight: 700;
+}

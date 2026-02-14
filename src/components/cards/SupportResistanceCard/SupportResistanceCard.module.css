@@ -1,0 +1,157 @@
+.card {
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    padding: 1.5rem;
+    color: var(--text-primary);
+    gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-left: 1px solid rgba(255, 255, 255, 0.4);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 30px;
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.3),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+
+    z-index: 1;
+    backdrop-filter: blur(1px) saturate(150%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(150%) brightness(1);
+}
+
+[data-theme="light"] .card {
+    background: transparent;
+    box-shadow:
+        /* 1. Main Drop Shadow (Bottom & Right) - The strong one */
+        15px 15px 35px rgba(0, 0, 0, 0.2),
+        /* 2. Tiny Drop Shadow (Top & Left) - The subtle one */
+        -5px -5px 20px rgba(0, 0, 0, 0.1),
+        /* Smaller offset, smaller blur, lower opacity */
+
+        /* 3. Highlight (Inner/Inset) - Keep as is */
+        inset 5px 3.5px 5px rgba(255, 255, 255, 0.2),
+
+        /* 4. Shadow (Inner/Inset) - Keep as is */
+        inset -2px -2px 5px rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgb(255, 255, 255);
+    border-left: 1px solid rgb(255, 255, 255);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgb(0, 0, 0, 0.2);
+    backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    -webkit-backdrop-filter: blur(1px) saturate(200%) brightness(1);
+    z-index: 1;
+}
+
+.card:hover {
+    outline: none;
+    background: transparent;
+    transform: translateY(-10px) scale(1.01);
+    border-radius: 60px;
+}
+
+.card>* {
+    position: relative;
+    z-index: 1;
+}
+
+
+.loading {
+    padding: 1.5rem;
+    background-color: var(--bg-secondary);
+    border-radius: 0.5rem;
+    height: 16rem;
+}
+
+
+.title {
+    font-size: 1.5rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.noDataText {
+    color: var(--text-secondary);
+}
+
+.listContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+}
+
+.supportRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.supportRow:last-child {
+    border-bottom: none;
+}
+
+.leftCol {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rightCol {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+    text-align: right;
+}
+
+.price {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-weight: 600;
+    color: var(--text-secondary);
+    /* Matches assumptionKey */
+    font-size: 0.9rem;
+}
+
+.price.active {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.reasonText {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.strongLabel {
+    font-size: 0.7rem;
+    color: #facc15;
+}
+
+.actionText {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.textGreen {
+    color: #4ade80;
+    /* var(--neu-success) */
+    font-weight: 700;
+}
+
+.textRed {
+    color: #f87171;
+    /* var(--neu-error) */
+    font-weight: 700;
+}

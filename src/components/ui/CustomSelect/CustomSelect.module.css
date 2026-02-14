@@ -1,0 +1,304 @@
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.container {
+    padding: 0 1rem;
+    position: relative;
+    width: 100%;
+}
+
+.customSelectContainer {
+    position: relative;
+    width: 100%;
+    min-width: 150px;
+    z-index: 20;
+    /* Ensure trigger is above elements */
+}
+
+.customSelectTrigger {
+    background: var(--neu-bg);
+    border: none;
+    color: var(--neu-text-primary);
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--neu-radius-sm, 8px);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: var(--neu-transition-default, all 0.2s ease);
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+}
+
+.customSelectTrigger:hover {
+    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark),
+        inset -3px -3px 7px var(--neu-shadow-light);
+}
+
+.desktopDropdownWrapper {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    min-width: 250px;
+    margin-top: 0.5rem;
+    z-index: 10000;
+}
+
+.customSelectMenu,
+[data-theme="light"] .customSelectMenu {
+    display: flex;
+    flex-direction: column;
+    max-height: 400px;
+    overflow: visible;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Secondary styles for desktop hover if needed */
+.customSelectMenu:hover {
+    transition: transform 0.2s;
+}
+
+.customSelectOptionsList {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 0.5rem;
+}
+
+/* Scrollbar Styles */
+.customSelectOptionsList::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.customSelectOptionsList::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.customSelectOptionsList::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.3);
+    border-radius: 4px;
+}
+
+.customSelectOptionsList::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.5);
+}
+
+[data-theme="light"] .customSelectOptionsList::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .customSelectOptionsList::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.4);
+}
+
+
+.customSelectGroupLabel {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin: 1rem 0 0.5rem 0.5rem;
+    letter-spacing: 0.05em;
+}
+
+.customSelectOption {
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    margin-bottom: 1px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.customSelectOption:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .customSelectOption:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.selected {
+    background: rgba(96, 165, 250, 0.2);
+    color: #60a5fa;
+    font-weight: 600;
+}
+
+[data-theme="light"] .selected {
+    background: rgba(96, 165, 250, 0.15);
+    color: #2563eb;
+}
+
+.deleteOptionBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.deleteOptionBtn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+    opacity: 1;
+}
+
+/* Mobile Modal Styles */
+.mobileModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100000;
+    display: flex;
+    align-items: flex-end;
+    /* Bottom sheet by default */
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.mobileModalContent {
+    width: 100%;
+    max-height: 80vh;
+    background: rgba(15, 23, 42, 0.95);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+
+    /* Glass Effect */
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    animation: slideUp 0.3s ease-out;
+    overflow-y: auto;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+[data-theme="light"] .mobileModalContent {
+    background: rgba(255, 255, 255, 0.95);
+    border-top: 1px solid rgb(255, 255, 255);
+}
+
+/* STRONG RESET for nested mobile modals */
+.mobileModalContent .customSelectMenu,
+[data-theme="light"] .mobileModalContent .customSelectMenu {
+    position: static;
+    width: 100%;
+    max-width: unset;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0;
+    margin: 0;
+    animation: none;
+    background: transparent !important;
+    max-height: none;
+    transform: none !important;
+}
+
+.mobileModalContent .customSelectMenu:hover {
+    transform: none !important;
+}
+
+/* Multi-select Checkbox Styles */
+.checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    margin-right: 10px;
+}
+
+[data-theme="light"] .checkbox {
+    border-color: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.customSelectOption:hover .checkbox {
+    border-color: #ffffff;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="light"] .customSelectOption:hover .checkbox {
+    border-color: #000000;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.checkbox.checked {
+    background: #60a5fa;
+    border-color: #60a5fa;
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+}
+
+.checkIcon {
+    color: white;
+}
+
+.selectAllOption {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 4px;
+    padding-bottom: 0.5rem !important;
+    font-weight: 600;
+    color: #60a5fa !important;
+}

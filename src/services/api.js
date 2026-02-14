@@ -29,6 +29,7 @@ export const fetchStockData = async (ticker, forceRefresh = false) => {
         try {
             // console.log(`Requesting ${ticker} data...`);
             const response = await axios.get(`${API_URL}/stock/${ticker}`, {
+                params: { refresh: forceRefresh },
                 timeout: 60000 // 60 seconds timeout
             });
 
@@ -89,9 +90,13 @@ export const fetchCurrencyRate = async (targetCurrency) => {
     }
 };
 
-export const calculatePortfolioTWR = async (portfolioItems, uid) => {
+export const calculatePortfolioTWR = async (portfolioItems, uid, comparisonTickers = []) => {
     try {
-        const response = await axios.post(`${API_URL}/portfolio/twr`, { items: portfolioItems, uid });
+        const response = await axios.post(`${API_URL}/portfolio/twr`, {
+            items: portfolioItems,
+            uid,
+            comparison_tickers: comparisonTickers
+        });
         return response.data;
     } catch (error) {
         if (error.response) {

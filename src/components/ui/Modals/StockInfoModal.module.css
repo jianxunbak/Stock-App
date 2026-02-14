@@ -1,0 +1,108 @@
+.container {
+    padding: 0.5rem 0.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sectionTitle {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--neu-border-subtle);
+    padding-bottom: 0.5rem;
+}
+
+.description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--neu-text-secondary);
+    text-align: justify;
+}
+
+.infoGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+}
+
+.infoCard {
+    background: var(--neu-bg);
+    border: 1px solid var(--neu-border-subtle);
+    border-radius: var(--neu-radius-sm);
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    box-shadow: none;
+    /* Removed shadows as requested */
+    transition: background 0.2s ease;
+}
+
+.infoCard:hover {
+    background: var(--neu-app-bg);
+}
+
+.infoLabel {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+}
+
+.infoValue {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+}
+
+.calendarGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    /* Unified with infoGrid */
+}
+
+@media (max-width: 600px) {
+    .calendarGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+.calendarItem {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-sm);
+    border: 1px solid var(--neu-border-subtle);
+    box-shadow: none;
+    /* Removed shadows and highlights */
+}
+
+.calendarKey {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--neu-text-tertiary);
+}
+
+.calendarValue {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+}
+
+.noData {
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--neu-text-tertiary);
+}

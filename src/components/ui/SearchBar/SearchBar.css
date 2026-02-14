@@ -1,0 +1,147 @@
+.search-bar-container {
+    display: flex;
+    align-items: center;
+    overflow: visible;
+    position: relative;
+    padding: 0;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: all var(--neu-transition-default);
+}
+
+.search-bar-container.expanded {
+    cursor: default;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+/* Hide Fabric SVG layers when collapsed to let CSS handle the look */
+.search-bar-container:not(.expanded) .fabric-bg-layer,
+.search-bar-container:not(.expanded) .fabric-stroke-layer {
+    opacity: 0 !important;
+}
+
+/* Hover State - Raised Pop (Matches Button) */
+.search-bar-container.hover-pop:hover:not(.expanded):not(.pressed-latch):not(.active) {
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow-hover, var(--neu-card-shadow));
+    border: 1px solid transparent;
+    filter: brightness(1.03);
+    z-index: 2;
+}
+
+/* Pressed State - Inset Deep (Matches Button) */
+.search-bar-container.pressed-latch.active:not(.expanded) {
+    background: var(--neu-btn-bg-pressed) !important;
+    box-shadow: var(--neu-card-shadow-inset-deep) !important;
+    border: 1px solid transparent;
+    z-index: 1;
+}
+
+/* Ensure border-radius and appearance match Button exactly */
+.search-bar-container:not(.expanded) {
+    border-radius: var(--neu-radius-sm);
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow);
+    border: none;
+    height: 2.22rem;
+    width: 2.22rem;
+}
+
+.search-bar-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding-right: 3.5rem;
+    font-size: var(--neu-text-sm);
+    color: var(--neu-text-primary);
+    min-width: 0;
+    height: 100%;
+}
+
+.search-bar-input::placeholder {
+    color: var(--neu-text-tertiary);
+    opacity: 0.7;
+}
+
+.search-bar-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.22rem;
+    height: 2.22rem;
+    flex-shrink: 0;
+}
+
+.search-bar-icon-wrapper svg {
+    stroke: var(--neu-text-secondary);
+    stroke-width: var(--neu-icon-stroke);
+    filter: none;
+    height: var(--neu-icon-size);
+    width: var(--neu-icon-size);
+}
+
+.search-bar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    position: absolute;
+    right: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding-left: 0.5rem;
+    height: 90%;
+}
+
+/* Action Buttons (Clear & Submit) */
+.tag-remove-btn,
+.search-submit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow);
+    border: none;
+    cursor: pointer;
+    color: var(--neu-text-secondary);
+    width: 1.4rem;
+    /* Slightly larger for the "pill-button" feel */
+    height: 1.4rem;
+    border-radius: 50%;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.tag-remove-btn:hover {
+    box-shadow: var(--neu-card-shadow-hover);
+    color: var(--neu-error);
+    transform: translateY(-1px);
+}
+
+.search-submit-btn.has-text {
+    color: var(--neu-text-primary);
+}
+
+.search-submit-btn:hover {
+    box-shadow: var(--neu-card-shadow-hover);
+    color: var(--neu-success);
+    transform: translateY(-1px);
+}
+
+.tag-remove-btn:active,
+.search-submit-btn:active {
+    background: var(--neu-btn-bg-pressed);
+    box-shadow: var(--neu-card-shadow-inset);
+    transform: translateY(0) scale(0.95);
+}
+
+.tag-remove-btn svg,
+.search-submit-btn svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    stroke-width: 2.5;
+}

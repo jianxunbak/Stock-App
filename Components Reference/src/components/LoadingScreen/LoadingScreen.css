@@ -1,0 +1,178 @@
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: var(--neu-app-bg);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    transition: opacity 0.5s ease;
+}
+
+.fabric-layers {
+    position: absolute;
+    top: -100px;
+    left: -100px;
+    right: -100px;
+    bottom: -100px;
+    pointer-events: none;
+    filter: url(#soft-morph) blur(20px);
+    opacity: 0.7;
+    display: flex;
+    justify-content: space-between;
+}
+
+.fabric-layer {
+    position: relative;
+    width: 35%;
+    height: 180%;
+    background: linear-gradient(180deg,
+            transparent 0%,
+            var(--neu-bg) 30%,
+            var(--neu-bg) 70%,
+            transparent 100%);
+    border-radius: 100% 100% 100% 100%;
+    box-shadow: 0 0 100px rgba(0, 0, 0, 0.05);
+}
+
+.layer-1 {
+    left: -5%;
+    background: linear-gradient(180deg, transparent, rgba(251, 191, 36, 0.15), transparent);
+    animation: fabric-wave 12s infinite ease-in-out;
+}
+
+.layer-2 {
+    background: linear-gradient(180deg, transparent, rgba(99, 102, 241, 0.15), transparent);
+    animation: fabric-wave 15s infinite ease-in-out -2s;
+}
+
+.layer-3 {
+    background: linear-gradient(180deg, transparent, rgba(16, 185, 129, 0.15), transparent);
+    animation: fabric-wave 18s infinite ease-in-out -4s;
+}
+
+.layer-4 {
+    right: -5%;
+    background: linear-gradient(180deg, transparent, rgba(239, 68, 68, 0.15), transparent);
+    animation: fabric-wave 20s infinite ease-in-out -6s;
+}
+
+@keyframes fabric-wave {
+
+    0%,
+    100% {
+        transform: translateY(-10%) skewX(0deg) scaleX(1);
+        border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+    }
+
+    50% {
+        transform: translateY(10%) skewX(5deg) scaleX(1.1);
+        border-radius: 60% 40% 30% 70% / 50% 60% 40% 50%;
+    }
+}
+
+/* Glassmorphic Content Card */
+.loading-content {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3.5rem 5rem;
+    border-radius: var(--neu-radius-lg);
+    background: rgba(var(--neu-bg-rgb, 255, 255, 255), 0.1);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.25),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .loading-content {
+    background: rgba(26, 29, 33, 0.4);
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.loading-spinner-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 2rem;
+}
+
+.loading-spinner {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 2px solid transparent;
+    border-top-color: var(--neu-color-favorite);
+    border-radius: 50%;
+    animation: spin 1.5s cubic-bezier(0.76, 0, 0.24, 1) infinite;
+}
+
+.loading-spinner::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
+    border: 2px solid transparent;
+    border-top-color: rgba(99, 102, 241, 0.8);
+    border-radius: 50%;
+    animation: spin 2s cubic-bezier(0.76, 0, 0.24, 1) infinite reverse;
+}
+
+.loading-text {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: var(--neu-text-primary);
+    margin: 0;
+    animation: pulse-text 2s infinite ease-in-out;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse-text {
+
+    0%,
+    100% {
+        opacity: 0.6;
+        transform: scale(0.98);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Add a subtle grain texture */
+.loading-screen::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.03;
+    pointer-events: none;
+    background-image: url("https://grainy-gradients.vercel.app/noise.svg");
+    z-index: 15;
+}

@@ -1,11 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { StockDataProvider } from './hooks/useStockData';
-import HeroPage from './components/pages/HeroPage';
-import DashboardPage from './components/pages/DashboardPage';
-import PortfolioPage from './components/pages/PortfolioPage';
+import HeroPage from './components/pages/HeroPage/HeroPage';
+import AnalysisPage from './components/pages/AnalysisPage/AnalysisPage';
+import PortfolioPage from './components/pages/PortfolioPage/PortfolioPage';
 
-import ScrollToTop from './components/ui/ScrollToTop';
+import ScrollToTop from './components/ui/Navigation/ScrollToTop';
 
 function App() {
   return (
@@ -13,7 +13,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<HeroPage />} />
-          <Route path="/analysis" element={<DashboardPage />} />
+          <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
         </Routes>
         <ScrollToTop />

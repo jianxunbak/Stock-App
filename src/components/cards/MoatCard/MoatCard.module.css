@@ -1,0 +1,451 @@
+.card {
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: visible;
+    padding: 0;
+    color: var(--neu-text-primary);
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+}
+
+[data-theme="light"] .card {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+}
+
+.card:hover {
+    outline: none;
+    transform: none;
+}
+
+
+/* Ensure content sits above the background effects */
+.card>* {
+    position: relative;
+    z-index: 1;
+}
+
+
+.loading {
+    padding: 1.5rem;
+    background-color: var(--bg-secondary);
+    border-radius: 0.5rem;
+    height: 16rem;
+}
+
+
+
+.title {
+    font-size: 1.5rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0rem;
+    margin-top: 0;
+    color: var(--text-primary);
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Top Zone: Score + Checklist */
+.topZone {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .topZone {
+        flex-direction: row;
+    }
+}
+
+.scoreSection {
+    flex: 2;
+}
+
+.checklistSection {
+    flex: 1;
+    min-width: 300px;
+}
+
+/* Score Card Styles */
+.scoreCard {
+    padding: 1.5rem;
+    text-align: center;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+    position: relative;
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-lg);
+    box-shadow: var(--neu-card-shadow-inset);
+    overflow: hidden;
+}
+
+.scoreLabel {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.scoreValue {
+    font-size: 3rem;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0
+}
+
+.scoreMax {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+}
+
+.scoreStatus {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.statusGreen {
+    color: #4ade80;
+}
+
+.statusYellow {
+    color: #facc15;
+}
+
+.statusRed {
+    color: #f87171;
+}
+
+.checklistSubtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-left: 0.5rem;
+    /* Align with item padding */
+}
+
+/* Checklist Styles */
+.checklistContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    height: 100%;
+    justify-content: center;
+}
+
+.checklistItem {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem;
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-sm);
+    /* box-shadow: var(--neu-card-shadow); Optional: make them look like rows */
+}
+
+.checklistLabel {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    flex: 1;
+    margin-right: 0.5rem;
+}
+
+.buttonGroup {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Button styles removed to use standard component */
+
+/* Bottom Zone: Chart */
+.bottomZone {
+    width: 100%;
+}
+
+.chartContainer {
+    border-radius: 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+    border-radius: 20px;
+}
+
+@media (min-width: 768px) {
+    .chartContainer {
+        min-height: 480px;
+        /* Desktop */
+    }
+}
+
+.chartContainer *:focus {
+    outline: none !important;
+}
+
+.chartWrapper {
+    flex: 1;
+    width: 100%;
+    /* height: 400px; */
+    /* width: 100%; */
+    height: 100%;
+    min-height: 0;
+    outline: none;
+}
+
+.userNoteInput {
+    width: 100%;
+    margin-top: auto;
+    padding: 12px;
+    border-radius: var(--neu-radius-sm);
+    border: none;
+    background: var(--neu-bg);
+    box-shadow: var(--neu-card-shadow-inset);
+    color: var(--neu-text-primary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    resize: none;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    min-height: 80px;
+    overflow-y: auto;
+
+    /* Custom Scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--neu-border-subtle) transparent;
+}
+
+.userNoteInput::-webkit-scrollbar {
+    width: 8px;
+}
+
+.userNoteInput::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.userNoteInput::-webkit-scrollbar-thumb {
+    background-color: var(--neu-border-subtle);
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+.userNoteInput::-webkit-scrollbar-thumb:hover {
+    background-color: var(--neu-text-tertiary);
+}
+
+.userNoteInput::placeholder {
+    color: var(--neu-text-tertiary);
+    opacity: 0.6;
+}
+
+.userNoteInput:focus {
+    box-shadow: var(--neu-card-shadow-inset), 0 0 0 1px var(--neu-border-subtle);
+}
+
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    color: var(--neu-text-secondary);
+}
+
+.emptyState p {
+    margin: 0;
+    font-weight: 600;
+}
+
+.promptText {
+    font-size: 0.8rem;
+    font-weight: 400 !important;
+    opacity: 0.7;
+    max-width: 240px;
+}
+
+.gradingNote {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0;
+    font-style: italic;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.comparisonControls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.tickerInput {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 1em;
+    font-size: 0.75rem;
+    width: 120px;
+}
+
+.tickerInput:focus {
+    outline: none;
+    border: 1px solid rgb(73, 71, 194);
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+}
+
+.addButton {
+    background-color: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.addButton:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 12px rgba(96, 165, 250, 0.5),
+        inset 0 2px 4px rgba(96, 165, 250, 0.5);
+}
+
+.activeComparisons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.comparisonTag {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.removeButton {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.chartTitle {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0;
+    box-sizing: border-box;
+}
+
+.chartNote {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    box-sizing: border-box;
+    margin: 0;
+    margin-bottom: 1rem;
+}
+
+/* AI Button styles removed to use standard component */
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.evaluatingText {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 1rem 0;
+}
+
+.score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;
+    align-content: center;
+    height: 100%;
+    width: 100%;
+}
+
+.description {
+    text-align: justify;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0
+}
+
+.aiIcon {
+    color: #a855f7;
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+    position: absolute;
+    top: 10px;
+    right: 10px
+}
+
+.evaluatorNote {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 0.25rem;
+}
+
+.etfMessage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px dashed var(--border-color);
+}
