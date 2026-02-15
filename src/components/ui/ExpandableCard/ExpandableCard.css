@@ -1,4 +1,4 @@
-/* --- Geneic Expandable Card --- */
+/* --- Generic Expandable Card --- */
 
 .expandable-card-header {
     display: flex;
@@ -20,8 +20,8 @@
 .expandable-card.is-collapsed {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    /* Prevent wanderers */
+    overflow: visible;
+    /* Allow menu to pop out */
     box-sizing: border-box;
 }
 
@@ -78,10 +78,6 @@
 }
 
 /* Force zero padding on the inner content area of StyledCard */
-.expandable-card .styled-card-content {
-    height: 100%;
-}
-
 .expandable-card-body {
     display: flex;
     flex-direction: column;
@@ -136,7 +132,9 @@
 
 .expandable-card-components-group {
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
+    overflow: visible;
 }
 
 .vertical-stack {

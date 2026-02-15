@@ -2414,3 +2414,42 @@
     /* Use site primary text color */
     font-weight: 600;
 }
+
+/* --- Portfolio Details Window --- */
+.detailsGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 0.5rem;
+}
+
+.detailsCard {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-sm);
+    box-shadow: var(--neu-card-shadow-inset);
+    transition: all 0.2s ease;
+}
+
+.detailsLabel {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--neu-text-tertiary);
+    margin-bottom: 0.4rem;
+}
+
+.detailsValue {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+}
+
+@media (max-width: 480px) {
+    .detailsGrid {
+        grid-template-columns: 1fr;
+    }
+}

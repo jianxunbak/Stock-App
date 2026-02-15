@@ -13,7 +13,8 @@ const AiInsightsCard = ({
     handleAnalyzePortfolio,
     setShowClearAnalysisModal, // Pass the setter or handler
     notes = '',
-    onSaveNotes
+    onSaveNotes,
+    onHide
 }) => {
     const [userNote, setUserNote] = React.useState(notes);
     const timeoutRef = React.useRef(null);
@@ -98,6 +99,7 @@ const AiInsightsCard = ({
             expanded={openCards.ai}
             defaultExpanded={openCards.ai}
             onToggle={() => toggleCard('ai')}
+            onHide={onHide}
             menuItems={menuItems}
             headerContent={summary}
         >

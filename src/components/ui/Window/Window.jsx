@@ -23,17 +23,20 @@ const Window = ({
             const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
             document.body.style.overflow = 'hidden';
+            document.body.classList.add('window-open');
             if (scrollbarWidth > 0) {
                 document.body.style.paddingRight = `${scrollbarWidth}px`;
             }
         } else {
             document.body.style.overflow = 'unset';
             document.body.style.paddingRight = '0px';
+            document.body.classList.remove('window-open');
         }
 
         return () => {
             document.body.style.overflow = 'unset';
             document.body.style.paddingRight = '0px';
+            document.body.classList.remove('window-open');
         };
     }, [isOpen]);
 

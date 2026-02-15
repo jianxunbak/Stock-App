@@ -65,6 +65,16 @@
     opacity: 0.7;
 }
 
+/* Hide browser default search clear buttons */
+.search-bar-input::-webkit-search-decoration,
+.search-bar-input::-webkit-search-cancel-button,
+.search-bar-input::-webkit-search-results-button,
+.search-bar-input::-webkit-search-results-decoration {
+    display: none;
+    -webkit-appearance: none;
+}
+
+
 .search-bar-icon-wrapper {
     display: flex;
     align-items: center;

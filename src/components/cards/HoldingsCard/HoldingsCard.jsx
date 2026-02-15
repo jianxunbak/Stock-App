@@ -30,7 +30,9 @@ const HoldingsCard = ({
     totalValue = 0,
     totalPerformance = 0,
     dayChange = 0,
-    dayChangePercent = 0
+    dayChangePercent = 0,
+    isTestPortfolio = false,
+    onHide
 }) => {
     const navigate = useNavigate();
     const [expandedTickers, setExpandedTickers] = useState({});
@@ -174,6 +176,11 @@ const HoldingsCard = ({
 
     if (!portfolioList || portfolioList.length === 0) return null;
 
+    // Automatically hide cost basis columns for test portfolios
+    const effectiveHiddenColumns = isTestPortfolio
+        ? [...new Set([...hiddenColumns, 'initAmt', 'invDate'])]
+        : hiddenColumns;
+
     const renderRow = (item, isSubItem = false) => {
         if (!item) return null;
 
@@ -189,7 +196,7 @@ const HoldingsCard = ({
         return (
             <Fragment key={isSubItem ? displayItem.id : item.ticker}>
                 <tr className={isSubItem ? styles.subRow : ''} style={isSubItem ? { background: 'rgba(255,255,255,0.02)' } : {}}>
-                    {!hiddenColumns.includes('ticker') && (
+                    {!effectiveHiddenColumns.includes('ticker') && (
                         <td style={{ width: columnWidths['ticker'] }}>
                             <div className={styles.tickerCell}>
                                 {isGroup ? (
@@ -205,7 +212,7 @@ const HoldingsCard = ({
                         </td>
                     )}
                     {/* ... (rest of columns remain similar, use item properties) ... */}
-                    {!hiddenColumns.includes('category') && (
+                    {!effectiveHiddenColumns.includes('category') && (
                         <td style={{ width: columnWidths['category'] }}>
                             {isEditing ? (
                                 <CustomSelect
@@ -214,6 +221,7 @@ const HoldingsCard = ({
                                     options={['Core', 'Growth', 'Compounder', 'Defensive', 'Speculative']}
                                     triggerClassName={styles.editableSelectTrigger}
                                     isMobile={isMobile}
+                                    useModalOnDesktop={true}
                                     style={{ color: 'var(--text-primary)', WebkitTextFillColor: 'var(--text-primary)' }}
                                     containerStyle={{ minWidth: 0 }}
                                 />
@@ -221,10 +229,10 @@ const HoldingsCard = ({
                         </td>
                     )}
 
-                    {!hiddenColumns.includes('sector') && <td style={{ width: columnWidths['sector'] }}>{displayItem.sector}</td>}
-                    {!hiddenColumns.includes('beta') && <td className={styles.mono} style={{ width: columnWidths['beta'] }}>{(displayItem.beta || 0).toFixed(2)}</td>}
+                    {!effectiveHiddenColumns.includes('sector') && <td style={{ width: columnWidths['sector'] }}>{displayItem.sector}</td>}
+                    {!effectiveHiddenColumns.includes('beta') && <td className={styles.mono} style={{ width: columnWidths['beta'] }}>{(displayItem.beta || 0).toFixed(2)}</td>}
 
-                    {!hiddenColumns.includes('initAmt') && (
+                    {!effectiveHiddenColumns.includes('initAmt') && (
                         <td className={styles.mono} style={{ width: columnWidths['initAmt'] }}>
                             {isEditing ? (
                                 <input type="number" className={styles.pInput} value={editValues.totalCost} onChange={(e) => setEditValues({ ...editValues, totalCost: e.target.value })} />
@@ -232,7 +240,7 @@ const HoldingsCard = ({
                         </td>
                     )}
 
-                    {!hiddenColumns.includes('invDate') && (
+                    {!effectiveHiddenColumns.includes('invDate') && (
                         <td className={styles.mono} style={{ width: columnWidths['invDate'] }}>
                             {isEditing ? (
                                 <CustomDatePicker
@@ -240,6 +248,7 @@ const HoldingsCard = ({
                                     onChange={(val) => setEditValues({ ...editValues, purchaseDate: val })}
                                     triggerClassName={styles.editableDateTrigger}
                                     isMobile={isMobile}
+                                    useModalOnDesktop={true}
                                     style={{ color: 'var(--text-primary)', WebkitTextFillColor: 'var(--text-primary)', background: 'transparent', borderRadius: '1.5rem' }}
                                     containerStyle={{ minWidth: 0 }}
                                 />
@@ -253,9 +262,9 @@ const HoldingsCard = ({
                         </td>
                     )}
 
-                    {!hiddenColumns.includes('price') && <td className={`${styles.livePrice} ${styles.mono}`} style={{ width: columnWidths['price'] }}>${(displayItem.price || 0).toFixed(2)}</td>}
+                    {!effectiveHiddenColumns.includes('price') && <td className={`${styles.livePrice} ${styles.mono}`} style={{ width: columnWidths['price'] }}>${(displayItem.price || 0).toFixed(2)}</td>}
 
-                    {!hiddenColumns.includes('position') && (
+                    {!effectiveHiddenColumns.includes('position') && (
                         <td className={styles.mono} style={{ width: columnWidths['position'] }}>
                             {isEditing ? (
                                 <input type="number" className={styles.pInput} value={editValues.shares} onChange={(e) => setEditValues({ ...editValues, shares: e.target.value })} />
@@ -263,17 +272,17 @@ const HoldingsCard = ({
                         </td>
                     )}
 
-                    {!hiddenColumns.includes('totalValue') && <td className={`${styles.boldValue} ${styles.mono}`} style={{ width: columnWidths['totalValue'] }}>{currencySymbol}{displayItem.currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>}
+                    {!effectiveHiddenColumns.includes('totalValue') && <td className={`${styles.boldValue} ${styles.mono}`} style={{ width: columnWidths['totalValue'] }}>{currencySymbol}{displayItem.currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>}
 
-                    {!hiddenColumns.includes('weight') && <td className={styles.mono} style={{ width: columnWidths['weight'] }}>{(displayItem.weightPercent || 0).toFixed(2)}%</td>}
+                    {!effectiveHiddenColumns.includes('weight') && <td className={styles.mono} style={{ width: columnWidths['weight'] }}>{(displayItem.weightPercent || 0).toFixed(2)}%</td>}
 
-                    {!hiddenColumns.includes('return') && (
+                    {!effectiveHiddenColumns.includes('return') && (
                         <td className={`${(displayItem.performance || 0) >= 0 ? styles.pos : styles.neg} ${styles.mono}`} style={{ width: columnWidths['return'] }}>
                             {(displayItem.performance || 0) >= 0 ? '+' : ''}{(displayItem.performance || 0).toFixed(2)}%
                         </td>
                     )}
 
-                    {!hiddenColumns.includes('growth') && (
+                    {!effectiveHiddenColumns.includes('growth') && (
                         <td className={`${(displayItem.growth || 0) > 0 ? styles.pos : ((displayItem.growth || 0) < 0 ? styles.neg : '')} ${styles.mono}`} style={{ width: columnWidths['growth'] }}>
                             {(displayItem.growth || 0) !== 0 ? `${(displayItem.growth || 0) > 0 ? '+' : ''}${(displayItem.growth || 0).toFixed(2)}%` : 'N/A'}
                         </td>
@@ -309,6 +318,7 @@ const HoldingsCard = ({
                 expanded={openCards.holdings}
                 defaultExpanded={openCards.holdings}
                 onToggle={() => toggleCard('holdings')}
+                onHide={onHide}
                 headerContent={header}
                 className={styles.card}
                 menuItems={menuItems}
@@ -317,134 +327,182 @@ const HoldingsCard = ({
                     <table className={styles.table}>
                         <thead>
                             <tr>
-                                {!hiddenColumns.includes('ticker') && (
+                                {!effectiveHiddenColumns.includes('ticker') && (
                                     <th style={{ width: columnWidths['ticker'] }} onClick={() => handleSort('ticker')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Ticker</span>
                                             {sortConfig.key === 'ticker' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'ticker')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'ticker')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'ticker')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('category') && (
+                                {!effectiveHiddenColumns.includes('category') && (
                                     <th style={{ width: columnWidths['category'] }} onClick={() => handleSort('category')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Category</span>
                                             {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'category')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'category')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'category')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('sector') && (
+                                {!effectiveHiddenColumns.includes('sector') && (
                                     <th style={{ width: columnWidths['sector'] }} onClick={() => handleSort('sector')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Sector</span>
                                             {sortConfig.key === 'sector' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'sector')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'sector')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'sector')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('beta') && (
+                                {!effectiveHiddenColumns.includes('beta') && (
                                     <th style={{ width: columnWidths['beta'] }} onClick={() => handleSort('beta')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Beta</span>
                                             {sortConfig.key === 'beta' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'beta')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'beta')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'beta')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('initAmt') && (
+                                {!effectiveHiddenColumns.includes('initAmt') && (
                                     <th style={{ width: columnWidths['initAmt'] }} onClick={() => handleSort('initAmt')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Cost Basis ({currency})</span>
                                             {sortConfig.key === 'initAmt' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'initAmt')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'initAmt')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'initAmt')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('invDate') && (
+                                {!effectiveHiddenColumns.includes('invDate') && (
                                     <th style={{ width: columnWidths['invDate'] }} onClick={() => handleSort('invDate')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Cost Basis Date</span>
                                             {sortConfig.key === 'invDate' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'invDate')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'invDate')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'invDate')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('price') && (
+                                {!effectiveHiddenColumns.includes('price') && (
                                     <th style={{ width: columnWidths['price'] }} onClick={() => handleSort('price')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Price ({currency})</span>
                                             {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'price')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'price')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'price')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('position') && (
+                                {!effectiveHiddenColumns.includes('position') && (
                                     <th style={{ width: columnWidths['position'] }} onClick={() => handleSort('shares')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Position</span>
                                             {sortConfig.key === 'shares' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'position')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'position')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'position')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('totalValue') && (
+                                {!effectiveHiddenColumns.includes('totalValue') && (
                                     <th style={{ width: columnWidths['totalValue'] }} onClick={() => handleSort('totalValue')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Total Value ({currency})</span>
                                             {sortConfig.key === 'totalValue' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'totalValue')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'totalValue')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'totalValue')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('weight') && (
+                                {!effectiveHiddenColumns.includes('weight') && (
                                     <th style={{ width: columnWidths['weight'] }} onClick={() => handleSort('weightPercent')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Weight %</span>
                                             {sortConfig.key === 'weightPercent' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'weight')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'weight')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'weight')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('return') && (
+                                {!effectiveHiddenColumns.includes('return') && (
                                     <th style={{ width: columnWidths['return'] }} onClick={() => handleSort('return')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">Return %</span>
                                             {sortConfig.key === 'return' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'return')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'return')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'return')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>
                                 )}
-                                {!hiddenColumns.includes('growth') && (
+                                {!effectiveHiddenColumns.includes('growth') && (
                                     <th style={{ width: columnWidths['growth'] }} onClick={() => handleSort('growth')}>
                                         <div className="watchlist-th-content">
                                             <span className="watchlist-th-label">5Y Growth</span>
                                             {sortConfig.key === 'growth' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                         </div>
-                                        <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'growth')}>
+                                        <div
+                                            className="resize-handle"
+                                            onMouseDown={(e) => handleResizeStart(e, 'growth')}
+                                            onTouchStart={(e) => handleResizeStart(e, 'growth')}
+                                        >
                                             <GripVertical size={12} />
                                         </div>
                                     </th>

@@ -380,7 +380,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Instrument</span>
                                                 {sortConfig.key === 'instrument' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'instrument')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'instrument')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'instrument')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>
@@ -391,7 +395,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Health</span>
                                                 {sortConfig.key === 'health' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'health')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'health')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'health')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>
@@ -402,7 +410,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Currency</span>
                                                 {sortConfig.key === 'currency' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'currency')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'currency')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'currency')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>
@@ -413,7 +425,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Price</span>
                                                 {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'price')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'price')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'price')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>
@@ -424,7 +440,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Signal</span>
                                                 {sortConfig.key === 'signal' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'signal')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'signal')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'signal')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>
@@ -435,7 +455,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Intrinsic</span>
                                                 {sortConfig.key === 'intrinsic' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'intrinsic')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'intrinsic')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'intrinsic')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>
@@ -446,7 +470,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Support</span>
                                                 {sortConfig.key === 'support' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'support')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'support')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'support')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>
@@ -457,7 +485,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 <span className="watchlist-th-label">Notes</span>
                                                 {sortConfig.key === 'notes' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                             </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'notes')}>
+                                            <div
+                                                className="resize-handle"
+                                                onMouseDown={(e) => handleResizeStart(e, 'notes')}
+                                                onTouchStart={(e) => handleResizeStart(e, 'notes')}
+                                            >
                                                 <GripVertical size={12} />
                                             </div>
                                         </th>

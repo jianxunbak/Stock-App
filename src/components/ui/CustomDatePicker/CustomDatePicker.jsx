@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CardAnimator } from '../Animator';
 import styles from './CustomDatePicker.module.css';
 
-const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsMobile, style }) => {
+const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsMobile, style, useModalOnDesktop = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef(null);
     const popupRef = useRef(null);
@@ -181,6 +181,24 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
                             className={styles.mobileModalContent}
                             onClick={(e) => e.stopPropagation()}
                             style={{ background: 'var(--neu-bg)' }}
+                            ref={popupRef}
+                        >
+                            {renderPopupContent()}
+                        </div>
+                    </div>
+                ) : useModalOnDesktop ? (
+                    <div
+                        className={`${styles.mobileModalOverlay} ${styles.centered}`}
+                        style={{ zIndex: 2000000, pointerEvents: 'auto' }}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsOpen(false);
+                        }}
+                    >
+                        <div
+                            style={{ width: '350px', pointerEvents: 'auto' }}
+                            onClick={(e) => e.stopPropagation()}
                             ref={popupRef}
                         >
                             {renderPopupContent()}

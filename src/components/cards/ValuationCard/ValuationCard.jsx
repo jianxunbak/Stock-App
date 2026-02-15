@@ -14,6 +14,7 @@ const ValuationCard = ({
     currentRate = 1,
     isOpen = true,
     onToggle = null,
+    onHide = null,
     className = "",
     variant = 'default',
     ...props
@@ -107,7 +108,24 @@ const ValuationCard = ({
     if (!isETF) {
         const methods = valuation?.allMethods || [];
         if (methods.length > 0) {
-            methods.forEach(m => {
+            // Define requested order
+            const methodPriority = [
+                "Discounted Free Cash Flow",
+                "Discounted Operating Cash Flow",
+                "Discounted Net Income",
+                "Price-to-Book",
+                "Price-to-Sales-Growth",
+                "Graham Number"
+            ];
+
+            // Sort methods based on priority
+            const sortedMethods = [...methods].sort((a, b) => {
+                const indexA = methodPriority.findIndex(p => a.method.includes(p));
+                const indexB = methodPriority.findIndex(p => b.method.includes(p));
+                return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
+            });
+
+            sortedMethods.forEach(m => {
                 valMenuItems.push({
                     label: m.method,
                     icon: getMethodIcon(m.method),
@@ -130,6 +148,7 @@ const ValuationCard = ({
             title="Intrinsic Value"
             expanded={isOpen}
             onToggle={onToggle}
+            onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={header}

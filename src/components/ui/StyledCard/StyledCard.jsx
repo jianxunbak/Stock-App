@@ -114,7 +114,7 @@ const StyledCard = React.memo(({
             style={{
                 ...style,
                 width: "100%",
-                height: "100%",
+                height: "auto",
             }}
         >
             {renderContent()}

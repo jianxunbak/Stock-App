@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { MoreVertical, Landmark, Calculator, Activity, Calendar, Clock, ChevronUp, ChevronDown, GripVertical, Maximize } from 'lucide-react';
+import { MoreVertical, Landmark, Calculator, Activity, Calendar, Clock, ChevronUp, ChevronDown, GripVertical, Maximize, Eye, Check } from 'lucide-react';
+import Window from '../Window/Window';
 import Button from '../Button/Button';
 import Menu from '../Menu/Menu';
 import ExpandableCard from '../ExpandableCard/ExpandableCard';
@@ -25,11 +26,15 @@ const FinancialStatementsTable = ({
     currentRate = 1,
     isOpen = true,
     onToggle = null,
+    onHide = null,
     stackControls = false,
     ...props
 }) => {
     const { stockData, loading, loadStockData } = useStockData();
     const [activeTab, setActiveTab] = useState('income_statement');
+    const [showToggleModal, setShowToggleModal] = useState(false);
+    const [hiddenColumns, setHiddenColumns] = useState([]); // indices of columns to hide
+    const [hiddenRows, setHiddenRows] = useState([]); // metric names to hide
 
     const tabs = [
         { id: 'income_statement', label: 'Income Statement', icon: <Landmark size={16} /> },
@@ -42,13 +47,22 @@ const FinancialStatementsTable = ({
     const columns = currentFinancialData.dates || [];
 
     const rows = useMemo(() => {
-        return (currentFinancialData.metrics || []).map((metric, idx) => ({
+        const metrics = (currentFinancialData.metrics || []).map((metric, idx) => ({
             id: `metric-${idx}`,
             label: metric.name,
             values: metric.values.map(val => typeof val === 'number' ? val * currentRate : val),
             type: metric.name.toLowerCase().includes('total') || metric.name.toLowerCase().includes('net') ? 'total' : 'default'
         }));
-    }, [currentFinancialData, currentRate]);
+
+        // Filter out hidden rows
+        return metrics.filter(row => !hiddenRows.includes(row.label));
+    }, [currentFinancialData, currentRate, hiddenRows]);
+
+    // Derived columns (filtered)
+    const filteredColumns = useMemo(() => {
+        return columns.map((col, idx) => ({ label: col, originalIndex: idx }))
+            .filter(col => !hiddenColumns.includes(col.originalIndex));
+    }, [columns, hiddenColumns]);
 
     // Column Resizing logic
     const initialWidths = useMemo(() => {
@@ -85,6 +99,8 @@ const FinancialStatementsTable = ({
                     bValue = b.label;
                 } else {
                     const colIndex = parseInt(sortConfig.key.split('-')[1]);
+                    // Map visual column index back to original array if needed, 
+                    // but here sortConfig.key is already `col-${originalIndex}` from the header render
                     aValue = a.values[colIndex];
                     bValue = b.values[colIndex];
                 }
@@ -136,6 +152,7 @@ const FinancialStatementsTable = ({
     const activeTabObj = tabs.find(t => t.id === activeTab);
 
     const menuItems = [
+        { label: 'Toggle Visibility', onClick: () => setShowToggleModal(true), indicatorNode: <Eye size={14} /> },
         { label: 'Reset Column Sizes', onClick: handleResetWidths, indicatorNode: <Maximize size={14} /> },
     ];
 
@@ -163,76 +180,157 @@ const FinancialStatementsTable = ({
     );
 
     return (
-        <ExpandableCard
-            title={title}
-            defaultExpanded={isOpen}
-            onToggle={onToggle}
-            collapsedWidth={220}
-            collapsedHeight={220}
-            headerContent={header}
-            className={`fs-table-card ${className}`}
-            controls={isOpen ? combinedControls : null}
-            menuItems={menuItems}
-            stackControls={stackControls}
-            onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
-            {...props}
-        >
-            <div className="fs-table-body-content">
-                {/* Title removed as it's now handled by the ExpandableCard wrapper */}
+        <>
+            <ExpandableCard
+                title={title}
+                defaultExpanded={isOpen}
+                onToggle={onToggle}
+                collapsedWidth={220}
+                collapsedHeight={220}
+                headerContent={header}
+                className={`fs-table-card ${className}`}
+                controls={isOpen ? combinedControls : null}
+                menuItems={menuItems}
+                stackControls={stackControls}
+                onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
+                onHide={onHide}
+                {...props}
+            >
+                <div className="fs-table-body-content">
+                    {/* Title removed as it's now handled by the ExpandableCard wrapper */}
 
 
-                {isETF ? (
-                    <div className="fs-etf-message">
-                        Financial statements are not available for ETFs.
-                    </div>
-                ) : (
-                    <div className={`fs-table-wrapper ${isResizing ? 'resizing' : ''}`}>
-                        <div className="fs-table-scroll-container">
-                            <table className="fs-table-element">
-                                <thead>
-                                    <tr>
-                                        <th className="fs-th" style={{ width: columnWidths['breakdown'] }} onClick={() => handleSort('breakdown')}>
-                                            <div className="watchlist-th-content">
-                                                <span className="watchlist-th-label">Breakdown</span>
-                                                {sortConfig.key === 'breakdown' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
-                                            </div>
-                                            <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'breakdown')}>
-                                                <GripVertical size={12} />
-                                            </div>
-                                        </th>
-                                        {columns.map((col, i) => (
-                                            <th key={i} className="fs-th" style={{ width: columnWidths[`col-${i}`] }} onClick={() => handleSort(`col-${i}`)}>
+                    {isETF ? (
+                        <div className="fs-etf-message">
+                            Financial statements are not available for ETFs.
+                        </div>
+                    ) : (
+                        <div className={`fs-table-wrapper ${isResizing ? 'resizing' : ''}`}>
+                            <div className="fs-table-scroll-container">
+                                <table className="fs-table-element">
+                                    <thead>
+                                        <tr>
+                                            <th className="fs-th" style={{ width: columnWidths['breakdown'] }} onClick={() => handleSort('breakdown')}>
                                                 <div className="watchlist-th-content">
-                                                    <span className="watchlist-th-label">{col}</span>
-                                                    {sortConfig.key === `col-${i}` && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                                                    <span className="watchlist-th-label">Breakdown</span>
+                                                    {sortConfig.key === 'breakdown' && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                                                 </div>
-                                                <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, `col-${i}`)}>
+                                                <div
+                                                    className="resize-handle"
+                                                    onMouseDown={(e) => handleResizeStart(e, 'breakdown')}
+                                                    onTouchStart={(e) => handleResizeStart(e, 'breakdown')}
+                                                >
                                                     <GripVertical size={12} />
                                                 </div>
                                             </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {sortedRows.map((row) => (
-                                        <tr key={row.id} className={`fs-tr ${row.type === 'total' ? 'fs-row-total' : ''}`}>
-                                            <td className="fs-td fs-td-sticky" style={{ width: columnWidths['breakdown'] }}>
-                                                <div className="watchlist-th-label" title={row.label}>{row.label}</div>
-                                            </td>
-                                            {row.values.map((val, vIdx) => (
-                                                <td key={vIdx} className={`fs-td ${val < 0 ? 'fs-val-negative' : ''}`} style={{ width: columnWidths[`col-${vIdx}`] }}>
-                                                    {formatCurrency(val)}
-                                                </td>
+                                            {filteredColumns.map((col) => (
+                                                <th key={col.originalIndex} className="fs-th" style={{ width: columnWidths[`col-${col.originalIndex}`] }} onClick={() => handleSort(`col-${col.originalIndex}`)}>
+                                                    <div className="watchlist-th-content">
+                                                        <span className="watchlist-th-label">{col.label}</span>
+                                                        {sortConfig.key === `col-${col.originalIndex}` && (sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                                                    </div>
+                                                    <div
+                                                        className="resize-handle"
+                                                        onMouseDown={(e) => handleResizeStart(e, `col-${col.originalIndex}`)}
+                                                        onTouchStart={(e) => handleResizeStart(e, `col-${col.originalIndex}`)}
+                                                    >
+                                                        <GripVertical size={12} />
+                                                    </div>
+                                                </th>
                                             ))}
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {sortedRows.map((row) => (
+                                            <tr key={row.id} className={`fs-tr ${row.type === 'total' ? 'fs-row-total' : ''}`}>
+                                                <td className="fs-td fs-td-sticky" style={{ width: columnWidths['breakdown'] }}>
+                                                    <div className="watchlist-th-label" title={row.label}>{row.label}</div>
+                                                </td>
+                                                {filteredColumns.map((col) => {
+                                                    const val = row.values[col.originalIndex];
+                                                    return (
+                                                        <td key={col.originalIndex} className={`fs-td ${val < 0 ? 'fs-val-negative' : ''}`} style={{ width: columnWidths[`col-${col.originalIndex}`] }}>
+                                                            {formatCurrency(val)}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </ExpandableCard>
+
+            {showToggleModal && (
+                <Window
+                    isOpen={showToggleModal}
+                    onClose={() => setShowToggleModal(false)}
+                    title="Table Visibility"
+                    width="600px"
+                    height="80vh"
+                    headerAlign="start"
+                >
+                    <div className="visibility-modal-content">
+                        <div className="visibility-section">
+                            <h4 className="visibility-section-title">Show/Hide Years</h4>
+                            <div className="visibility-list">
+                                {columns.map((col, idx) => {
+                                    const isActive = !hiddenColumns.includes(idx);
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`visibility-item ${isActive ? 'active' : ''}`}
+                                            onClick={() => {
+                                                if (isActive) {
+                                                    setHiddenColumns([...hiddenColumns, idx]);
+                                                } else {
+                                                    setHiddenColumns(hiddenColumns.filter(c => c !== idx));
+                                                }
+                                            }}
+                                        >
+                                            <div className="visibility-check">
+                                                {isActive && <Check size={14} />}
+                                            </div>
+                                            <span className="visibility-label">{col}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="visibility-section" style={{ marginTop: '2rem' }}>
+                            <h4 className="visibility-section-title">Show/Hide Metrics</h4>
+                            <div className="visibility-list">
+                                {(currentFinancialData.metrics || []).map((metric) => {
+                                    const isActive = !hiddenRows.includes(metric.name);
+                                    return (
+                                        <div
+                                            key={metric.name}
+                                            className={`visibility-item ${isActive ? 'active' : ''}`}
+                                            onClick={() => {
+                                                if (isActive) {
+                                                    setHiddenRows([...hiddenRows, metric.name]);
+                                                } else {
+                                                    setHiddenRows(hiddenRows.filter(r => r !== metric.name));
+                                                }
+                                            }}
+                                        >
+                                            <div className="visibility-check">
+                                                {isActive && <Check size={14} />}
+                                            </div>
+                                            <span className="visibility-label">{metric.name}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
-                )}
-            </div>
-        </ExpandableCard>
+                </Window>
+            )}
+        </>
     );
 };
 

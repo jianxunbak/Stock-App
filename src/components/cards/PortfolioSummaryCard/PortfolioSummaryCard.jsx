@@ -35,11 +35,13 @@ const PortfolioSummaryCard = ({
     onSelectPortfolio,
     onShowDetails,
     isMounted,
+    isTestPortfolio = false,
     isRenaming,
     setIsRenaming,
     renameValue,
     setRenameValue,
-    onRenameSubmit
+    onRenameSubmit,
+    onHide
 }) => {
     if (!portfolioList || portfolioList.length === 0) return null;
 
@@ -52,13 +54,13 @@ const PortfolioSummaryCard = ({
             expanded={openCards.summary} // Controlled
             defaultExpanded={openCards.summary} // Fallback
             onToggle={(state) => toggleCard('summary')}
+            onHide={onHide}
             menuItems={[
-                { label: 'Select Portfolio', onClick: onSelectPortfolio, indicatorNode: <Briefcase size={14} />, isHeader: false },
-                { label: 'Portfolio Details', onClick: onShowDetails, indicatorNode: <ChevronRight size={14} /> },
-                { isSeparator: true },
+                { label: 'Select Portfolio', onClick: onSelectPortfolio, indicatorNode: <Briefcase size={14} /> },
                 { label: 'New Portfolio', onClick: onNewPortfolio, indicatorNode: <Plus size={14} /> },
                 { label: 'Rename Portfolio', onClick: onRenamePortfolio, indicatorNode: <Edit2 size={14} /> },
-                { label: 'Delete Portfolio', onClick: onDeletePortfolio, indicatorNode: <Trash2 size={14} />, className: 'danger-item' }
+                { label: 'Delete Portfolio', onClick: onDeletePortfolio, indicatorNode: <Trash2 size={14} />, className: 'danger-item' },
+                { label: 'Portfolio Details', onClick: onShowDetails, indicatorNode: <ChevronRight size={14} /> }
             ]}
             headerContent={
                 <div className="stock-summary-container stacked">
@@ -66,11 +68,12 @@ const PortfolioSummaryCard = ({
                         name={currentPortfolioName}
                         ticker="PORTFOLIO"
                         price={totalValue}
-                        change={totalValue - totalCost}
-                        changePercent={totalPerformance}
+                        change={isTestPortfolio ? 0 : (totalValue - totalCost)}
+                        changePercent={isTestPortfolio ? 0 : totalPerformance}
                         currencySymbol={currencySymbol}
                         currentRate={1} // totalValue is already converted
                         view="summary"
+                        hideChange={isTestPortfolio}
                     />
 
                     <StockHealthCard
@@ -79,15 +82,17 @@ const PortfolioSummaryCard = ({
                         type="Health"
                     />
 
-                    <PriceChartCard
-                        view="summary"
-                        data={twrData?.chart_data?.map(d => ({ date: d.date, price: d.value })) || []}
-                        change={totalPerformance >= 0 ? '+1' : '-1'}
-                        title="Performance"
-                        currentRate={1}
-                        currencySymbol=""
-                        isPercentageData={true}
-                    />
+                    {!isTestPortfolio && (
+                        <PriceChartCard
+                            view="summary"
+                            data={twrData?.chart_data?.map(d => ({ date: d.date, price: d.value })) || []}
+                            change={totalPerformance >= 0 ? '+1' : '-1'}
+                            title="Performance"
+                            currentRate={1}
+                            currencySymbol=""
+                            isPercentageData={true}
+                        />
+                    )}
                 </div>
             }
         >
@@ -137,12 +142,13 @@ const PortfolioSummaryCard = ({
                         name={null}
                         ticker={null}
                         price={totalValue}
-                        change={totalValue - totalCost}
-                        changePercent={totalPerformance}
+                        change={isTestPortfolio ? 0 : (totalValue - totalCost)}
+                        changePercent={isTestPortfolio ? 0 : totalPerformance}
                         currencySymbol={currencySymbol}
                         currentRate={1}
                         variant="transparent"
                         showFavorite={false}
+                        hideChange={isTestPortfolio}
                         className="portfolio-expanded-header"
                     />
                 )}
@@ -167,50 +173,52 @@ const PortfolioSummaryCard = ({
                 </div>
 
                 {/* Big Performance Chart */}
-                <div style={{ marginTop: '1rem', width: '100%' }}>
-                    {isMounted && (
-                        <PriceChartCard
-                            view="expanded"
-                            title="Portfolio Performance"
-                            ticker="Portfolio"
-                            isManual={true}
-                            manualSeries={[
-                                { id: 'main', name: 'My Portfolio', dataKey: 'price_main', color: totalPerformance >= 0 ? 'var(--neu-success)' : 'var(--neu-error)' },
-                                ...(comparisonStocks?.map(s => {
-                                    const t = typeof s === 'string' ? s : s.ticker;
-                                    const col = typeof s === 'string' ? 'var(--neu-color-favorite)' : s.color;
-                                    return {
-                                        id: t,
-                                        name: t,
-                                        dataKey: `val_${t}`,
-                                        color: col,
-                                        strokeDasharray: null
-                                    };
-                                }) || [])
-                            ]}
-                            manualChartData={mergedChartData.map(d => ({
-                                date: d.date,
-                                price_main: d.value,
-                                ...(comparisonStocks?.reduce((acc, s) => {
-                                    const t = typeof s === 'string' ? s : s.ticker;
-                                    return {
-                                        ...acc,
-                                        [`val_${t}`]: d[`val_${t}`]
-                                    };
-                                }, {}) || {})
-                            }))}
-                            currencySymbol=""
-                            variant="transparent"
-                            chartHeight={350}
-                            allowComparison={true}
-                            comparisonTickers={comparisonStocks.map(s => typeof s === 'string' ? s : s.ticker)}
-                            onAddSeries={onAddComparison}
-                            onRemoveSeries={onRemoveComparison}
-                            isPercentageData={true}
-                            allowSMA={false}
-                        />
-                    )}
-                </div>
+                {!isTestPortfolio && (
+                    <div style={{ marginTop: '1rem', width: '100%' }}>
+                        {isMounted && (
+                            <PriceChartCard
+                                view="expanded"
+                                title="Portfolio Performance"
+                                ticker="Portfolio"
+                                isManual={true}
+                                manualSeries={[
+                                    { id: 'main', name: 'My Portfolio', dataKey: 'price_main', color: totalPerformance >= 0 ? 'var(--neu-success)' : 'var(--neu-error)' },
+                                    ...(comparisonStocks?.map(s => {
+                                        const t = typeof s === 'string' ? s : s.ticker;
+                                        const col = typeof s === 'string' ? 'var(--neu-color-favorite)' : s.color;
+                                        return {
+                                            id: t,
+                                            name: t,
+                                            dataKey: `val_${t}`,
+                                            color: col,
+                                            strokeDasharray: null
+                                        };
+                                    }) || [])
+                                ]}
+                                manualChartData={mergedChartData.map(d => ({
+                                    date: d.date,
+                                    price_main: d.value,
+                                    ...(comparisonStocks?.reduce((acc, s) => {
+                                        const t = typeof s === 'string' ? s : s.ticker;
+                                        return {
+                                            ...acc,
+                                            [`val_${t}`]: d[`val_${t}`]
+                                        };
+                                    }, {}) || {})
+                                }))}
+                                currencySymbol=""
+                                variant="transparent"
+                                chartHeight={350}
+                                allowComparison={true}
+                                comparisonTickers={comparisonStocks.map(s => typeof s === 'string' ? s : s.ticker)}
+                                onAddSeries={onAddComparison}
+                                onRemoveSeries={onRemoveComparison}
+                                isPercentageData={true}
+                                allowSMA={false}
+                            />
+                        )}
+                    </div>
+                )}
             </div>
         </ExpandableCard>
     );

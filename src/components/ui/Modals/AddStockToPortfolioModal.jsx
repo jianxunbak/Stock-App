@@ -100,6 +100,7 @@ const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioLis
                             isMobile={false}
                             multiple={true}
                             placeholder="Select Portfolios"
+                            useModalOnDesktop={true}
                             dropdownStyle={{ maxWidth: '400px' }}
                         />
                     </div>
@@ -133,7 +134,7 @@ const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioLis
 
                     <div className={styles.formGroup}>
                         <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost Basis Date</label>
-                        <CustomDatePicker value={date} onChange={setDate} isMobile={false} />
+                        <CustomDatePicker value={date} onChange={setDate} isMobile={false} useModalOnDesktop={true} />
                     </div>
 
                     <div className={styles.formGroup}>
@@ -143,6 +144,7 @@ const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioLis
                             onChange={setCategory}
                             options={['Core', 'Growth', 'Compounder', 'Defensive', 'Speculative']}
                             isMobile={false}
+                            useModalOnDesktop={true}
                         />
                     </div>
 

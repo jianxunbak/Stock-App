@@ -35,6 +35,8 @@
     margin-top: 1.5rem;
     /* Gap for the absolute title */
     width: 100%;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .fs-table-wrapper.resizing {
@@ -236,4 +238,78 @@
         padding: 0.6rem 0.75rem;
         font-size: 0.8rem;
     }
+}
+
+/* --- Visibility Modal Styles --- */
+.visibility-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    padding: 1rem 0;
+}
+
+.visibility-section-title {
+    font-size: 0.9rem;
+    color: var(--neu-text-tertiary);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.visibility-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.visibility-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.4rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+}
+
+.visibility-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.visibility-check {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 4px;
+    border: 2px solid var(--neu-border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    color: transparent;
+}
+
+.visibility-item.active .visibility-check {
+    background: transparent;
+    border-color: var(--neu-brand);
+    color: var(--neu-text-primary);
+}
+
+.visibility-label {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--neu-text-secondary);
+}
+
+.visibility-item.active .visibility-label {
+    color: var(--neu-text-primary);
+    font-weight: 600;
+}
+
+[data-theme="light"] .visibility-check {
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .visibility-item:hover {
+    background: rgba(0, 0, 0, 0.03);
 }

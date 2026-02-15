@@ -22,6 +22,7 @@ const StockHeader = ({
     currencySymbol = "$",
     currentRate = 1,
     showFavorite = true,
+    hideChange = false,
     ...props
 }) => {
     // Robust parsing for price and change
@@ -57,7 +58,7 @@ const StockHeader = ({
                 </div>
                 <div className="summary-price-group">
                     {price && <div className={`summary-price ${isPositive ? 'positive' : 'negative'}`}>{currencySymbol}{displayPrice}</div>}
-                    {change && (
+                    {!hideChange && change && (
                         <div className={`summary-change ${isPositive ? 'positive' : 'negative'}`}>
                             {currencySymbol}{displayChange} ({displayChangePercent})
                         </div>
@@ -102,10 +103,12 @@ const StockHeader = ({
 
             <div className="stock-price-row">
                 <span className={`current-price ${isPositive ? 'positive' : 'negative'}`}>{currencySymbol}{displayPrice}</span>
-                <div className={`price-change-block ${isPositive ? 'positive' : 'negative'}`}>
-                    {isPositive ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-                    <span>{currencySymbol}{displayChange} ({displayChangePercent})</span>
-                </div>
+                {!hideChange && (
+                    <div className={`price-change-block ${isPositive ? 'positive' : 'negative'}`}>
+                        {isPositive ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+                        <span>{currencySymbol}{displayChange} ({displayChangePercent})</span>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -22,6 +22,7 @@ const StockOverviewCard = ({
     comparisonTickers = [],
     onAddComparison,
     onRemoveComparison,
+    onHide,
     collapsedWidth = 220,
     collapsedHeight = 220
 }) => {
@@ -31,6 +32,11 @@ const StockOverviewCard = ({
 
     // Build menu items dynamically
     const menuItems = [
+        {
+            label: 'Add Stock to Portfolio',
+            onClick: () => onAddToPortfolio && onAddToPortfolio(),
+            indicatorNode: <Briefcase size={14} />
+        },
         {
             label: 'View Details',
             onClick: () => onViewDetails && onViewDetails(),
@@ -46,12 +52,6 @@ const StockOverviewCard = ({
             indicatorNode: <Star size={14} style={{ fill: isFavorite ? 'currentColor' : 'none' }} />
         });
     }
-
-    menuItems.push({
-        label: 'Add Stock to Portfolio',
-        onClick: () => onAddToPortfolio && onAddToPortfolio(),
-        indicatorNode: <Briefcase size={14} />
-    });
 
     const commonHeaderProps = {
         name: overview?.name,
@@ -73,6 +73,7 @@ const StockOverviewCard = ({
             expanded={isOpen}
             defaultExpanded={isOpen}
             onToggle={onToggle}
+            onHide={onHide}
             collapsedWidth={collapsedWidth}
             collapsedHeight={collapsedHeight}
             menuItems={menuItems}

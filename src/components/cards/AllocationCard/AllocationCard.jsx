@@ -52,7 +52,8 @@ const AllocationCard = ({
     totalValue,
     currencySymbol,
     isMounted,
-    onRefresh
+    onRefresh,
+    onHide
 }) => {
     if (!portfolioList || portfolioList.length === 0) return null;
 
@@ -265,6 +266,7 @@ const AllocationCard = ({
             expanded={openCards.allocation}
             defaultExpanded={openCards.allocation}
             onToggle={() => toggleCard('allocation')}
+            onHide={onHide}
             menuItems={menuItems}
             headerContent={summaryCharts}
         >

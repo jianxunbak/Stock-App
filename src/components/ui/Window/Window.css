@@ -28,6 +28,13 @@
     opacity: 0.9;
 }
 
+@media (max-width: 767px) {
+    .window-overlay.open {
+        opacity: 1;
+        background: var(--neu-app-bg);
+    }
+}
+
 .window-wrapper.resizing {
     cursor: col-resize !important;
 }
@@ -50,8 +57,8 @@
 /* Window Content Structure */
 .window-card .styled-card-content {
     padding: 1rem;
-    overflow: visible;
-    /* Clips content to rounding */
+    overflow: hidden;
+    /* Changed from visible to contain content for scroll */
     display: flex;
     flex-direction: column;
     height: 100%;

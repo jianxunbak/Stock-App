@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, MoreVertical, RefreshCcw } from 'lucide-react';
+import { ChevronDown, ChevronUp, MoreVertical, RefreshCcw, EyeOff } from 'lucide-react';
 import StyledCard from '../StyledCard';
 import Button from '../Button/Button';
 import DropdownButton from '../DropdownButton/DropdownButton';
@@ -17,6 +17,7 @@ const ExpandableCard = ({
     controls,
     menuItems,
     onRefresh,
+    onHide, // NEW: Prop to handle hiding the card
     expanded, // NEW: Controlled state
     defaultExpanded = false,
     collapsedWidth = 210,
@@ -38,22 +39,33 @@ const ExpandableCard = ({
     const combinedMenuItems = React.useMemo(() => {
         const baseItems = Array.isArray(menuItems) ? [...menuItems] : [];
 
-        if (!onRefresh) return menuItems;
+        if (onRefresh) {
+            const alreadyHasRefresh = baseItems.some(item =>
+                item && item.label && item.label.toLowerCase().includes('refresh')
+            );
+            if (!alreadyHasRefresh) {
+                baseItems.push({
+                    label: 'Refresh Data',
+                    onClick: onRefresh,
+                    indicatorNode: <RefreshCcw size={14} />
+                });
+            }
+        }
 
-        const alreadyHasRefresh = baseItems.some(item =>
-            item && item.label && item.label.toLowerCase().includes('refresh')
-        );
+        if (onHide) {
+            baseItems.push({
+                label: 'Hide Card',
+                onClick: (e) => {
+                    if (e && e.stopPropagation) e.stopPropagation();
+                    onHide();
+                },
+                indicatorNode: <EyeOff size={14} />,
+                style: { color: 'var(--neu-danger)' }
+            });
+        }
 
-        if (alreadyHasRefresh) return baseItems;
-
-        const refreshItem = {
-            label: 'Refresh Data',
-            onClick: onRefresh,
-            indicatorNode: <RefreshCcw size={14} />
-        };
-
-        return [refreshItem, ...baseItems];
-    }, [menuItems, onRefresh]);
+        return baseItems;
+    }, [menuItems, onRefresh, onHide]);
 
     const handleToggle = (e) => {
         // Prevent toggle if clicking a button or link inside header, EXCLUDING the toggle button itself
@@ -104,9 +116,9 @@ const ExpandableCard = ({
             }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             containerStyle={{
-                flex: isExpanded ? '1 1 100%' : '0 0 auto',
+                flex: isExpanded ? '1 1 auto' : '0 0 auto',
                 width: isExpanded ? '100%' : collapsedWidth,
-                minWidth: isExpanded ? '100%' : collapsedWidth,
+                minWidth: isExpanded ? 0 : collapsedWidth,
                 maxWidth: isExpanded ? '100%' : collapsedWidth,
             }}
             style={{

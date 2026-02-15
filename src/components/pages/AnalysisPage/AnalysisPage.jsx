@@ -20,6 +20,7 @@ import WatchlistModal from '../../ui/Modals/WatchlistModal';
 import AddStockToPortfolioModal from '../../ui/Modals/AddStockToPortfolioModal';
 import { usePortfolio } from '../../../hooks/usePortfolio';
 import { useWatchlist } from '../../../hooks/useWatchlist';
+import HideConfirmationModal from '../../ui/Modals/HideConfirmationModal';
 import { ArrowLeft, Briefcase, Zap, TrendingUp, Info, MoreVertical, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import UserProfileModal from '../../ui/Modals/UserProfileModal';
@@ -129,6 +130,64 @@ const AnalysisPage = () => {
         support: true,
         financials: true
     });
+
+    const [hideModalState, setHideModalState] = useState({
+        isOpen: false,
+        cardKey: null,
+        cardLabel: ''
+    });
+
+    const cardLabels = {
+        stockSummary: 'Stock Summary',
+        financialAnalysis: 'Financial Analysis',
+        profitability: 'Profitability',
+        moat: 'Moat Evaluation',
+        debt: 'Debt Analysis',
+        valuation: 'Valuation',
+        support: 'Support & Resistance',
+        financials: 'Financial Statements'
+    };
+
+    const handleHideRequest = (key) => {
+        setHideModalState({
+            isOpen: true,
+            cardKey: key,
+            cardLabel: cardLabels[key] || key
+        });
+    };
+
+    const handleConfirmHide = async () => {
+        const { cardKey } = hideModalState;
+        if (!cardKey) return;
+
+        const newVisibility = {
+            ...cardVisibility,
+            [cardKey]: false
+        };
+
+        // Update local state
+        setCardVisibility(newVisibility);
+
+        // Save to DB
+        if (currentUser?.uid) {
+            const currentSettings = await fetchUserSettings(currentUser.uid);
+            const newSettings = {
+                ...currentSettings,
+                cardVisibility: {
+                    ...currentSettings?.cardVisibility,
+                    analysis: newVisibility
+                }
+            };
+            await saveUserSettings(currentUser.uid, newSettings);
+
+            // Notify other components (like UserProfileModal if it were open)
+            window.dispatchEvent(new CustomEvent('user-settings-updated', {
+                detail: { settings: newSettings }
+            }));
+        }
+
+        setHideModalState({ isOpen: false, cardKey: null, cardLabel: '' });
+    };
 
     const handleCloseProfileModal = useCallback(() => setShowProfileModal(false), []);
 
@@ -405,6 +464,7 @@ const AnalysisPage = () => {
                                 onViewDetails={() => setShowStockInfo(true)}
                                 isFavorite={watchlist.some(item => item.ticker === stockData?.overview?.symbol)}
                                 onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
+                                onHide={() => handleHideRequest('stockSummary')}
                                 comparisonTickers={analysisComparisons}
                                 onAddComparison={handleAddAnalysisComparison}
                                 onRemoveComparison={handleRemoveAnalysisComparison}
@@ -422,6 +482,7 @@ const AnalysisPage = () => {
                             <GrowthCard
                                 isOpen={openCards.financialAnalysis}
                                 onToggle={(isOpen) => setOpenCards(prev => ({ ...prev, financialAnalysis: isOpen }))}
+                                onHide={() => handleHideRequest('financialAnalysis')}
                                 isETF={stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF'}
                             />
                         </div>
@@ -434,6 +495,7 @@ const AnalysisPage = () => {
                                 currentRate={currentRate}
                                 isOpen={openCards.profitability}
                                 onToggle={(isOpen) => toggleCard('profitability')}
+                                onHide={() => handleHideRequest('profitability')}
                             />
                         </div>
                     )}
@@ -448,6 +510,7 @@ const AnalysisPage = () => {
                                 currentRate={currentRate}
                                 isOpen={openCards.moat}
                                 onToggle={(isOpen) => toggleCard('moat')}
+                                onHide={() => handleHideRequest('moat')}
                             />
                         </div>
                     )}
@@ -459,6 +522,7 @@ const AnalysisPage = () => {
                                 currentRate={currentRate}
                                 isOpen={openCards.debt}
                                 onToggle={(isOpen) => toggleCard('debt')}
+                                onHide={() => handleHideRequest('debt')}
                             />
                         </div>
                     )}
@@ -471,6 +535,7 @@ const AnalysisPage = () => {
                                 currentRate={currentRate}
                                 isOpen={openCards.valuation}
                                 onToggle={(isOpen) => toggleCard('valuation')}
+                                onHide={() => handleHideRequest('valuation')}
                             />
                         </div>
                     )}
@@ -483,6 +548,7 @@ const AnalysisPage = () => {
                                 currentRate={currentRate}
                                 isOpen={openCards.support}
                                 onToggle={(isOpen) => toggleCard('support')}
+                                onHide={() => handleHideRequest('support')}
                             />
                         </div>
                     )}
@@ -494,6 +560,7 @@ const AnalysisPage = () => {
                                 currentRate={currentRate}
                                 isOpen={openCards.financials}
                                 onToggle={(isOpen) => toggleCard('financials')}
+                                onHide={() => handleHideRequest('financials')}
                             />
                         </div>
                     )}
@@ -542,6 +609,13 @@ const AnalysisPage = () => {
                         />
                     )
                 }
+
+                <HideConfirmationModal
+                    isOpen={hideModalState.isOpen}
+                    onClose={() => setHideModalState(prev => ({ ...prev, isOpen: false }))}
+                    onConfirm={handleConfirmHide}
+                    cardLabel={hideModalState.cardLabel}
+                />
             </div >
             {(loading || initialLoading) && <LoadingScreen fullScreen={true} message="Loading Data..." />}
         </div >

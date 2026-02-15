@@ -259,7 +259,7 @@ const CustomSelect = ({
                 {!triggerClassName && <ChevronDown size={16} color="var(--text-secondary)" />}
             </div>
             {isOpen && createPortal(
-                (isMobile || useModalOnDesktop) ? (
+                isMobile ? (
                     <div
                         className={styles.mobileModalOverlay}
                         style={{ zIndex: 2000000, pointerEvents: 'auto' }}
@@ -273,6 +273,24 @@ const CustomSelect = ({
                             className={styles.mobileModalContent}
                             onClick={(e) => e.stopPropagation()}
                             style={{ background: 'var(--neu-bg)' }}
+                            ref={menuRef}
+                        >
+                            {menuContent}
+                        </div>
+                    </div>
+                ) : useModalOnDesktop ? (
+                    <div
+                        className={`${styles.mobileModalOverlay} ${styles.centered}`}
+                        style={{ zIndex: 2000000, pointerEvents: 'auto' }}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            updateIsOpen(false);
+                        }}
+                    >
+                        <div
+                            style={{ width: '400px', pointerEvents: 'auto' }}
+                            onClick={(e) => e.stopPropagation()}
                             ref={menuRef}
                         >
                             {menuContent}

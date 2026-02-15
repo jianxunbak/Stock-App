@@ -13,6 +13,7 @@ const GrowthCard = ({
     className,
     variant = 'default',
     isETF = false,
+    onHide = null,
     ...props
 }) => {
     const { stockData, loading, loadStockData } = useStockData();
@@ -65,6 +66,7 @@ const GrowthCard = ({
             title="Growth"
             expanded={isOpen}
             onToggle={onToggle}
+            onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={summaryContent}

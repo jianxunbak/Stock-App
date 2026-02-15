@@ -30,36 +30,37 @@
 
 .infoGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
+    padding: 0.25rem;
 }
 
 .infoCard {
     background: var(--neu-bg);
-    border: 1px solid var(--neu-border-subtle);
     border-radius: var(--neu-radius-sm);
-    padding: 0.75rem 1rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    box-shadow: none;
-    /* Removed shadows as requested */
-    transition: background 0.2s ease;
+    gap: 0.4rem;
+    box-shadow: var(--neu-card-shadow-inset);
+    border: none;
+    transition: all 0.2s ease;
 }
 
 .infoCard:hover {
-    background: var(--neu-app-bg);
+    background: var(--neu-bg);
 }
 
 .infoLabel {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--neu-text-tertiary);
     text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .infoValue {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: var(--neu-text-primary);
 }
@@ -68,10 +69,12 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    /* Unified with infoGrid */
+    padding: 0.25rem;
 }
 
 @media (max-width: 600px) {
+
+    .infoGrid,
     .calendarGrid {
         grid-template-columns: 1fr;
     }
@@ -81,22 +84,24 @@
 .calendarItem {
     display: flex;
     justify-content: space-between;
-    padding: 0.75rem 1rem;
+    align-items: center;
+    padding: 1rem;
     background: var(--neu-bg);
     border-radius: var(--neu-radius-sm);
-    border: 1px solid var(--neu-border-subtle);
-    box-shadow: none;
-    /* Removed shadows and highlights */
+    box-shadow: var(--neu-card-shadow-inset);
+    border: none;
 }
 
 .calendarKey {
     font-size: 0.85rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .calendarValue {
-    font-size: 0.85rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--neu-text-primary);
 }

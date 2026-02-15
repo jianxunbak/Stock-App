@@ -19,6 +19,7 @@ import UserProfileModal from '../../ui/Modals/UserProfileModal';
 import LogoutConfirmationModal from '../../ui/Modals/LogoutConfirmationModal';
 import Button from '../../ui/Button';
 import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
+import HideConfirmationModal from '../../ui/Modals/HideConfirmationModal';
 
 // Refactored Components
 import PortfolioSummaryCard from '../../cards/PortfolioSummaryCard/PortfolioSummaryCard';
@@ -136,6 +137,10 @@ const PortfolioPage = () => {
         clearAnalysis
     } = usePortfolio(currentPortfolioId);
 
+    // Derive portfolio type (must come after usePortfolio hook)
+    const currentPortfolio = portfolioList.find(p => p.id === currentPortfolioId);
+    const isTestPortfolio = currentPortfolio?.type === 'test';
+
 
 
     // Add Stock Form
@@ -148,6 +153,60 @@ const PortfolioPage = () => {
 
     const [searchTicker, setSearchTicker] = useState('');
     const [currentRate, setCurrentRate] = useState(1);
+
+    const [hideModalState, setHideModalState] = useState({
+        isOpen: false,
+        cardKey: null,
+        cardLabel: ''
+    });
+
+    const cardLabelsMapping = {
+        summary: 'Summary',
+        allocation: 'Allocation',
+        ai: 'AI Insights',
+        holdings: 'Holdings'
+    };
+
+    const handleHideRequest = (key) => {
+        setHideModalState({
+            isOpen: true,
+            cardKey: key,
+            cardLabel: cardLabelsMapping[key] || key
+        });
+    };
+
+    const handleConfirmHide = async () => {
+        const { cardKey } = hideModalState;
+        if (!cardKey) return;
+
+        const newVisibility = {
+            ...cardVisibility,
+            [cardKey]: false
+        };
+
+        // Update local state
+        setCardVisibility(newVisibility);
+
+        // Save to DB
+        if (currentUser?.uid) {
+            const currentSettings = await fetchUserSettings(currentUser.uid);
+            const newSettings = {
+                ...currentSettings,
+                cardVisibility: {
+                    ...currentSettings?.cardVisibility,
+                    portfolio: newVisibility
+                }
+            };
+            await saveUserSettings(currentUser.uid, newSettings);
+
+            // Notify other components
+            window.dispatchEvent(new CustomEvent('user-settings-updated', {
+                detail: { settings: newSettings }
+            }));
+        }
+
+        setHideModalState({ isOpen: false, cardKey: null, cardLabel: '' });
+    };
     const [twrData, setTwrData] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
     const [analysis, setAnalysis] = useState(null);
@@ -321,6 +380,12 @@ const PortfolioPage = () => {
 
     // Fetch TWR
     useEffect(() => {
+        // Skip TWR calculation for test portfolios (no cost basis)
+        if (isTestPortfolio) {
+            setTwrData(null);
+            return;
+        }
+
         if (portfolio && portfolio.length > 0) {
             const normalizedItems = portfolio
                 .map(item => ({
@@ -339,7 +404,7 @@ const PortfolioPage = () => {
         } else {
             setTwrData(null);
         }
-    }, [portfolio, comparisonStocks]);
+    }, [portfolio, comparisonStocks, isTestPortfolio]);
 
 
     // --- Processing & Grouping (useMemo) ---
@@ -609,7 +674,13 @@ const PortfolioPage = () => {
     // Handlers
     const handleAddStock = async () => {
         if (!currentPortfolioId) { setAddError("Please select or create a portfolio first"); return; }
-        if (!newTicker || !newShares || !newCost) { setAddError("Please fill all required fields"); return; }
+
+        // For test portfolios, only require ticker and shares
+        if (isTestPortfolio) {
+            if (!newTicker || !newShares) { setAddError("Please fill all required fields"); return; }
+        } else {
+            if (!newTicker || !newShares || !newCost) { setAddError("Please fill all required fields"); return; }
+        }
 
         setIsLoadingData(true);
         setAddError("");
@@ -623,12 +694,15 @@ const PortfolioPage = () => {
                 return;
             }
 
-            const costInUSD = parseFloat(newCost) / currentRate;
+            // For test portfolios, use default values for cost and date
+            const costInUSD = isTestPortfolio ? 0 : parseFloat(newCost) / currentRate;
+            const purchaseDate = isTestPortfolio ? new Date().toISOString().split('T')[0] : newDate;
+
             await addToPortfolio({
                 ticker: newTicker.toUpperCase(),
                 shares: parseFloat(newShares),
                 totalCost: costInUSD,
-                purchaseDate: newDate,
+                purchaseDate: purchaseDate,
                 category: newCategory
             });
             setShowAddModal(false);
@@ -875,12 +949,14 @@ const PortfolioPage = () => {
                         onSelectPortfolio={() => setShowSelectPortfolioModal(true)}
                         onShowDetails={() => setShowPortfolioDetails(true)}
                         isMounted={true}
+                        isTestPortfolio={isTestPortfolio}
                         // Inline Rename Props
                         isRenaming={isRenaming}
                         setIsRenaming={setIsRenaming}
                         renameValue={renameValue}
                         setRenameValue={setRenameValue}
                         onRenameSubmit={handleRenameSubmit}
+                        onHide={() => handleHideRequest('summary')}
                     />
                 )}
 
@@ -896,6 +972,7 @@ const PortfolioPage = () => {
                         currencySymbol={currency === 'USD' ? '$' : 'S$'}
                         isMounted={true}
                         onRefresh={() => window.location.reload()}
+                        onHide={() => handleHideRequest('allocation')}
                     />
                 )}
 
@@ -910,6 +987,7 @@ const PortfolioPage = () => {
                         setShowClearAnalysisModal={setShowClearAnalysisModal}
                         notes={notes}
                         onSaveNotes={saveNotes}
+                        onHide={() => handleHideRequest('ai')}
                     />
                 )}
 
@@ -932,6 +1010,8 @@ const PortfolioPage = () => {
                         onColumnToggle={() => setShowColumnModal(true)}
                         updatePortfolioItem={updatePortfolioItem}
                         removeFromPortfolio={removeFromPortfolio}
+                        isTestPortfolio={isTestPortfolio}
+                        onHide={() => handleHideRequest('holdings')}
                     />
                 )}
             </div>
@@ -988,25 +1068,30 @@ const PortfolioPage = () => {
                                     placeholder="0.00"
                                 />
                             </div>
-                            <div className={styles.formGroup}>
-                                <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost</label>
-                                <input
-                                    type="number"
-                                    value={newCost}
-                                    onChange={e => setNewCost(e.target.value)}
-                                    placeholder="0.00"
-                                />
-                            </div>
-                            <div className={styles.formGroup}>
-                                <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Date</label>
-                                <CustomDatePicker value={newDate} onChange={setNewDate} isMobile={isMobile} />
-                            </div>
+                            {!isTestPortfolio && (
+                                <>
+                                    <div className={styles.formGroup}>
+                                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost</label>
+                                        <input
+                                            type="number"
+                                            value={newCost}
+                                            onChange={e => setNewCost(e.target.value)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    <div className={styles.formGroup}>
+                                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Date</label>
+                                        <CustomDatePicker value={newDate} onChange={setNewDate} isMobile={isMobile} useModalOnDesktop={true} />
+                                    </div>
+                                </>
+                            )}
                             <div className={styles.formGroup}>
                                 <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Category</label>
                                 <CustomSelect
                                     value={newCategory}
                                     onChange={setNewCategory}
                                     options={['Core', 'Growth', 'Compounder', 'Defensive', 'Speculative']}
+                                    useModalOnDesktop={true}
                                 />
                             </div>
                             {addError && <p className={styles.error}>{addError}</p>}
@@ -1022,6 +1107,13 @@ const PortfolioPage = () => {
                 isOpen={showLogoutConfirm}
                 onClose={() => setShowLogoutConfirm(false)}
                 onConfirm={logout}
+            />
+
+            <HideConfirmationModal
+                isOpen={hideModalState.isOpen}
+                onClose={() => setHideModalState(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={handleConfirmHide}
+                cardLabel={hideModalState.cardLabel}
             />
 
             {showClearAnalysisModal && (
@@ -1266,27 +1358,28 @@ const PortfolioPage = () => {
                     title="Portfolio Details"
                     width="500px"
                     height="auto"
+                    headerAlign="start"
                 >
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', padding: '1rem' }}>
-                        <div className="metric-card secondary">
-                            <span className="metric-label">Portfolio Beta</span>
-                            <span className="metric-value">{weightedBeta?.toFixed(2)}</span>
+                    <div className={styles.detailsGrid}>
+                        <div className={styles.detailsCard}>
+                            <span className={styles.detailsLabel}>Portfolio Beta</span>
+                            <span className={styles.detailsValue}>{weightedBeta?.toFixed(2)}</span>
                         </div>
-                        <div className="metric-card secondary">
-                            <span className="metric-label">Est. 5Y Growth</span>
-                            <span className="metric-value">{weightedGrowth?.toFixed(1)}%</span>
+                        <div className={styles.detailsCard}>
+                            <span className={styles.detailsLabel}>Est. 5Y Growth</span>
+                            <span className={styles.detailsValue}>{weightedGrowth?.toFixed(1)}%</span>
                         </div>
-                        <div className="metric-card secondary">
-                            <span className="metric-label">HHI Concentration</span>
-                            <span className="metric-value">{hhi?.toFixed(3)}</span>
+                        <div className={styles.detailsCard}>
+                            <span className={styles.detailsLabel}>HHI Concentration</span>
+                            <span className={styles.detailsValue}>{hhi?.toFixed(3)}</span>
                         </div>
-                        <div className="metric-card secondary">
-                            <span className="metric-label">Portfolio PEG</span>
-                            <span className="metric-value">{weightedPeg?.toFixed(2)}</span>
+                        <div className={styles.detailsCard}>
+                            <span className={styles.detailsLabel}>Portfolio PEG</span>
+                            <span className={styles.detailsValue}>{weightedPeg?.toFixed(2)}</span>
                         </div>
-                        <div className="metric-card secondary">
-                            <span className="metric-label">Debt to Cash</span>
-                            <span className="metric-value">{weightedLiquidity?.toFixed(2)}</span>
+                        <div className={styles.detailsCard}>
+                            <span className={styles.detailsLabel}>Debt to Cash</span>
+                            <span className={styles.detailsValue}>{weightedLiquidity?.toFixed(2)}</span>
                         </div>
                     </div>
                 </Window>
