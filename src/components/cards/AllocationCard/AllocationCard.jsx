@@ -8,40 +8,6 @@ import {
 } from 'lucide-react';
 import styles from './AllocationCard.module.css';
 
-const CAT_TARGETS = {
-    "Speculative": { min: 0, max: 10 },
-    "Growth": { min: 30, max: 40 },
-    "Core": { min: 20, max: 30 },
-    "Compounder": { min: 20, max: 25 },
-    "Defensive": { min: 15, max: 20 }
-};
-
-const SECTOR_LIMITS = {
-    'Information Technology': 30,
-    'Technology': 30,
-    'Financials': 25,
-    'Financial Services': 25,
-    'Healthcare': 20,
-    'Communication Services': 20,
-    'Consumer Defensive': 20,
-    'Non-Cyclical': 20
-};
-
-const getStatusColor = (name, pct, isSector = false) => {
-    if (isSector) {
-        const limit = SECTOR_LIMITS[name] || 15;
-        if (pct > limit) return '#EF4444'; // Red: Too High
-        return '#10B981'; // Green: Ideal
-    }
-
-    const target = CAT_TARGETS[name];
-    if (!target) return '#9CA3AF'; // Gray: Uncategorized
-
-    if (pct > target.max) return '#EF4444'; // Red: Too High
-    if (pct < target.min) return '#F59E0B'; // Amber: Too Low
-    return '#10B981'; // Green: Ideal
-};
-
 const AllocationCard = ({
     portfolioList,
     portfolioLength,
@@ -53,9 +19,27 @@ const AllocationCard = ({
     currencySymbol,
     isMounted,
     onRefresh,
-    onHide
+    onHide,
+    catTargets,
+    sectorLimits,
+    onManageTargets
 }) => {
     if (!portfolioList || portfolioList.length === 0) return null;
+
+    const getStatusColor = (name, pct, isSector = false) => {
+        if (isSector) {
+            const limit = sectorLimits[name] || 15;
+            if (pct > limit) return '#EF4444'; // Red: Too High
+            return '#10B981'; // Green: Ideal
+        }
+
+        const target = catTargets[name];
+        if (!target) return '#9CA3AF'; // Gray: Uncategorized
+
+        if (pct > target.max) return '#EF4444'; // Red: Too High
+        if (pct < target.min) return '#F59E0B'; // Amber: Too Low
+        return '#10B981'; // Green: Ideal
+    };
 
     const getIconForName = (name) => {
         const lowerName = name.toLowerCase();
@@ -158,10 +142,10 @@ const AllocationCard = ({
 
                             let targetStr = "";
                             if (isSector) {
-                                const limit = SECTOR_LIMITS[entry.name] || 15;
+                                const limit = sectorLimits[entry.name] || 15;
                                 targetStr = `Max ${limit}%`;
                             } else {
-                                const target = CAT_TARGETS[entry.name];
+                                const target = catTargets[entry.name];
                                 if (target) targetStr = `${target.min}-${target.max}%`;
                             }
 
@@ -196,6 +180,11 @@ const AllocationCard = ({
             label: 'Refresh Data',
             onClick: () => onRefresh && onRefresh(),
             indicatorNode: <RefreshCw size={14} />
+        },
+        {
+            label: 'Manage Allocation Targets',
+            onClick: () => onManageTargets && onManageTargets(),
+            indicatorNode: <TrendingUp size={14} />
         }
     ];
 

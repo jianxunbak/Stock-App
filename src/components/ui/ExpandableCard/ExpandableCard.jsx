@@ -126,6 +126,8 @@ const ExpandableCard = ({
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'visible',
+                width: isExpanded ? '100%' : collapsedWidth,
+                height: isExpanded ? 'auto' : collapsedHeight,
                 ...style
             }}
         >

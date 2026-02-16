@@ -30,6 +30,7 @@ const BaseChart = ({
     xAxisFormatter,
     yAxisFormatter, // Optional custom Y-axis tick formatter
     tooltipValueFormatter, // Optional custom tooltip value formatter
+    tooltipLabelFormatter, // Optional custom tooltip label formatter
     extraControls, // Optional extra controls to render in the header
     height = 300,
 }) => {
@@ -38,12 +39,13 @@ const BaseChart = ({
     // --- Custom Tooltip ---
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
+            const formattedLabel = tooltipLabelFormatter ? tooltipLabelFormatter(label, payload) : label;
             return (
                 <div className="custom-tooltip">
-                    <span className="tooltip-date">{label}</span>
+                    <span className="tooltip-date">{formattedLabel}</span>
                     <div className="tooltip-items">
                         {payload.map((entry, index) => (
-                            <div key={index} className="tooltip-item" style={{ color: entry.color }}>
+                            <div key={index} className="tooltip-item" style={{ color: entry.stroke || entry.color }}>
                                 <span className="tooltip-name">{entry.name}:</span>
                                 <span className="tooltip-value">
                                     {tooltipValueFormatter ? tooltipValueFormatter(entry.value) : `${currency}${Number(entry.value).toFixed(2)}`}

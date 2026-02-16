@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Calendar, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CardAnimator } from '../Animator';
@@ -7,9 +7,18 @@ import styles from './CustomDatePicker.module.css';
 
 const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsMobile, style, useModalOnDesktop = false }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [activeDropdown, setActiveDropdown] = useState(null); // 'month' or 'year' or null
     const containerRef = useRef(null);
     const popupRef = useRef(null);
-    const [viewDate, setViewDate] = useState(new Date(value || new Date()));
+    const yearListRef = useRef(null);
+
+    const parseDate = (val) => {
+        if (!val) return new Date();
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    const [viewDate, setViewDate] = useState(parseDate(value));
     const [coords, setCoords] = useState({ top: 0, left: 0 });
     const [internalIsMobile, setInternalIsMobile] = useState(window.innerWidth < 768);
 
@@ -23,7 +32,7 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
 
     useEffect(() => {
         if (isOpen) {
-            setViewDate(new Date(value || new Date()));
+            setViewDate(parseDate(value));
         }
     }, [isOpen, value]);
 
@@ -40,11 +49,27 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
             }
 
             setIsOpen(false);
+            setActiveDropdown(null);
         };
 
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen]);
+
+    useEffect(() => {
+        const handleInnerClickOutside = (event) => {
+            if (!activeDropdown) return;
+            const selectors = popupRef.current?.querySelector(`.${styles.headerSelectors}`);
+            if (selectors && !selectors.contains(event.target)) {
+                setActiveDropdown(null);
+            }
+        };
+
+        if (activeDropdown) {
+            document.addEventListener('mousedown', handleInnerClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleInnerClickOutside);
+    }, [activeDropdown]);
 
     const daysInMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
     const firstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1).getDay();
@@ -65,6 +90,7 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
         const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         onChange(dateStr);
         setIsOpen(false);
+        setActiveDropdown(null);
     };
 
     const handleToggle = (e) => {
@@ -97,6 +123,7 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
             setCoords({ top, left });
         }
         setIsOpen(!isOpen);
+        setActiveDropdown(null);
     };
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -129,6 +156,35 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
         );
     }
 
+    const handleMonthChange = (monthIndex) => {
+        setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1));
+        setActiveDropdown(null);
+    };
+
+    const handleYearChange = (year) => {
+        setViewDate(new Date(year, viewDate.getMonth(), 1));
+        setActiveDropdown(null);
+    };
+
+    useEffect(() => {
+        if (activeDropdown === 'year' && yearListRef.current) {
+            const activeItem = yearListRef.current.querySelector(`.${styles.active}`);
+            if (activeItem) {
+                activeItem.scrollIntoView({ block: 'center', behavior: 'instant' });
+            }
+        }
+    }, [activeDropdown]);
+
+    const years = useMemo(() => {
+        const currentYear = new Date().getFullYear();
+        const startYear = currentYear - 100;
+        const yearsArray = [];
+        for (let y = currentYear; y >= startYear; y--) {
+            yearsArray.push(y);
+        }
+        return yearsArray;
+    }, []);
+
     const renderPopupContent = () => (
         <CardAnimator
             type="fabricCard"
@@ -142,7 +198,77 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
         >
             <div className={styles.dateHeader}>
                 <button onClick={handlePrevMonth} className={styles.iconBtn}><ChevronLeft size={16} /></button>
-                <span>{monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}</span>
+                <div className={styles.headerSelectors}>
+                    {/* Month Selector */}
+                    <div className={styles.selectorWrapper}>
+                        <button
+                            className={styles.headerSelect}
+                            onClick={() => setActiveDropdown(activeDropdown === 'month' ? null : 'month')}
+                        >
+                            {monthNames[viewDate.getMonth()]}
+                            <ChevronDown size={14} style={{ opacity: 0.6 }} />
+                        </button>
+                        <AnimatePresence>
+                            {activeDropdown === 'month' && (
+                                <motion.div
+                                    className={styles.customDropdown}
+                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                                >
+                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }}>
+                                        <div className={styles.dropdownList}>
+                                            {monthNames.map((name, i) => (
+                                                <button
+                                                    key={name}
+                                                    className={`${styles.dropdownItem} ${viewDate.getMonth() === i ? styles.active : ''}`}
+                                                    onClick={() => handleMonthChange(i)}
+                                                >
+                                                    {name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </CardAnimator>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Year Selector */}
+                    <div className={styles.selectorWrapper}>
+                        <button
+                            className={styles.headerSelect}
+                            onClick={() => setActiveDropdown(activeDropdown === 'year' ? null : 'year')}
+                        >
+                            {viewDate.getFullYear()}
+                            <ChevronDown size={14} style={{ opacity: 0.6 }} />
+                        </button>
+                        <AnimatePresence>
+                            {activeDropdown === 'year' && (
+                                <motion.div
+                                    className={styles.customDropdown}
+                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                                >
+                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }}>
+                                        <div className={styles.dropdownList} ref={yearListRef}>
+                                            {years.map(y => (
+                                                <button
+                                                    key={y}
+                                                    className={`${styles.dropdownItem} ${viewDate.getFullYear() === y ? styles.active : ''}`}
+                                                    onClick={() => handleYearChange(y)}
+                                                >
+                                                    {y}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </CardAnimator>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                </div>
                 <button onClick={handleNextMonth} className={styles.iconBtn}><ChevronRight size={16} /></button>
             </div>
             <div className={styles.dateGrid}>

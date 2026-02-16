@@ -36,9 +36,9 @@ const GrowthCard = ({
     const summaryContent = (
         <FinancialSummary>
             {/* Revenue Growth Summary */}
-            <div className={`summary-info stock-health-summary ${className || ''}`}>
+            <div className={`summary-info stock-health-summary ${className || ''}`} style={{ alignSelf: 'flex-start', paddingTop: '0.25rem' }}>
                 <div className="summary-name">Growth</div>
-                <div className="summary-price-group" style={{ paddingTop: '2.25rem' }}>
+                <div className="summary-price-group">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                         <span style={{ fontSize: '0.75rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>
                             Revenue Growth

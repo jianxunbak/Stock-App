@@ -1,0 +1,276 @@
+.windowContent {
+    padding: 0;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.container {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    color: var(--text-primary);
+}
+
+.scenarioList {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+}
+
+/* ---- Chart/Plan Group ---- */
+.chartGroup {
+    background: var(--neu-bg);
+    border-radius: 16px;
+    border: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    overflow: hidden;
+    padding-bottom: 1.5rem;
+}
+
+.chartHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--neu-bg-light);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.chartHeaderLeft {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+}
+
+.chartHeaderRight {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.chartNameInput {
+    border: none;
+    background: transparent;
+    color: var(--neu-text-primary);
+    font-size: 0.95rem;
+    font-weight: 700;
+    outline: none;
+    flex: 1;
+    padding: 0.25rem 0;
+    transition: all 0.2s ease;
+}
+
+.chartNameInput:hover,
+.chartNameInput:focus {
+    color: var(--neu-brand);
+}
+
+/* ---- Toggle Switch (matching user preferences) ---- */
+.customToggle {
+    width: 44px;
+    height: 24px;
+    background: var(--neu-bg);
+    border-radius: 20px;
+    position: relative;
+    box-shadow: inset 2px 2px 4px var(--neu-shadow-dark),
+        inset -2px -2px 4px var(--neu-shadow-light);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.customToggle.active {
+    background: #4ade80 !important;
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggleKnob {
+    width: 18px;
+    height: 18px;
+    background: var(--neu-text-secondary);
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.customToggle.active .toggleKnob {
+    left: 23px;
+    background: white;
+}
+
+/* Small toggle for scenarios */
+.customToggle.small {
+    width: 34px;
+    height: 18px;
+}
+
+.customToggle.small .toggleKnob {
+    width: 14px;
+    height: 14px;
+    top: 2px;
+    left: 2px;
+}
+
+.customToggle.small.active .toggleKnob {
+    left: 18px;
+}
+
+/* ---- Scenario Cards (Sub-sections) ---- */
+.scenarioCard {
+    padding: 1.25rem;
+    background: transparent;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.scenarioCard:last-child {
+    border-bottom: none;
+}
+
+.scenarioHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.5rem;
+    /* Removed individual card border look */
+}
+
+.scenarioColorDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.scenarioNameInput {
+    /* padding: 0.5rem 0.75rem; */
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--neu-text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    outline: none;
+    flex: 1;
+}
+
+.scenarioNameInput:hover {
+    background: var(--neu-bg);
+    border-color: var(--neu-border-subtle);
+}
+
+.scenarioNameInput:focus {
+    background: var(--neu-bg);
+    border-color: var(--neu-success);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+/* Calculator Form */
+.calculatorForm {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+}
+
+.inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.inputLabel {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Input styling - matches notes input from portfolio cards */
+.numberInput {
+    background: var(--neu-bg);
+    border: none;
+    border-radius: var(--neu-radius-sm, 8px);
+    padding: 0.6rem 0.75rem;
+    color: var(--neu-text-primary);
+    font-size: 0.85rem;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+    transition: all 0.2s ease;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.numberInput:focus {
+    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark),
+        inset -3px -3px 7px var(--neu-shadow-light);
+}
+
+/* Remove number input arrows */
+.numberInput::-webkit-inner-spin-button,
+.numberInput::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.numberInput[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+/* Frequency Dropdown */
+.frequencyDropdown {
+    display: block;
+    width: 100%;
+}
+
+.frequencyDropdown button {
+    text-align: left !important;
+    justify-content: flex-start !important;
+    gap: 0.5rem;
+}
+
+/* Override the inner text wrapper centering from Button component */
+.frequencyDropdown :global(.neu-text-base) {
+    justify-content: flex-start !important;
+}
+
+.frequencyDropdown button span {
+    text-align: left;
+}
+
+.frequencyDropdown button:active,
+.frequencyDropdown button.active {
+    box-shadow: inset 3px 3px 7px var(--neu-shadow-dark),
+        inset -3px -3px 7px var(--neu-shadow-light) !important;
+}
+
+/* Remove shading on selected dropdown item */
+.frequencyDropdown :global(.dropdown-item.active) {
+    background: transparent;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .calculatorForm {
+        grid-template-columns: 1fr;
+    }
+
+    .container {
+        padding: 1rem;
+        gap: 1rem;
+    }
+}

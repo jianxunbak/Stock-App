@@ -29,6 +29,27 @@ import HoldingsCard from '../../cards/HoldingsCard/HoldingsCard';
 
 import CustomSelect from '../../ui/CustomSelect/CustomSelect';
 import CustomDatePicker from '../../ui/CustomDatePicker/CustomDatePicker';
+import AllocationEditorWindow from '../../ui/AllocationEditorWindow/AllocationEditorWindow';
+import { useUserSettings } from '../../../hooks/useUserSettings';
+
+const DEFAULT_CAT_TARGETS = {
+    "Speculative": { min: 0, max: 10 },
+    "Growth": { min: 30, max: 40 },
+    "Core": { min: 20, max: 30 },
+    "Compounder": { min: 20, max: 25 },
+    "Defensive": { min: 15, max: 20 }
+};
+
+const DEFAULT_SECTOR_LIMITS = {
+    'Information Technology': 30,
+    'Technology': 30,
+    'Financials': 25,
+    'Financial Services': 25,
+    'Healthcare': 20,
+    'Communication Services': 20,
+    'Consumer Defensive': 20,
+    'Non-Cyclical': 20
+};
 
 // Styles used for legacy parts or layout
 import '../../cards/PortfolioSummaryCard/PortfolioSummaryCard.css';
@@ -57,6 +78,31 @@ const PortfolioPage = () => {
         ai: true,
         holdings: true
     });
+
+    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
+    const [catTargets, setCatTargets] = useState(DEFAULT_CAT_TARGETS);
+    const [sectorLimits, setSectorLimits] = useState(DEFAULT_SECTOR_LIMITS);
+    const [showAllocationEditor, setShowAllocationEditor] = useState(false);
+
+    // Sync targets from settings
+    useEffect(() => {
+        if (settings?.allocation) {
+            if (settings.allocation.catTargets) setCatTargets(settings.allocation.catTargets);
+            if (settings.allocation.sectorLimits) setSectorLimits(settings.allocation.sectorLimits);
+        }
+    }, [settings]);
+
+    // Save targets to settings (Debounced)
+    useEffect(() => {
+        if (settingsLoading) return;
+        const timer = setTimeout(() => {
+            const currentAlloc = { catTargets, sectorLimits };
+            if (JSON.stringify(settings?.allocation) !== JSON.stringify(currentAlloc)) {
+                updateSettings({ allocation: currentAlloc });
+            }
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [catTargets, sectorLimits, settingsLoading]);
 
     // Load User Preferences for Portfolio ID and Visibility
     const loadSettings = useCallback((e) => {
@@ -559,36 +605,24 @@ const PortfolioPage = () => {
         const uncategorizedVal = groupList.filter(g => g.category === 'Uncategorized').reduce((a, b) => a + b.currentValue, 0);
         const uncategorizedPct = tVal > 0 ? (uncategorizedVal / tVal) * 100 : 0;
 
-        // Speculative (10 pts)
-        const specItem = categoryData.find(c => c.name === 'Speculative');
-        const specPctValue = tVal > 0 ? ((specItem?.value || 0) / tVal) * 100 : 0;
-        let specPtsSub = 10;
-        if (specPctValue >= 14) {
-            specPtsSub = 0;
-        } else if (specPctValue > 10) {
-            specPtsSub -= Math.floor((specPctValue - 10) / 2) * 5;
-        }
-        catPointsSum += Math.max(0, specPtsSub);
+        let specPctValue = 0;
+        // Dynamic category scoring
+        Object.entries(catTargets).forEach(([name, target]) => {
+            const item = categoryData.find(c => c.name === name);
+            const pctVal = tVal > 0 ? ((item?.value || 0) / tVal) * 100 : 0;
+            const targetMin = Number(target.min || 0);
+            const targetMax = Number(target.max || 0);
 
-        // Growth (5 pts): 30% – 40%
-        const growthItem = categoryData.find(c => c.name === 'Growth');
-        const growthPctValue = tVal > 0 ? ((growthItem?.value || 0) / tVal) * 100 : 0;
-        if (growthPctValue >= 30 && growthPctValue <= 40) catPointsSum += 5;
-
-        // Core (5 pts): 20% – 30%
-        const coreItem = categoryData.find(c => c.name === 'Core');
-        const corePctValue = tVal > 0 ? ((coreItem?.value || 0) / tVal) * 100 : 0;
-        if (corePctValue >= 20 && corePctValue <= 30) catPointsSum += 5;
-
-        // Compounder (5 pts): 20% – 25%
-        const compItem = categoryData.find(c => c.name === 'Compounder');
-        const compPctValue = tVal > 0 ? ((compItem?.value || 0) / tVal) * 100 : 0;
-        if (compPctValue >= 20 && compPctValue <= 25) catPointsSum += 5;
-
-        // Defensive (5 pts): 15% – 20%
-        const defItem = categoryData.find(c => c.name === 'Defensive');
-        const defPctValue = tVal > 0 ? ((defItem?.value || 0) / tVal) * 100 : 0;
-        if (defPctValue >= 15 && defPctValue <= 20) catPointsSum += 5;
+            if (name === 'Speculative') {
+                specPctValue = pctVal;
+                let specPtsSub = 10;
+                if (pctVal >= targetMax + 4) specPtsSub = 0;
+                else if (pctVal > targetMax) specPtsSub -= Math.floor((pctVal - targetMax) / 2) * 5;
+                catPointsSum += Math.max(0, specPtsSub);
+            } else {
+                if (pctVal >= targetMin && pctVal <= targetMax) catPointsSum += 5;
+            }
+        });
 
         // Portfolio Balance (5 pts)
         if (tVal > 0) catPointsSum += 5;
@@ -603,20 +637,10 @@ const PortfolioPage = () => {
 
         // 4. Sector Allocation (Max 10)
         let sectPtsSum = 10;
-        const SECTOR_LIMITS = {
-            'Information Technology': 30,
-            'Technology': 30,
-            'Financials': 25,
-            'Financial Services': 25,
-            'Healthcare': 20,
-            'Communication Services': 20,
-            'Consumer Defensive': 20,
-            'Non-Cyclical': 20
-        };
 
         sectorData.forEach(s => {
             const pct = tVal > 0 ? (s.value / tVal) * 100 : 0;
-            const limit = SECTOR_LIMITS[s.name] || 15;
+            const limit = Number(sectorLimits[s.name] || 15);
             if (pct > limit) sectPtsSum -= 2;
         });
         sectPtsSum = Math.max(0, sectPtsSum);
@@ -668,7 +692,7 @@ const PortfolioPage = () => {
             isCriticalRisk: criticalRiskActive,
             mergedChartData: chart_data_final
         };
-    }, [portfolio, liveData, currentRate, searchTicker, twrData]);
+    }, [portfolio, liveData, currentRate, searchTicker, twrData, catTargets, sectorLimits]);
 
 
     // Handlers
@@ -971,8 +995,11 @@ const PortfolioPage = () => {
                         totalValue={totalValue}
                         currencySymbol={currency === 'USD' ? '$' : 'S$'}
                         isMounted={true}
-                        onRefresh={() => window.location.reload()}
+                        onRefresh={() => window.location.reload()} // Simplified for now
                         onHide={() => handleHideRequest('allocation')}
+                        catTargets={catTargets}
+                        sectorLimits={sectorLimits}
+                        onManageTargets={() => setShowAllocationEditor(true)}
                     />
                 )}
 
@@ -1501,6 +1528,23 @@ const PortfolioPage = () => {
                     </div>
                 </div>
             </Window>
+
+            {showAllocationEditor && (
+                <AllocationEditorWindow
+                    isOpen={showAllocationEditor}
+                    onClose={() => setShowAllocationEditor(false)}
+                    catTargets={catTargets}
+                    sectorLimits={sectorLimits}
+                    onUpdateCatTarget={(name, field, val) => setCatTargets(prev => ({ ...prev, [name]: { ...prev[name], [field]: val } }))}
+                    onUpdateSectorLimit={(name, val) => setSectorLimits(prev => ({ ...prev, [name]: val }))}
+                    onRemoveSectorLimit={(name) => {
+                        const newLimits = { ...sectorLimits };
+                        delete newLimits[name];
+                        setSectorLimits(newLimits);
+                    }}
+                    onAddSectorLimit={(name, limit) => setSectorLimits(prev => ({ ...prev, [name]: limit }))}
+                />
+            )}
 
         </div>
     );

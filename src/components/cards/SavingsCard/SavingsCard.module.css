@@ -1,0 +1,205 @@
+.container {
+    color: var(--text-primary);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 2rem;
+}
+
+.chartSection,
+.donutSection {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.sectionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    /* Removed border-bottom */
+}
+
+.sectionIcon {
+    color: var(--text-secondary);
+}
+
+.sectionTitle {
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--neu-text-secondary);
+}
+
+.chartContainer,
+.donutContainer {
+    position: relative;
+    border-radius: 16px;
+    /* padding: 1rem; */
+    /* Removed background and shadow */
+}
+
+.scenarioDropdown {
+    box-shadow: var(--neu-card-shadow);
+    border-radius: var(--neu-radius-sm);
+}
+
+.scenarioDropdown :global(.dropdown-item.active) {
+    background: transparent;
+    font-weight: 600;
+}
+
+.scenarioDropdown :global(.neu-text-base) {
+    font-weight: 600;
+}
+
+.donutContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.donutCenterText {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.centerValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--neu-success);
+}
+
+.centerLabel {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Legend Styling */
+.legendGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 1rem;
+    padding: 0 0.5rem;
+}
+
+.legendItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+}
+
+.legendItem:not(:last-child) {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+:global(.dark-mode) .legendItem:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.legendDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.legendName {
+    flex: 1;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.legendValue {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Custom Recharts Tooltip */
+.chartTooltip {
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-sm);
+    padding: 0.75rem 1rem;
+    box-shadow: var(--neu-card-shadow);
+    border: none;
+    z-index: 50;
+    position: relative;
+    pointer-events: none;
+}
+
+.tooltipDate {
+    font-size: 0.75rem;
+    color: var(--neu-text-secondary);
+    margin-bottom: 0.5rem;
+    display: block;
+    border-bottom: 1px solid var(--neu-shadow-dark);
+    padding-bottom: 0.25rem;
+}
+
+.tooltipItems {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.tooltipItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.tooltipName {
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.tooltipValue {
+    font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 0.5rem;
+    }
+
+    .legendGrid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.input::-webkit-outer-spin-button,
+.input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+.input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}

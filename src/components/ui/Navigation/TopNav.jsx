@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, LogOut, PieChart, TrendingUp, ArrowLeft, FlaskConical, MoreVertical, X, Check } from 'lucide-react';
+import { Star, LogOut, PieChart, TrendingUp, ArrowLeft, FlaskConical, MoreVertical, X, Check, Wallet } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import Window from '../Window/Window';
@@ -34,9 +34,11 @@ export const TopNavActions = ({
     showCurrency = true,
     showWatchlistBtn = true,
     showPortfolioBtn = true,
+    showWealthBtn = true,
     showUserBtn = true,
     showLogoutBtn = true,
     showThemeToggle = true,
+    alwaysOpenSearch = false,
 
     // Values & Handlers
     searchTicker = '',
@@ -57,6 +59,7 @@ export const TopNavActions = ({
             {showSearch && (
                 <SearchBar
                     placeholder="Search ticker..."
+                    alwaysOpen={alwaysOpenSearch}
                     onEnter={(val) => {
                         setSearchTicker(val);
                         handleSearch(val);
@@ -80,6 +83,11 @@ export const TopNavActions = ({
                         {showPortfolioBtn && (
                             <Button variant="icon" className={styles.navActionButton} onClick={() => navigate('/portfolio')} title="Portfolio">
                                 <PieChart size={16} className={styles.starIcon} />
+                            </Button>
+                        )}
+                        {showWealthBtn && (
+                            <Button variant="icon" className={styles.navActionButton} onClick={() => navigate('/wealth')} title="Wealth">
+                                <Wallet size={16} className={styles.starIcon} />
                             </Button>
                         )}
 
@@ -127,6 +135,11 @@ export const TopNavActions = ({
                     {currentUser && showPortfolioBtn && (
                         <Button variant="icon" onClick={() => navigate('/portfolio')} title="Portfolio">
                             <PieChart size={16} />
+                        </Button>
+                    )}
+                    {currentUser && showWealthBtn && (
+                        <Button variant="icon" onClick={() => navigate('/wealth')} title="Wealth">
+                            <Wallet size={16} />
                         </Button>
                     )}
                     {currentUser && showUserBtn && (

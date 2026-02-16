@@ -54,6 +54,12 @@
     font-weight: 600;
 }
 
+.dropdown-item.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* Indicator dot for items that need it */
 .dropdown-dot {
     width: 6px;

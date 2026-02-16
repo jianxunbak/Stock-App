@@ -57,6 +57,7 @@ const DropdownButton = ({
 
     const handleItemClick = (e, item) => {
         if (e) e.stopPropagation();
+        if (item.disabled) return;
         if (item.onClick) {
             item.onClick(e);
         }
@@ -162,7 +163,7 @@ const DropdownButton = ({
                                     return (
                                         <button
                                             key={index}
-                                            className={`dropdown-item ${item.isActive ? 'active' : ''}`}
+                                            className={`dropdown-item ${item.isActive ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`}
                                             onClick={(e) => handleItemClick(e, item)}
                                         >
                                             <div className="dropdown-item-content">

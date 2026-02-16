@@ -1,0 +1,465 @@
+.card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    color: var(--neu-text-primary);
+}
+
+.headerGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.1rem;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.headerItem {
+    display: flex;
+    flex-direction: column;
+}
+
+.headerLabel {
+    font-size: 0.73rem;
+    color: var(--neu-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.headerValueSuccess {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--neu-success);
+}
+
+.headerValueSecondary {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--neu-text-secondary);
+}
+
+.content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.summaryFullLayout {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+
+.summarySection,
+.projectionSection {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.sectionHeaderTitle {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--neu-text-secondary);
+    margin: 0;
+}
+
+.summaryTopRow {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+}
+
+@media (min-width: 768px) {
+    .summaryTopRow {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.chartContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chartOverlay {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.overlayLabel {
+    font-size: 0.72rem;
+    color: var(--neu-text-secondary);
+}
+
+.overlayValue {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--neu-text-primary);
+}
+
+.statsPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    justify-content: center;
+}
+
+.statLine {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.statDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.statLabel {
+    flex: 1;
+    font-size: 0.88rem;
+    color: var(--neu-text-secondary);
+}
+
+.statValue {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.divider {
+    height: 1px;
+    background: var(--glass-border);
+    margin: 0.5rem 0;
+}
+
+.statLabelEmphasized {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--neu-text-primary);
+}
+
+.statValueSuccess {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--neu-success);
+}
+
+/* Projection Chart */
+.projectionChartContainer {
+    width: 100%;
+}
+
+/* Window & Settings */
+.windowContainer {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.settingsGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.inputWrapper {
+    width: 100%;
+}
+
+.neuInput {
+    width: 100%;
+    background: var(--neu-bg);
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.neuInput::-webkit-outer-spin-button,
+.neuInput::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+.neuInput[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.neuInput:focus {
+    box-shadow: inset 1px 1px 3px var(--neu-shadow-dark),
+        inset -1px -1px 3px var(--neu-shadow-light);
+}
+
+.lockedInput {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(59, 130, 246, 0.05);
+    border: 1px solid rgba(59, 130, 246, 0.1);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.lockIcon {
+    color: #3b82f6;
+    opacity: 0.7;
+}
+
+.sectionDivider {
+    height: 1px;
+    background: var(--glass-border);
+    margin: 0.5rem 0;
+}
+
+.subTitle {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.inputGridMini {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.inputGroupMini {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Tooltip */
+.chartTooltip {
+    background: var(--neu-bg);
+    border-radius: var(--neu-radius-sm);
+    padding: 0.75rem 1rem;
+    box-shadow: var(--neu-card-shadow);
+    border: none;
+    z-index: 50;
+    position: relative;
+    pointer-events: none;
+}
+
+.tooltipLabel {
+    font-size: 0.75rem;
+    color: var(--neu-text-secondary);
+    margin-bottom: 0.5rem;
+    display: block;
+    border-bottom: 1px solid var(--neu-shadow-dark);
+    padding-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.tooltipItems {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.tooltipItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.tooltipName {
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.tooltipValue {
+    font-weight: 600;
+}
+
+/* Reference Modal Styles */
+.referenceContainer {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.refSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.refTitle {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    border-left: 3px solid #3b82f6;
+    padding-left: 0.75rem;
+}
+
+.refSub {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: -0.25rem 0 0 0.75rem;
+}
+
+.refGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 1rem;
+}
+
+.refRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+    padding: 0.25rem 0;
+}
+
+.refRow>span {
+    flex: 1;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.refValueGroup {
+    display: grid;
+    grid-template-columns: 50px 100px;
+    gap: 1rem;
+    align-items: center;
+}
+
+.refValueGroup strong {
+    color: var(--neu-success);
+    font-size: 1rem;
+    text-align: right;
+}
+
+.refValueGroup small {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    opacity: 0.7;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.refAllocGrid {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.refAllocHeader,
+.refAllocRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    padding: 0.75rem 1rem;
+    font-size: 0.88rem;
+}
+
+.refAllocHeader {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.refAllocRow {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.refAllocRow:last-child {
+    border-bottom: none;
+}
+
+.refAllocRow span {
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.refAllocHeader span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.refAllocHeader span:first-child,
+.refAllocRow span:first-child {
+    justify-content: flex-start;
+}
+
+.refAllocRow span:not(:first-child) {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.refNote {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.05);
+    border-radius: 10px;
+    border: 1px solid rgba(59, 130, 246, 0.1);
+    color: var(--text-secondary);
+}
+
+.refNote p {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}

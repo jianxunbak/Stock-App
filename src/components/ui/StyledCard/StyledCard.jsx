@@ -113,8 +113,8 @@ const StyledCard = React.memo(({
             distortionFactor={distortionFactor}
             style={{
                 ...style,
-                width: "100%",
-                height: "auto",
+                width: style.width || "100%",
+                height: style.height || "auto",
             }}
         >
             {renderContent()}

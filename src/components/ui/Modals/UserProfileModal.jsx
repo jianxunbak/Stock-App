@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
-import { Settings, LogOut, User as UserIcon, X, Edit2, MoreVertical, Check, Camera } from 'lucide-react';
+import { Settings, LogOut, User as UserIcon, X, Edit2, MoreVertical, Check, Camera, Cake } from 'lucide-react';
 import Window from '../Window/Window';
+import CustomDatePicker from '../CustomDatePicker/CustomDatePicker';
 import Button from '../Button/Button';
 import DropdownButton from '../DropdownButton/DropdownButton';
 import { useTheme } from '../../../context/ThemeContext';
@@ -27,6 +28,13 @@ const analysisCards = [
     { key: 'financials', label: 'Financial Statements' }
 ];
 
+const wealthCards = [
+    { key: 'wealthSummary', label: 'Wealth Summary' },
+    { key: 'stocks', label: 'Stocks' },
+    { key: 'cpf', label: 'CPF' },
+    { key: 'savings', label: 'Savings' }
+];
+
 const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
     const { theme, toggleTheme } = useTheme();
     const { updateUserProfile, uploadProfilePicture } = useAuth();
@@ -36,15 +44,36 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewURL, setPreviewURL] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [dateOfBirth, setDateOfBirth] = useState('');
+    const [editDateOfBirth, setEditDateOfBirth] = useState('');
     const fileInputRef = useRef(null);
+
+    const calculateAge = (dob) => {
+        if (!dob) return null;
+        const birth = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        return age;
+    };
+
+    const formatDateDisplay = (dob) => {
+        if (!dob) return '';
+        const date = new Date(dob);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
 
     useEffect(() => {
         if (user) {
             setEditName(user.displayName || '');
             setEditPhotoURL(user.photoURL || '');
             setPreviewURL(user.photoURL || '');
+            setEditDateOfBirth(dateOfBirth || '');
         }
-    }, [user, isEditing]);
+    }, [user, isEditing, dateOfBirth]);
 
     const handleFileChange = (e) => {
         if (e.target.files[0]) {
@@ -64,6 +93,15 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
             }
 
             await updateUserProfile(editName, photoURL);
+
+            // Save DOB to settings
+            setDateOfBirth(editDateOfBirth);
+            if (user?.uid) {
+                const newSettings = { ...settings, dateOfBirth: editDateOfBirth };
+                setSettings(newSettings);
+                await saveUserSettings(user.uid, newSettings);
+            }
+
             setIsEditing(false);
             setSelectedFile(null);
         } catch (error) {
@@ -95,6 +133,12 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                 valuation: true,
                 support: true,
                 financials: true
+            },
+            wealth: {
+                wealthSummary: true,
+                stocks: true,
+                cpf: true,
+                savings: true
             }
         }
     });
@@ -107,9 +151,13 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                         ...prev,
                         cardVisibility: {
                             portfolio: { ...prev.cardVisibility.portfolio, ...fetched.cardVisibility.portfolio },
-                            analysis: { ...prev.cardVisibility.analysis, ...fetched.cardVisibility.analysis }
+                            analysis: { ...prev.cardVisibility.analysis, ...fetched.cardVisibility.analysis },
+                            wealth: { ...prev.cardVisibility.wealth, ...fetched.cardVisibility.wealth }
                         }
                     }));
+                }
+                if (fetched?.dateOfBirth) {
+                    setDateOfBirth(fetched.dateOfBirth);
                 }
             });
         }
@@ -242,6 +290,16 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                                         placeholder="Display Name"
                                         className={styles.profileInput}
                                     />
+                                    <div className={styles.dobInputWrapper}>
+                                        <Cake size={14} className={styles.dobIcon} />
+                                        <CustomDatePicker
+                                            value={editDateOfBirth}
+                                            onChange={setEditDateOfBirth}
+                                            isMobile={false}
+                                            useModalOnDesktop={true}
+                                            triggerClassName={styles.profileInput}
+                                        />
+                                    </div>
                                 </div>
                                 <div className={styles.editActions}>
                                     <Button
@@ -293,6 +351,17 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                                     <h3>{user.displayName || 'User'}</h3>
                                     <p>{user.email}</p>
                                 </div>
+                                {dateOfBirth && (
+                                    <div className={styles.dobDisplay}>
+                                        <Cake size={14} className={styles.dobIcon} />
+                                        <span className={styles.dobText}>
+                                            {formatDateDisplay(dateOfBirth)}
+                                        </span>
+                                        <span className={styles.dobAge}>
+                                            ({calculateAge(dateOfBirth)} years old)
+                                        </span>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -345,6 +414,20 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                                     <div key={card.key} className={styles.toggleRow} onClick={() => handleToggleVisibility('analysis', card.key)}>
                                         <span className={styles.cardLabel}>{card.label}</span>
                                         <div className={`${styles.customToggle} ${settings.cardVisibility.analysis[card.key] ? styles.active : ''}`}>
+                                            <div className={styles.toggleKnob} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className={styles.settingsGroup} style={{ marginTop: '1.5rem' }}>
+                            <h5>Wealth Page</h5>
+                            <div className={styles.togglesGrid}>
+                                {wealthCards.map(card => (
+                                    <div key={card.key} className={styles.toggleRow} onClick={() => handleToggleVisibility('wealth', card.key)}>
+                                        <span className={styles.cardLabel}>{card.label}</span>
+                                        <div className={`${styles.customToggle} ${settings.cardVisibility.wealth[card.key] ? styles.active : ''}`}>
                                             <div className={styles.toggleKnob} />
                                         </div>
                                     </div>

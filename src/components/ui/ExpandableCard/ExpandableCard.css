@@ -194,4 +194,8 @@
     display: block;
     /* Let the internal container (grid) handle layout */
     width: 100%;
+    overflow: hidden;
+    /* Contain content within collapsed card boundaries */
+    padding: 0 0.4rem;
+    box-sizing: border-box;
 }
