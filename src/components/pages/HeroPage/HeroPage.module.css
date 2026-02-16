@@ -331,3 +331,110 @@
     animation: fadeInUp 0.8s ease-out 0.4s backwards;
     justify-content: center;
 }
+
+/* Wealth Overview Styles */
+.overviewSection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    margin-top: 3.5rem;
+    animation: fadeInUp 0.8s ease-out 0.6s backwards;
+    width: 100%;
+}
+
+.heroOverviewCard {
+    padding: 1.25rem 1.5rem !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.heroOverviewCard:hover {
+    transform: translateY(-4px) scale(1.01) !important;
+}
+
+.cardHeaderSmall {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.02rem;
+    opacity: 0.7;
+    text-align: left;
+    width: 100%;
+}
+
+.cardRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 1rem;
+}
+
+.cardCol {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.colLabel {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    opacity: 0.9;
+}
+
+.colValue {
+    font-size: 2.25rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.04rem;
+    line-height: 1;
+}
+
+.colValueProjected {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--neu-success);
+    letter-spacing: -0.04rem;
+    line-height: 1;
+}
+
+.colSub {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    opacity: 0.6;
+}
+
+.colDivider {
+    width: 1px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 1rem;
+}
+
+@media (max-width: 768px) {
+    .cardRow {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.5rem;
+    }
+
+    .colDivider {
+        display: none;
+    }
+
+    .colValue,
+    .colValueProjected {
+        font-size: 1.75rem;
+    }
+}

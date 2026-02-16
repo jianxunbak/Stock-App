@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './HeroPage.module.css';
 import SearchBar from '../../ui/SearchBar/SearchBar';
 import { useAuth } from '../../../context/AuthContext';
 import { usePortfolio } from '../../../hooks/usePortfolio';
+import { useUserSettings } from '../../../hooks/useUserSettings';
 import Window from '../../ui/Window/Window';
 import Button from '../../ui/Button';
 
@@ -18,6 +19,8 @@ import WatchlistModal from '../../ui/Modals/WatchlistModal';
 import UserProfileModal from '../../ui/Modals/UserProfileModal';
 import { fetchStockData } from '../../../services/api';
 import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
+import StyledCard from '../../ui/StyledCard';
+import { Wallet, TrendingUp, Sparkles, Clock } from 'lucide-react';
 
 const HeroPage = () => {
     const [ticker, setTicker] = useState('');
@@ -91,30 +94,219 @@ const HeroPage = () => {
         setErrorMessage('');
     };
 
-    // --- Background Prefetching Strategy ---
+    // --- Background Prefetching & Overview Data Strategy ---
     const { portfolioList } = usePortfolio();
+    const { settings } = useUserSettings();
+    const [liveData, setLiveData] = useState({});
 
-    // Silently pre-fetch portfolio data in background when user is idle on Hero Page
+    // Fetch live prices for all portfolio items to calculate total value
+    useEffect(() => {
+        if (!currentUser || !portfolioList?.length) return;
+
+        const allTickers = [...new Set(portfolioList.flatMap(p => (p.portfolio || []).map(item => item.ticker?.toUpperCase())))].filter(Boolean);
+
+        allTickers.forEach((ticker, index) => {
+            if (!liveData[ticker]) {
+                // Staggered fetch to avoid hitting rate limits too fast on hero page
+                setTimeout(() => {
+                    fetchStockData(ticker).then(data => {
+                        setLiveData(prev => ({
+                            ...prev,
+                            [ticker]: { price: data.overview?.price || 0 }
+                        }));
+                    }).catch(() => { });
+                }, index * 200);
+            }
+        });
+    }, [currentUser, portfolioList]);
+
+    const totalPortfolioValue = useMemo(() => {
+        let total = 0;
+        // Only sum 'main' portfolios for real-world value calculation
+        const mainPortfolios = portfolioList.filter(p => (p.type || 'main') === 'main');
+
+        mainPortfolios.forEach(p => {
+            (p.portfolio || []).forEach(item => {
+                const ticker = item.ticker?.toUpperCase();
+                const price = liveData[ticker]?.price || 0;
+                total += price * (item.shares || 0);
+            });
+        });
+        return total;
+    }, [portfolioList, liveData]);
+
+    const formatCurrency = (val) => {
+        if (typeof val !== 'number' || isNaN(val)) return '---';
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 0
+        }).format(val);
+    };
+
+    const estimatedNetWorth = useMemo(() => {
+        if (!settings) return null;
+
+        // 1. Savings Scenario Data - Match Wealth page's active scenario logic
+        const activeScenarioId = settings.savings?.activeScenarioId;
+        const savingsScenario = settings.savings?.scenarios?.find(s => s.id === activeScenarioId) || settings.savings?.scenarios?.[0];
+        const initialSavings = Number(savingsScenario?.initialSavings || 0);
+
+        // 2. CPF Data
+        const initialCpf = Number(settings.cpf?.balances?.oa || 0) +
+            Number(settings.cpf?.balances?.sa || 0) +
+            Number(settings.cpf?.balances?.ma || 0) +
+            Number(settings.cpf?.balances?.ra || 0);
+
+        // 3. Other Investments
+        const otherData = settings.otherInvestments || { items: [], groups: [] };
+        const sourceData = Array.isArray(otherData) ? { items: otherData, groups: [] } : otherData;
+        const otherItems = [...(sourceData.items || []), ...(sourceData.groups || []).flatMap(g => g.items || [])];
+        const otherValue = otherItems.reduce((sum, item) => sum + Number(item.value || 0), 0);
+
+        // 4. Stocks (To match Wealth Summary chart's Year 0, we use Scenario Initial Deposit)
+        let totalStocksScenario = 0;
+        const stocksScenarioIds = settings.stocks?.activeScenarioIds || {};
+        (settings.stocks?.charts || []).forEach(chart => {
+            const sId = stocksScenarioIds[chart.id];
+            const s = chart.scenarios?.find(sc => sc.id === sId) || chart.scenarios?.[0];
+            totalStocksScenario += Number(s?.initialDeposit || 0);
+        });
+
+        // Current Net Worth (Scenario-based for consistency with Wealth page chart)
+        return Math.round(initialSavings + initialCpf + otherValue + totalStocksScenario);
+    }, [settings]);
+
+    // --- Projection Logic (Replicated from WealthSummaryCard) ---
+    const currentAge = useMemo(() => {
+        if (!settings?.dateOfBirth) return null;
+        const birth = new Date(settings.dateOfBirth);
+        if (isNaN(birth.getTime())) return null;
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        return age;
+    }, [settings?.dateOfBirth]);
+
+    const projectedYear = settings?.wealth?.projectedYear || 0;
+    const targetAge = currentAge !== null ? currentAge + projectedYear : null;
+    const targetYear = new Date().getFullYear() + projectedYear;
+
+    const projectedValues = useMemo(() => {
+        if (!settings || projectedYear === 0) return { netWorth: estimatedNetWorth, stocks: totalPortfolioValue };
+
+        // 1. Savings & CPF Projection
+        const activeScenarioId = settings.savings?.activeScenarioId;
+        const scenario = settings.savings?.scenarios?.find(s => s.id === activeScenarioId) || settings.savings?.scenarios?.[0];
+
+        const calculateTotalExpenses = (expensesData) => {
+            if (!expensesData) return 0;
+            if (typeof expensesData === 'object' && !expensesData.items && !expensesData.groups) {
+                return Object.values(expensesData).reduce((a, b) => a + Number(b || 0), 0);
+            }
+            const { items = [], groups = [], linked = [] } = expensesData;
+            const getItemMonthly = (item) => {
+                const val = Number(item.value || 0);
+                if (item.frequency === 'Yearly') return val / 12;
+                if (item.frequency === 'Quarterly') return val / 3;
+                return val;
+            };
+            let total = 0;
+            items.forEach(i => total += getItemMonthly(i));
+            groups.forEach(g => (g.items || []).forEach(i => total += getItemMonthly(i)));
+            linked.forEach(i => total += getItemMonthly(i));
+            return total;
+        };
+
+        const monthlyPay = Number(scenario?.monthlyPay || 0);
+        const totalExpenses = calculateTotalExpenses(scenario?.expenses);
+        const cpfSalary = Number(settings?.cpf?.monthlySalary || monthlyPay);
+        const annualBonus = Number(settings?.cpf?.annualBonus || 0);
+        const owCeiling = 8000;
+        const annualCeiling = 102000;
+        const cpfContributionEmployee = Math.min(monthlyPay, owCeiling) * 0.2;
+        const monthlySavings = monthlyPay - cpfContributionEmployee - totalExpenses;
+        const bankInterestRate = Number(scenario?.bankInterestRate || 0) / 100;
+
+        let savingsBalance = Number(scenario?.initialSavings || 0);
+        const initialCpf = Number(settings?.cpf?.balances?.oa || 0) +
+            Number(settings?.cpf?.balances?.sa || 0) +
+            Number(settings?.cpf?.balances?.ma || 0) +
+            Number(settings?.cpf?.balances?.ra || 0);
+        let cpfBalance = initialCpf;
+
+        for (let y = 1; y <= projectedYear; y++) {
+            savingsBalance = (savingsBalance * (1 + bankInterestRate)) + (monthlySavings * 12);
+            const ageAtYear = (currentAge || 30) + y - 1;
+            let contributionRate = 0.37;
+            if (ageAtYear > 55) contributionRate = 0.34;
+            if (ageAtYear > 60) contributionRate = 0.25;
+            if (ageAtYear > 65) contributionRate = 0.165;
+            if (ageAtYear > 70) contributionRate = 0.125;
+            const annualOW = Math.min(cpfSalary, owCeiling) * 12;
+            const annualAW = Math.min(annualBonus, Math.max(0, annualCeiling - annualOW));
+            const annualTotalContr = (annualOW + annualAW) * contributionRate;
+            cpfBalance = (cpfBalance * 1.033) + annualTotalContr;
+        }
+
+        // 2. Stocks Projection
+        let stocksTotal = 0;
+        const stocksScenarioIds = settings.stocks?.activeScenarioIds || {};
+        (settings.stocks?.charts || []).forEach(chart => {
+            const sId = stocksScenarioIds[chart.id];
+            const s = chart.scenarios?.find(sc => sc.id === sId) || chart.scenarios?.[0];
+            if (!s) return;
+            const initialDeposit = Number(s.initialDeposit || 0);
+            const contributionAmount = Number(s.contributionAmount || 0);
+            const annualRate = Number(s.estimatedRate || 0) / 100;
+            const periodsPerYear = s.contributionFrequency === 'monthly' ? 12 : s.contributionFrequency === 'quarterly' ? 4 : 1;
+            const ratePerPeriod = annualRate / periodsPerYear;
+            const totalPeriods = projectedYear * periodsPerYear;
+            let val = initialDeposit;
+            for (let p = 1; p <= totalPeriods; p++) {
+                val = (val + contributionAmount) * (1 + ratePerPeriod);
+            }
+            stocksTotal += val;
+        });
+
+        // 3. Other Investments
+        const otherData = settings.otherInvestments || { items: [], groups: [] };
+        const sourceData = Array.isArray(otherData) ? { items: otherData, groups: [] } : otherData;
+        const allOtherItems = [...(sourceData.items || []), ...(sourceData.groups || []).flatMap(g => g.items || [])];
+        const otherInvTotal = allOtherItems.reduce((sum, item) => {
+            const currentVal = Number(item.value || 0);
+            const payment = Number(item.paymentAmount || 0);
+            const frequency = item.frequency || 'One-time';
+            if (frequency === 'One-time') return sum + currentVal;
+            let annualContribution = 0;
+            if (frequency === 'Monthly') annualContribution = payment * 12;
+            else if (frequency === 'Quarterly') annualContribution = payment * 4;
+            else if (frequency === 'Yearly') annualContribution = payment;
+            return sum + currentVal + (annualContribution * projectedYear);
+        }, 0);
+
+        return {
+            netWorth: Math.round(stocksTotal + savingsBalance + cpfBalance + otherInvTotal),
+            stocks: Math.round(stocksTotal)
+        };
+    }, [settings, projectedYear, estimatedNetWorth, currentAge]);
+
+    // Silently pre-fetch first portfolio data more aggressively for quick transition
     useEffect(() => {
         const firstPortfolioItems = portfolioList?.[0]?.portfolio || [];
         if (currentUser && firstPortfolioItems.length > 0) {
             const uniqueTickers = [...new Set(firstPortfolioItems.map(p => p.ticker))];
 
-            // Wait 5s (increased from 1s) after load to allow user to search comfortably first
             const timer = setTimeout(() => {
-                console.log("HeroPage: Starting background prefetch for first portfolio...");
-
                 uniqueTickers.forEach((ticker, index) => {
-                    // Stagger requests every 500ms (slower) to avoid clogging network
                     setTimeout(() => {
-                        fetchStockData(ticker).then(() => {
-                            console.log(`HeroPage: Prefetched ${ticker}`);
-                        }).catch(() => {
-                            // Ignore errors in prefetch
-                        });
-                    }, index * 500);
+                        fetchStockData(ticker).catch(() => { });
+                    }, index * 300);
                 });
-            }, 5000);
+            }, 3000);
 
             return () => clearTimeout(timer);
         }
@@ -175,6 +367,69 @@ const HeroPage = () => {
                             className={styles.searchBarOverride}
                         />
 
+                        {currentUser && (
+                            <div className={styles.overviewSection}>
+                                {/* Card 1: Current Overview */}
+                                <StyledCard
+                                    className={styles.heroOverviewCard}
+                                    containerStyle={{ width: '100%', maxWidth: '700px' }}
+                                >
+                                    <div className={styles.cardHeaderSmall}>
+                                        <span>CURRENT OVERVIEW</span>
+                                    </div>
+                                    <div className={styles.cardRow}>
+                                        <div className={styles.cardCol} onClick={() => navigate('/wealth')}>
+                                            <div className={styles.colLabel}>
+                                                <Wallet size={14} />
+                                                <span>EST. NET WORTH</span>
+                                            </div>
+                                            <div className={styles.colValue}>
+                                                {estimatedNetWorth !== null ? formatCurrency(estimatedNetWorth) : '---'}
+                                            </div>
+                                        </div>
+                                        <div className={styles.colDivider} />
+                                        <div className={styles.cardCol} onClick={() => navigate('/portfolio')}>
+                                            <div className={styles.colLabel}>
+                                                <TrendingUp size={14} />
+                                                <span>PORTFOLIO VALUE</span>
+                                            </div>
+                                            <div className={styles.colValue}>
+                                                {totalPortfolioValue > 0 ? formatCurrency(totalPortfolioValue) : '---'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </StyledCard>
+
+                                {/* Card 2: Projected Overview */}
+                                <StyledCard
+                                    className={styles.heroOverviewCard}
+                                    containerStyle={{ width: '100%', maxWidth: '700px' }}
+                                >
+                                    <div className={styles.cardHeaderSmall}>
+                                        <span>PROJECTED OVERVIEW AT AGE {targetAge} IN YEAR {targetYear}</span>
+                                    </div>
+                                    <div className={styles.cardRow}>
+                                        <div className={styles.cardCol} onClick={() => navigate('/wealth')}>
+                                            <div className={styles.colLabel}>
+                                                <span>PROJECTED NET WORTH</span>
+                                            </div>
+                                            <div className={styles.colValueProjected}>
+                                                {formatCurrency(projectedValues.netWorth)}
+                                            </div>
+                                        </div>
+                                        <div className={styles.colDivider} />
+                                        <div className={styles.cardCol} onClick={() => navigate('/wealth')}>
+                                            <div className={styles.colLabel}>
+                                                <span>PROJECTED STOCKS VALUE</span>
+                                            </div>
+                                            <div className={styles.colValueProjected}>
+                                                {formatCurrency(projectedValues.stocks)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </StyledCard>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

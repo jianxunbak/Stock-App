@@ -349,7 +349,7 @@ const WealthSummaryCard = ({
             </div>
             <div className={styles.headerValueGroup}>
                 <div className={styles.mainValue}>{formatCurrency(netWorth)}</div>
-                <div className={styles.valueLabel}>Projected Portfolio</div>
+                <div className={styles.valueLabel}>Projected Net Worth</div>
             </div>
         </div>
     );
