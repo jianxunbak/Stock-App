@@ -5,7 +5,7 @@
 }
 
 .container {
-    padding: 1.25rem;
+    /* padding: 1.25rem; */
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -46,6 +46,7 @@
     align-items: center;
     gap: 0.75rem;
     flex: 1;
+    min-width: 0;
 }
 
 .chartHeaderRight {
@@ -62,6 +63,7 @@
     font-weight: 700;
     outline: none;
     flex: 1;
+    min-width: 0;
     padding: 0.25rem 0;
     transition: all 0.2s ease;
 }
@@ -148,6 +150,14 @@
     /* Removed individual card border look */
 }
 
+.scenarioHeaderLeft {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+
 .scenarioColorDot {
     width: 10px;
     height: 10px;
@@ -166,6 +176,7 @@
     transition: all 0.2s ease;
     outline: none;
     flex: 1;
+    min-width: 0;
 }
 
 .scenarioNameInput:hover {
@@ -270,7 +281,7 @@
     }
 
     .container {
-        padding: 1rem;
+        /* padding: 1rem; */
         gap: 1rem;
     }
 }

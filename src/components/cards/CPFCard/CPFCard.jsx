@@ -493,6 +493,7 @@ const CPFCard = ({
                 title="CPF Calculator Settings"
                 width="500px"
                 height="auto"
+                headerAlign="start"
             >
                 <div className={styles.windowContainer}>
                     <div className={styles.settingsGrid}>

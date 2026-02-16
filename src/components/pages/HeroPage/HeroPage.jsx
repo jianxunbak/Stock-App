@@ -44,24 +44,8 @@ const HeroPage = () => {
         const trimmedTicker = val.trim().toUpperCase();
         if (!trimmedTicker) return;
 
-        setIsValidating(true); // Start loading
-
-        // Validate ticker before navigating
-        try {
-            console.log(`HeroPage: Search triggered for ${trimmedTicker}...`);
-            console.log(`HeroPage: Validating ticker ${trimmedTicker}... using fetchStockData`);
-            const data = await fetchStockData(trimmedTicker);
-            console.log(`HeroPage: Ticker ${trimmedTicker} validated successfully.`);
-
-            // If valid, navigate
-            navigate(`/analysis?ticker=${trimmedTicker}`);
-        } catch (error) {
-            console.error("HeroPage Error validating ticker:", error);
-            setIsValidating(false);
-            setFailedTicker(trimmedTicker);
-            setErrorMessage(error.message || 'Error validating ticker.');
-            setShowErrorModal(true);
-        }
+        // Navigate immediately - AnalysisPage will handle loading and validation
+        navigate(`/analysis?ticker=${trimmedTicker}`);
     };
 
     const handleLogin = async () => {

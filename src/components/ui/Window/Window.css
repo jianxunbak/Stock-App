@@ -103,8 +103,8 @@
     overflow-y: auto !important;
     color: var(--neu-text-secondary);
     min-height: 0;
-    /* padding: 0.5rem 1rem 1.5rem; */
-    /* Balanced bottom/side padding */
+    padding-bottom: 1.5rem;
+    /* Restored bottom padding for scroll list breathing room */
     scrollbar-gutter: stable;
 }
 

@@ -15,7 +15,8 @@ const Window = ({
     headerAlign = 'center',
     headerVerticalAlign = 'center',
     hideCloseButton = false,
-    contentClassName
+    contentClassName,
+    maxHeight = '85vh'
 }) => {
     useEffect(() => {
         if (isOpen) {
@@ -70,7 +71,7 @@ const Window = ({
                         style={{
                             width,
                             height,
-                            maxHeight: '85vh',
+                            maxHeight,
                             maxWidth: '95vw',
                             display: 'flex',
                             flexDirection: 'column',

@@ -1,5 +1,4 @@
 .container {
-    padding: 1.5rem;
     display: flex;
     flex-direction: column;
     gap: 2rem;
@@ -28,7 +27,7 @@
 
 .headerRow {
     display: grid;
-    grid-template-columns: 1fr 80px 80px 40px;
+    grid-template-columns: 1fr 100px 100px 40px;
     align-items: center;
     gap: 1rem;
     font-size: 0.8rem;
@@ -39,38 +38,54 @@
 
 .row {
     display: grid;
-    grid-template-columns: 1fr 80px 80px 40px;
+    grid-template-columns: 1fr 100px 100px 40px;
     align-items: center;
     gap: 1rem;
-    background: var(--bg-secondary);
-    padding: 0.5rem;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
+    padding: 0.75rem 0.5rem;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.row:last-child {
+    border-bottom: none;
+}
+
+.row:hover {
+    background: rgba(var(--neu-text-primary-rgb), 0.02);
 }
 
 .name {
     font-size: 0.95rem;
     color: var(--text-primary);
+    font-weight: 500;
 }
 
 .input {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 0.4rem;
+    background: var(--neu-bg);
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
     color: var(--text-primary);
     font-size: 0.9rem;
+    box-shadow: var(--neu-card-shadow-inset);
+    outline: none;
+    transition: all 0.2s ease;
     width: 100%;
+    text-align: center;
+}
+
+.addItemContainer .input {
+    text-align: left;
 }
 
 .input:focus {
-    outline: none;
-    border-color: var(--accent-color);
+    box-shadow: var(--neu-card-shadow-inset), 0 0 0 1px var(--neu-border-subtle);
 }
 
 .removeBtn {
     opacity: 0.5;
     transition: all 0.2s ease;
+    justify-self: end;
 }
 
 .removeBtn:hover {
@@ -82,19 +97,18 @@
 .addItemContainer {
     display: flex;
     gap: 1rem;
-    margin-top: 0.5rem;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
-    border: 1px dashed var(--border-color);
+    margin-top: 1rem;
+    padding: 1.25rem;
+    background: rgba(var(--neu-text-primary-rgb), 0.02);
+    border-radius: 12px;
+    border: 1px dashed var(--neu-border-subtle);
 }
 
 @media (max-width: 600px) {
-    .headerRow {
-        grid-template-columns: 1fr 60px 60px 30px;
-    }
 
+    .headerRow,
     .row {
-        grid-template-columns: 1fr 60px 60px 30px;
+        grid-template-columns: 1fr 70px 70px 35px;
+        gap: 0.5rem;
     }
 }

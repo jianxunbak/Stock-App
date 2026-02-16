@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useLayoutEffect } from 'react';
 import Window from '../Window/Window';
 import Button from '../Button/Button';
 import DropdownButton from '../DropdownButton/DropdownButton';
@@ -17,6 +17,21 @@ const SavingsEditorWindow = ({
     onUpdateExpenses
 }) => {
     const [newExpenseName, setNewExpenseName] = useState('');
+
+    // Auto-resize group title textareas
+    useLayoutEffect(() => {
+        if (isOpen) {
+            // Small timeout to ensure DOM is ready
+            const timer = setTimeout(() => {
+                const textareas = document.querySelectorAll(`.${styles.groupTitle}`);
+                textareas.forEach(ta => {
+                    ta.style.height = 'auto';
+                    ta.style.height = ta.scrollHeight + 'px';
+                });
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen, scenarios]);
 
     // Ensure expenses has the new structure: { items: [], groups: [], linked: [] }
     const normalizeExpenses = (expenses) => {
@@ -414,12 +429,18 @@ const SavingsEditorWindow = ({
                                         {expenses.groups.map(group => (
                                             <div key={group.id} className={styles.groupContainer}>
                                                 <div className={styles.groupHeader}>
-                                                    <input
+                                                    <textarea
                                                         className={styles.groupTitle}
                                                         value={group.name}
-                                                        onChange={(e) => handleUpdateGroup(scenario.id, group.id, 'name', e.target.value)}
+                                                        rows={1}
+                                                        onChange={(e) => {
+                                                            handleUpdateGroup(scenario.id, group.id, 'name', e.target.value);
+                                                            e.target.style.height = 'auto';
+                                                            e.target.style.height = e.target.scrollHeight + 'px';
+                                                        }}
+                                                        placeholder="Group Name"
                                                     />
-                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <div className={styles.groupControls}>
                                                         <Button variant="icon" size="sm" onClick={() => handleAddItem(scenario.id, group.id)}>
                                                             <Plus size={14} />
                                                         </Button>

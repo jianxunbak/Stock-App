@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { Settings, LogOut, User as UserIcon, X, Edit2, MoreVertical, Check, Camera, Cake, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
-import { Reorder } from 'framer-motion';
+import { Reorder, useDragControls } from 'framer-motion';
 import Window from '../Window/Window';
 import CustomDatePicker from '../CustomDatePicker/CustomDatePicker';
 import Button from '../Button/Button';
@@ -9,6 +9,34 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchUserSettings, saveUserSettings } from '../../../services/api';
 import styles from './UserProfileModal.module.css';
+
+// ReorderItem sub-component to handle explicit drag controls
+const ReorderItem = ({ value, label, isVisible, onToggle, onReorder }) => {
+    const dragControls = useDragControls();
+
+    return (
+        <Reorder.Item
+            value={value}
+            dragListener={false}
+            dragControls={dragControls}
+            className={styles.toggleRow}
+        >
+            <div
+                className={styles.dragHandle}
+                onPointerDown={(e) => dragControls.start(e)}
+                style={{ touchAction: 'none' }}
+            >
+                <GripVertical size={16} />
+            </div>
+            <div className={styles.cardLabelWrapper} onClick={onToggle}>
+                <span className={styles.cardLabel}>{label}</span>
+                <div className={`${styles.customToggle} ${isVisible ? styles.active : ''}`}>
+                    <div className={styles.toggleKnob} />
+                </div>
+            </div>
+        </Reorder.Item>
+    );
+};
 
 // Static configuration moved outside component to prevent re-creation on every render
 const portfolioCards = [
@@ -296,6 +324,7 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                     variant="icon"
                     icon={<MoreVertical size={20} />}
                     align="right"
+                    closeOnSelect={true}
                 />
             }
         >
@@ -448,23 +477,14 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                             >
                                 {(settings.cardOrder.portfolio || portfolioCards.map(c => c.key)).map((cardKey) => {
                                     const card = portfolioCards.find(c => c.key === cardKey) || { key: cardKey, label: cardKey };
-
                                     return (
-                                        <Reorder.Item
+                                        <ReorderItem
                                             key={card.key}
                                             value={card.key}
-                                            className={styles.toggleRow}
-                                        >
-                                            <div className={styles.dragHandle}>
-                                                <GripVertical size={16} />
-                                            </div>
-                                            <div className={styles.cardLabelWrapper} onClick={() => handleToggleVisibility('portfolio', card.key)}>
-                                                <span className={styles.cardLabel}>{card.label}</span>
-                                                <div className={`${styles.customToggle} ${settings.cardVisibility.portfolio[card.key] ? styles.active : ''}`}>
-                                                    <div className={styles.toggleKnob} />
-                                                </div>
-                                            </div>
-                                        </Reorder.Item>
+                                            label={card.label}
+                                            isVisible={settings.cardVisibility.portfolio[card.key]}
+                                            onToggle={() => handleToggleVisibility('portfolio', card.key)}
+                                        />
                                     );
                                 })}
                             </Reorder.Group>
@@ -480,23 +500,14 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                             >
                                 {(settings.cardOrder.analysis || analysisCards.map(c => c.key)).map((cardKey) => {
                                     const card = analysisCards.find(c => c.key === cardKey) || { key: cardKey, label: cardKey };
-
                                     return (
-                                        <Reorder.Item
+                                        <ReorderItem
                                             key={card.key}
                                             value={card.key}
-                                            className={styles.toggleRow}
-                                        >
-                                            <div className={styles.dragHandle}>
-                                                <GripVertical size={16} />
-                                            </div>
-                                            <div className={styles.cardLabelWrapper} onClick={() => handleToggleVisibility('analysis', card.key)}>
-                                                <span className={styles.cardLabel}>{card.label}</span>
-                                                <div className={`${styles.customToggle} ${settings.cardVisibility.analysis[card.key] ? styles.active : ''}`}>
-                                                    <div className={styles.toggleKnob} />
-                                                </div>
-                                            </div>
-                                        </Reorder.Item>
+                                            label={card.label}
+                                            isVisible={settings.cardVisibility.analysis[card.key]}
+                                            onToggle={() => handleToggleVisibility('analysis', card.key)}
+                                        />
                                     );
                                 })}
                             </Reorder.Group>
@@ -512,23 +523,14 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                             >
                                 {(settings.cardOrder.wealth || wealthCards.map(c => c.key)).map((cardKey) => {
                                     const card = wealthCards.find(c => c.key === cardKey) || { key: cardKey, label: cardKey };
-
                                     return (
-                                        <Reorder.Item
+                                        <ReorderItem
                                             key={card.key}
                                             value={card.key}
-                                            className={styles.toggleRow}
-                                        >
-                                            <div className={styles.dragHandle}>
-                                                <GripVertical size={16} />
-                                            </div>
-                                            <div className={styles.cardLabelWrapper} onClick={() => handleToggleVisibility('wealth', card.key)}>
-                                                <span className={styles.cardLabel}>{card.label}</span>
-                                                <div className={`${styles.customToggle} ${settings.cardVisibility.wealth[card.key] ? styles.active : ''}`}>
-                                                    <div className={styles.toggleKnob} />
-                                                </div>
-                                            </div>
-                                        </Reorder.Item>
+                                            label={card.label}
+                                            isVisible={settings.cardVisibility.wealth[card.key]}
+                                            onToggle={() => handleToggleVisibility('wealth', card.key)}
+                                        />
                                     );
                                 })}
                             </Reorder.Group>

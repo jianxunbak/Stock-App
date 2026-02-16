@@ -39,8 +39,6 @@
 .donutContainer {
     position: relative;
     border-radius: 16px;
-    /* padding: 1rem; */
-    /* Removed background and shadow */
 }
 
 .scenarioDropdown {
@@ -183,9 +181,7 @@
 }
 
 @media (max-width: 480px) {
-    .container {
-        padding: 0.5rem;
-    }
+
 
     .legendGrid {
         grid-template-columns: 1fr 1fr;

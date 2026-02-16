@@ -199,7 +199,7 @@ const Menu = ({
                             <div
                                 className={`menu-items-grid ${orientation}`}
                             >
-                                {React.Children.map(children, (child, index) => (
+                                {React.Children.toArray(children).filter(Boolean).map((child, index) => (
                                     <motion.div
                                         key={index}
                                         variants={{

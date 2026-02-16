@@ -97,7 +97,7 @@ const ScenarioEditorWindow = ({
                             {chart.scenarios.map((scenario) => (
                                 <div key={scenario.id} className={styles.scenarioCard}>
                                     <div className={styles.scenarioHeader}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <div className={styles.scenarioHeaderLeft}>
                                             <div
                                                 className={`${styles.customToggle} ${styles.small} ${scenario.visible ? styles.active : ''}`}
                                                 onClick={() => onToggleScenarioVisibility(chart.id, scenario.id)}

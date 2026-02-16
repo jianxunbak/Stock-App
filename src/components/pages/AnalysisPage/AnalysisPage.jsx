@@ -323,18 +323,8 @@ const AnalysisPage = () => {
 
         const upperTicker = tickerValue.toUpperCase();
 
-        try {
-            // Validate ticker first
-            await fetchStockData(upperTicker);
-            // Only update URL if validation success
-            setSearchParams({ ticker: upperTicker });
-        } catch (error) {
-            console.error("Search validation failed:", error);
-            // Show error modal but DO NOT update URL
-            // Ensure input reflects the failed ticker for context in error message
-            if (typeof val === 'string') setTicker(upperTicker);
-            setShowErrorModal(true);
-        }
+        // Update URL immediately - existing useEffect will handle loading & validation
+        setSearchParams({ ticker: upperTicker });
     };
 
     const handleLogout = async () => {

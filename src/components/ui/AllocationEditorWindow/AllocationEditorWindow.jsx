@@ -21,6 +21,7 @@ const AllocationEditorWindow = ({
             isOpen={isOpen}
             onClose={onClose}
             title="Manage Allocation Targets"
+            headerAlign="start"
             width="600px"
             height="85vh"
             maxHeight="90vh"
@@ -33,6 +34,7 @@ const AllocationEditorWindow = ({
                             <span>Category</span>
                             <span style={{ textAlign: 'center' }}>Min %</span>
                             <span style={{ textAlign: 'center' }}>Max %</span>
+                            <span />
                         </div>
                         {Object.entries(catTargets).map(([name, target]) => (
                             <div key={name} className={styles.row}>
@@ -49,6 +51,7 @@ const AllocationEditorWindow = ({
                                     value={target.max}
                                     onChange={(e) => onUpdateCatTarget(name, 'max', e.target.value === '' ? '' : Number(e.target.value))}
                                 />
+                                <span />
                             </div>
                         ))}
                     </div>
@@ -59,12 +62,14 @@ const AllocationEditorWindow = ({
                     <div className={styles.grid}>
                         <div className={styles.headerRow}>
                             <span>Sector</span>
+                            <span />
                             <span style={{ textAlign: 'center' }}>Max % Limit</span>
                             <span />
                         </div>
                         {Object.entries(sectorLimits).map(([name, limit]) => (
                             <div key={name} className={styles.row}>
                                 <span className={styles.name}>{name}</span>
+                                <span />
                                 <input
                                     type="number"
                                     className={styles.input}
@@ -98,8 +103,9 @@ const AllocationEditorWindow = ({
                                     setNewSectorName('');
                                 }
                             }}
+                            title="Add sector limit"
                         >
-                            <Plus size={16} /> Add
+                            <Plus size={16} />
                         </Button>
                     </div>
                 </section>
