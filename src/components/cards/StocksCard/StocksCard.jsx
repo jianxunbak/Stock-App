@@ -272,30 +272,6 @@ const StocksCard = ({
         });
     }, [charts, currentAge, projectionYears]);
 
-    const header = (
-        <div className="summary-info">
-            <div className="summary-name">Stocks</div>
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                rowGap: '0.25rem',
-                columnGap: '1rem',
-                width: '100%',
-                fontSize: '0.8rem',
-                alignItems: 'center'
-            }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Holdings</span>
-                <span style={{ color: 'var(--neu-text-primary)', fontWeight: 600, textAlign: 'right' }}>
-                    0
-                </span>
-                <span style={{ color: 'var(--text-secondary)' }}>Value</span>
-                <span style={{ color: 'var(--neu-success)', fontWeight: 600, textAlign: 'right' }}>
-                    $0.00
-                </span>
-            </div>
-        </div>
-    );
-
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
@@ -304,6 +280,56 @@ const StocksCard = ({
             maximumFractionDigits: 0
         }).format(value);
     };
+
+    const finalValues = useMemo(() => {
+        const values = [];
+        chartsData.forEach(({ chartData, visibleScenarios }) => {
+            if (chartData.length === 0) return;
+            const lastPoint = chartData[chartData.length - 1];
+            visibleScenarios.forEach(scenario => {
+                const finalVal = lastPoint ? lastPoint[`value_${scenario.id}`] : 0;
+                values.push({
+                    id: scenario.id,
+                    name: scenario.name,
+                    color: scenario.color,
+                    value: finalVal
+                });
+            });
+        });
+        return values;
+    }, [chartsData]);
+
+    const header = (
+        <div className="summary-info">
+            <div className="summary-name">Stocks</div>
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.25rem',
+                width: '100%',
+                fontSize: '0.8rem',
+            }}>
+                {finalValues.length > 0 ? (
+                    finalValues.map(item => (
+                        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: item.color }}></span>
+                                {item.name}
+                            </span>
+                            <span style={{ color: 'var(--neu-text-primary)', fontWeight: 600 }}>
+                                {formatCurrency(item.value)}
+                            </span>
+                        </div>
+                    ))
+                ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>No scenarios</span>
+                        <span style={{ color: 'var(--neu-text-primary)', fontWeight: 600 }}>-</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 
     return (
         <>

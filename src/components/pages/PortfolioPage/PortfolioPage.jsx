@@ -1511,7 +1511,7 @@ const PortfolioPage = () => {
                 </Window>
             )}
 
-            {portfolioLoading || isLoadingData ? <LoadingScreen fullScreen={true} message="Loading Data..." /> : null}
+            {portfolioLoading || isLoadingData ? <LoadingScreen fullScreen={true} message={`Loading... ${portfolioLoading ? '(Portfolio)' : ''} ${isLoadingData ? '(Market Data)' : ''}`} /> : null}
 
             {/* Search Error Window */}
             <Window

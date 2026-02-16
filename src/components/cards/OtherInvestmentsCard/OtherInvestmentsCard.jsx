@@ -338,32 +338,36 @@ const OtherInvestmentsCard = ({
         <div className="summary-info">
             <div className="summary-name">Other Investments</div>
             <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                rowGap: '0.25rem',
-                columnGap: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem',
                 width: '100%',
                 fontSize: '0.8rem',
-                alignItems: 'center'
+                marginTop: '0.25rem'
             }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Total Value</span>
-                <span style={{ color: 'var(--neu-success)', fontWeight: 600, textAlign: 'right' }}>
-                    {formatCurrency(totals.totalAssetValue)}
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Performance</span>
-                    <span style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        color: totals.totalGrowth >= 0 ? 'var(--neu-success)' : 'var(--neu-danger)',
-                        opacity: 0.8
-                    }}>
-                        ({totals.totalGrowth >= 0 ? '+' : ''}{totals.totalGrowth.toFixed(2)}%)
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Total Value</span>
+                    <span style={{ color: 'var(--neu-success)', fontWeight: 600 }}>
+                        {formatCurrency(totals.totalAssetValue)}
                     </span>
                 </div>
-                <span style={{ color: 'var(--neu-color-favorite)', fontWeight: 600, textAlign: 'right' }}>
-                    {formatCurrency(totals.totalMonthlyFlow)}/mo
-                </span>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Performance</span>
+                    <span style={{
+                        fontWeight: 700,
+                        color: totals.totalGrowth >= 0 ? 'var(--neu-success)' : 'var(--neu-danger)',
+                    }}>
+                        {totals.totalGrowth >= 0 ? '+' : ''}{totals.totalGrowth.toFixed(2)}%
+                    </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Monthly Contrib.</span>
+                    <span style={{ color: 'var(--neu-color-favorite)', fontWeight: 600 }}>
+                        {formatCurrency(totals.totalMonthlyFlow)}
+                    </span>
+                </div>
             </div>
         </div>
     );

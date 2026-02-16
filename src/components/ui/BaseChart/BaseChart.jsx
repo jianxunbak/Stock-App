@@ -141,6 +141,7 @@ const BaseChart = ({
                                     fillOpacity={isMain ? 1 : 0}
                                     fill={isMain ? `url(#gradient-${s.id})` : "none"}
                                     connectNulls={true}
+                                    isAnimationActive={false}
                                 />
                             );
                         })}

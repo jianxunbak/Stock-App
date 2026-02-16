@@ -53,7 +53,11 @@ export const useUserSettings = () => {
 
         try {
             // Fetch latest to avoid overwriting concurrent changes if any (though unlikely for single user)
+            // Fetch latest to avoid overwriting concurrent changes if any
             const latest = await fetchUserSettings(currentUser.uid);
+            // MERGE STRATEGY: 
+            // 1. Take 'latest' (DB) as base to get changes from other devices/components.
+            // 2. Overlay ONLY 'newSettings' (the requested delta) to ensure we don't overwrite unrelated fields with stale local state.
             const final = { ...latest, ...newSettings };
             await saveUserSettings(currentUser.uid, final);
 

@@ -158,14 +158,31 @@ const WealthPage = () => {
         const newStates = { ...openCards, [card]: !openCards[card] };
         setOpenCards(newStates);
 
-        // Save to DB
+        // Optimistically update local settings and broadcast
         if (currentUser?.uid) {
+            const updatedSettings = {
+                ...(userSettings || {}),
+                cardOpenStates: {
+                    ...(userSettings?.cardOpenStates || {}),
+                    wealth: newStates
+                }
+            };
+            setUserSettings(updatedSettings);
+
+            // Notify other components immediately to prevent stale state reverts
+            window.dispatchEvent(new CustomEvent('user-settings-updated', {
+                detail: { settings: updatedSettings }
+            }));
+
             try {
+                // Fetch latest to ensure we don't overwrite concurrent changes to other fields (e.g. CPF balances)
                 const currentSettings = await fetchUserSettings(currentUser.uid);
+
+                // Construct final object: Latest DB State + Our Explicit Toggle Change
                 const newSettings = {
                     ...currentSettings,
                     cardOpenStates: {
-                        ...currentSettings?.cardOpenStates,
+                        ...(currentSettings?.cardOpenStates || {}),
                         wealth: newStates
                     }
                 };

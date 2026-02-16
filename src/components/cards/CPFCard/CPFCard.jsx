@@ -272,21 +272,22 @@ const CPFCard = ({
         }
     };
 
-    const currentTotal = calculationResult.projection[0]?.total || 0;
-    const initialTotal = Number(balances.oa || 0) + Number(balances.sa || 0) + Number(balances.ma || 0) + Number(balances.ra || 0);
-    const firstYearGrowth = currentTotal - initialTotal;
+    const startBalance = Number(balances.oa || 0) + Number(balances.sa || 0) + Number(balances.ma || 0) + Number(balances.ra || 0);
+
+    const finalProjectedData = calculationResult.projection[calculationResult.projection.length - 1];
+    const finalProjectedTotal = finalProjectedData ? finalProjectedData.total : 0;
 
     const header = (
         <div className="summary-info">
             <div className="summary-name">CPF Calculator 2026</div>
-            <div className={styles.headerGrid}>
-                <div className={styles.headerItem}>
+            <div className={styles.headerGrid} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div className={styles.headerItem} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                     <span className={styles.headerLabel}>Current Total</span>
-                    <span className={styles.headerValueSuccess}>{formatCurrency(currentTotal)}</span>
+                    <span className={styles.headerValueSuccess}>{formatCurrency(startBalance)}</span>
                 </div>
-                <div className={styles.headerItem}>
-                    <span className={styles.headerLabel}>1yr Growth</span>
-                    <span className={styles.headerValueSecondary}>+{formatCurrency(firstYearGrowth)}</span>
+                <div className={styles.headerItem} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span className={styles.headerLabel}>Projected Total</span>
+                    <span className={styles.headerValueSecondary}>{formatCurrency(finalProjectedTotal)}</span>
                 </div>
             </div>
         </div>
@@ -413,9 +414,9 @@ const CPFCard = ({
                                             />
                                             <YAxis hide domain={['auto', 'auto']} />
                                             <Tooltip content={<CustomTooltip />} />
-                                            <Area name="OA" type="monotone" dataKey="oa" stackId="1" stroke="#3b82f6" fillOpacity={1} fill="url(#colorOAL)" />
-                                            <Area name={age < 55 ? "SA" : "RA"} type="monotone" dataKey="sa_ra" stackId="1" stroke="#f59e0b" fillOpacity={1} fill="url(#colorSAL)" />
-                                            <Area name="MA" type="monotone" dataKey="ma" stackId="1" stroke="#10b981" fillOpacity={1} fill="url(#colorMAL)" />
+                                            <Area name="OA" type="monotone" dataKey="oa" stackId="1" stroke="#3b82f6" fillOpacity={1} fill="url(#colorOAL)" isAnimationActive={false} />
+                                            <Area name={age < 55 ? "SA" : "RA"} type="monotone" dataKey="sa_ra" stackId="1" stroke="#f59e0b" fillOpacity={1} fill="url(#colorSAL)" isAnimationActive={false} />
+                                            <Area name="MA" type="monotone" dataKey="ma" stackId="1" stroke="#10b981" fillOpacity={1} fill="url(#colorMAL)" isAnimationActive={false} />
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -433,6 +434,7 @@ const CPFCard = ({
                                                     outerRadius={70}
                                                     paddingAngle={5}
                                                     dataKey="value"
+                                                    isAnimationActive={false}
                                                 >
                                                     {pieData.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -443,7 +445,7 @@ const CPFCard = ({
                                         </ResponsiveContainer>
                                         <div className={styles.chartOverlay}>
                                             <span className={styles.overlayLabel}>Balance</span>
-                                            <span className={styles.overlayValue}>{formatCurrency(currentTotal)}</span>
+                                            <span className={styles.overlayValue}>{formatCurrency(calculationResult.projection[0]?.total || 0)}</span>
                                         </div>
                                     </div>
 

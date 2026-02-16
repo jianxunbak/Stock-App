@@ -498,8 +498,7 @@ const SavingsCard = ({
                                             outerRadius={90}
                                             paddingAngle={5}
                                             dataKey="value"
-                                            animationBegin={0}
-                                            animationDuration={1000}
+                                            isAnimationActive={false}
                                         >
                                             {donutData.map((entry, index) => {
                                                 let color;
