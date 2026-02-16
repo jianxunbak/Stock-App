@@ -14,8 +14,10 @@ const StockHealthCard = ({
     variant = 'default',
     view = 'expanded',
     isOpen, // Ignore
+    loading = false,
     ...props
 }) => {
+
     const [isExpanded, setIsExpanded] = useState(false);
     const toggleExpand = () => setIsExpanded(!isExpanded);
 
@@ -72,7 +74,9 @@ const StockHealthCard = ({
             expanded={effectiveExpanded}
             className={`stock-health-wrapper ${className}`}
             variant={variant}
+            loading={loading}
             {...props}
+
         >
             {/* HEADER */}
             <div className="stock-health-header" onClick={variant === 'transparent' ? null : toggleExpand}>

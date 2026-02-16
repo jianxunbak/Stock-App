@@ -23,8 +23,10 @@ const StockHeader = ({
     currentRate = 1,
     showFavorite = true,
     hideChange = false,
+    loading = false,
     ...props
 }) => {
+
     // Robust parsing for price and change
     const numPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.-]+/g, "")) : price;
     const numChange = typeof change === 'string' ? parseFloat(change.replace(/[^0-9.-]+/g, "")) : change;
@@ -120,7 +122,9 @@ const StockHeader = ({
             headerAlign="start"
             headerVerticalAlign="flex-start"
             variant={variant}
+            loading={loading}
             {...props}
+
         />
     );
 };

@@ -14,12 +14,25 @@ const GrowthCard = ({
     variant = 'default',
     isETF = false,
     onHide = null,
+    loading: parentLoading = false,
     ...props
 }) => {
-    const { stockData, loading, loadStockData } = useStockData();
+    const { stockData, loading: stockLoading, loadStockData } = useStockData();
+    const isLoading = parentLoading || stockLoading;
 
-    if (loading && !stockData) return <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
-    if (!stockData) return null;
+    if (!stockData) {
+        return (
+            <ExpandableCard
+                title="Growth"
+                expanded={isOpen}
+                onToggle={onToggle}
+                onHide={onHide}
+                loading={isLoading}
+                className={className}
+            />
+        );
+    }
+
 
     const { growth } = stockData;
     const revenueGrowth = growth?.revenueGrowth;
@@ -69,7 +82,9 @@ const GrowthCard = ({
             onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
+            loading={isLoading}
             headerContent={summaryContent}
+
             className={className}
             menuItems={menuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}

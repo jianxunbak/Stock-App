@@ -474,70 +474,64 @@ const PriceChartCard = ({
     return (
         <StyledCard
             expanded={true}
-            className={`price-chart-card-container ${className} ${loading ? 'is-loading' : ''}`}
+            className={`price-chart-card-container ${className}`}
             title={headerTitle}
             headerAlign="start"
             variant={variant}
+            loading={loading && chartData.length === 0}
             {...props}
         >
-            {loading && chartData.length === 0 ? (
-                <div className="chart-loading-overlay">
-                    <div className="spinner"></div>
-                    <span>Loading chart data...</span>
-                </div>
-            ) : (
-                <>
-                    <BaseChart
-                        data={displayData}
-                        series={series}
-                        currency={currencySymbol}
-                        activeTimeRange={timeRange}
-                        onTimeRangeChange={setTimeRange}
-                        xAxisFormatter={xAxisFormatter}
-                        yAxisFormatter={yAxisFormatter}
-                        tooltipValueFormatter={tooltipValueFormatter}
-                        height={chartHeight}
-                        extraControls={
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                {allowSMA && (
-                                    <DropdownButton
-                                        icon={<Activity size={16} />}
-                                        buttonStyle={{ width: '36px', height: '36px', padding: 0 }}
-                                        items={['50', '100', '150', '200'].map(period => ({
-                                            label: `SMA ${period}`,
-                                            isActive: visibleSMAs[period],
-                                            onClick: () => setVisibleSMAs(prev => ({ ...prev, [period]: !prev[period] }))
-                                        }))}
-                                        closeOnSelect={false}
-                                        align="left"
-                                    />
-                                )}
+            <BaseChart
+                data={displayData}
 
-                                {!isPercentageData && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setMode(prev => prev === 'price' ? 'percent' : 'price')}
-                                        style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    >
-                                        {mode === 'price' ? <DollarSign size={16} /> : <Percent size={16} />}
-                                    </Button>
-                                )}
+                series={series}
+                currency={currencySymbol}
+                activeTimeRange={timeRange}
+                onTimeRangeChange={setTimeRange}
+                xAxisFormatter={xAxisFormatter}
+                yAxisFormatter={yAxisFormatter}
+                tooltipValueFormatter={tooltipValueFormatter}
+                height={chartHeight}
+                extraControls={
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {allowSMA && (
+                            <DropdownButton
+                                icon={<Activity size={16} />}
+                                buttonStyle={{ width: '36px', height: '36px', padding: 0 }}
+                                items={['50', '100', '150', '200'].map(period => ({
+                                    label: `SMA ${period}`,
+                                    isActive: visibleSMAs[period],
+                                    onClick: () => setVisibleSMAs(prev => ({ ...prev, [period]: !prev[period] }))
+                                }))}
+                                closeOnSelect={false}
+                                align="left"
+                            />
+                        )}
 
-                                {allowComparison && (
-                                    <SearchBar
-                                        placeholder="Compare ticker..."
-                                        onSearch={setSearchTerm}
-                                        onEnter={handleAddComparison}
-                                    />
-                                )}
-                            </div>
-                        }
-                    />
-                </>
-            )}
+                        {!isPercentageData && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setMode(prev => prev === 'price' ? 'percent' : 'price')}
+                                style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                {mode === 'price' ? <DollarSign size={16} /> : <Percent size={16} />}
+                            </Button>
+                        )}
+
+                        {allowComparison && (
+                            <SearchBar
+                                placeholder="Compare ticker..."
+                                onSearch={setSearchTerm}
+                                onEnter={handleAddComparison}
+                            />
+                        )}
+                    </div>
+                }
+            />
 
             {/* Legend / Tags (Below Chart) */}
             {series.length > 1 && (
+
                 <div className="chart-legend">
                     {series.map((s) => (
                         <div key={s.id} className="legend-tag" style={{ '--tag-color': s.color }}>
@@ -554,7 +548,8 @@ const PriceChartCard = ({
                         </div>
                     ))}
                 </div>
-            )}
+            )
+            }
             {/* Error Window */}
             <Window
                 isOpen={showErrorModal}

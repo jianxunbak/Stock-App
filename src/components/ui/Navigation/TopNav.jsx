@@ -17,7 +17,7 @@ export const TopNavLogo = ({
 }) => {
     const navigate = useNavigate();
     return (
-        <div className={styles.logoContainer} onClick={() => navigate('/')}>
+        <div className={styles.logoContainer} onClick={() => navigate('/')} style={{ pointerEvents: 'auto' }}>
             {customTitle ? (
                 <h1 className={styles.titleText} style={{ display: 'block' }}>{customTitle}</h1>
             ) : (

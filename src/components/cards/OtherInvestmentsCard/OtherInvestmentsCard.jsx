@@ -8,6 +8,7 @@ import CustomDatePicker from '../../ui/CustomDatePicker/CustomDatePicker';
 import BaseChart from '../../ui/BaseChart/BaseChart';
 import styles from './OtherInvestmentsCard.module.css';
 import { useUserSettings } from '../../../hooks/useUserSettings';
+import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const getAge = (dob) => {
     if (!dob) return null;
@@ -144,11 +145,12 @@ const OtherInvestmentsCard = ({
                 ...structuredData,
                 projectionYears
             };
-            if (JSON.stringify(settings?.otherInvestments) !== JSON.stringify(currentData)) {
+            const { updatedAt, ...prevInvWithoutTime } = settings?.otherInvestments || {};
+            if (JSON.stringify(prevInvWithoutTime) !== JSON.stringify(currentData)) {
                 updateSettings({
                     otherInvestments: {
-                        ...(settings?.otherInvestments || {}),
-                        ...currentData
+                        ...currentData,
+                        updatedAt: new Date().toISOString()
                     }
                 });
             }
@@ -337,6 +339,9 @@ const OtherInvestmentsCard = ({
     const header = (
         <div className="summary-info">
             <div className="summary-name">Other Investments</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
+                Last updated: {formatLastUpdated(settings?.otherInvestments?.updatedAt)}
+            </div>
             <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -481,14 +486,17 @@ const OtherInvestmentsCard = ({
     return (
         <ExpandableCard
             title="Other Investments"
+            subtitle={`Last updated: ${formatLastUpdated(settings?.otherInvestments?.updatedAt)}`}
             expanded={isOpen}
             onToggle={onToggle}
             onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={header}
+            loading={settingsLoading}
             className={className}
             menuItems={menuItems}
+
         >
             <div className={styles.container}>
                 <div className={styles.section}>

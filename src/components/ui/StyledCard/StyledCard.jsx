@@ -4,6 +4,7 @@ import { CardAnimator } from '../Animator';
 import Button from '../Button';
 import { X } from 'lucide-react';
 import Menu from '../Menu';
+import InlineSpinner from '../InlineSpinner/InlineSpinner';
 import { useResizeObserver } from '../../../hooks/useResizeObserver';
 import './StyledCard.css';
 
@@ -23,6 +24,7 @@ const StyledCard = React.memo(({
     noScale = false,
     containerStyle = {},
     distortionFactor = 1,
+    loading = false,
     isOpen, // Ignore
     onClose, // Ignore - we use it via props.onClose inside but don't want it on DOM
     ...props
@@ -99,7 +101,19 @@ const StyledCard = React.memo(({
                     </div>
                 </div>
             )}
-            {children}
+            {loading ? (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    height: '100%',
+                    width: '100%',
+                    minHeight: '100px',
+                    padding: '2rem'
+                }}>
+                    <InlineSpinner size="32px" />
+                </div>
+            ) : children}
         </div>
     );
 

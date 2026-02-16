@@ -22,6 +22,7 @@ import {
 } from 'recharts';
 import styles from './CPFCard.module.css';
 import { useUserSettings } from '../../../hooks/useUserSettings';
+import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const CPFCard = ({
     isOpen = true,
@@ -72,11 +73,12 @@ const CPFCard = ({
                 balances
             };
             // Only update if data changed to avoid infinite loop
-            if (JSON.stringify(settings?.cpf) !== JSON.stringify(currentData)) {
+            const { updatedAt: prevTime, ...prevCpfWithoutTime } = settings?.cpf || {};
+            if (JSON.stringify(prevCpfWithoutTime) !== JSON.stringify(currentData)) {
                 updateSettings({
                     cpf: {
-                        ...(settings?.cpf || {}),
-                        ...currentData
+                        ...currentData,
+                        updatedAt: new Date().toISOString()
                     }
                 });
             }
@@ -280,6 +282,9 @@ const CPFCard = ({
     const header = (
         <div className="summary-info">
             <div className="summary-name">CPF Calculator 2026</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
+                Last updated: {formatLastUpdated(settings?.cpf?.updatedAt)}
+            </div>
             <div className={styles.headerGrid} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <div className={styles.headerItem} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                     <span className={styles.headerLabel}>Current Total</span>
@@ -355,14 +360,17 @@ const CPFCard = ({
         <>
             <ExpandableCard
                 title="CPF"
+                subtitle={`Last updated: ${formatLastUpdated(settings?.cpf?.updatedAt)}`}
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}
+                loading={settingsLoading}
                 className={`${styles.card} ${className}`}
                 menuItems={menuItems}
+
             >
                 <div className={styles.container}>
                     <div className={styles.content}>

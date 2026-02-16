@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, MoreVertical, RefreshCcw, EyeOff } from 'lucide
 import StyledCard from '../StyledCard';
 import Button from '../Button/Button';
 import DropdownButton from '../DropdownButton/DropdownButton';
+import InlineSpinner from '../InlineSpinner/InlineSpinner';
 import './ExpandableCard.css';
 
 /**
@@ -23,12 +24,28 @@ const ExpandableCard = ({
     collapsedWidth = 210,
     collapsedHeight = 210,
     onToggle,
+    loading = false, // Add loading prop
     style,
     className = "",
     stackControls = false,
     isOpen, // Ignore
     ...props
 }) => {
+    // Determine the spinner to use
+    const renderLoading = () => (
+        <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100%',
+            width: '100%',
+            minHeight: '100px',
+            padding: '2rem'
+        }}>
+            <InlineSpinner size="32px" />
+        </div>
+    );
+
     // Internal state for uncontrolled mode
     const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
 
@@ -200,14 +217,14 @@ const ExpandableCard = ({
 
                     {/* Summary Content */}
                     <div className="collapsed-summary-wrapper">
-                        {finalHeaderContent ? (
+                        {loading ? renderLoading() : (finalHeaderContent ? (
                             finalHeaderContent
                         ) : (
                             <div className="default-header">
                                 <h3>{title}</h3>
                                 {subtitle && <p className="subtitle">{subtitle}</p>}
                             </div>
-                        )}
+                        ))}
                     </div>
                 </div>
 
@@ -236,6 +253,7 @@ const ExpandableCard = ({
                     <div className={`expandable-card-controls-group ${stackControls ? 'vertical-stack' : ''}`}>
                         <div className="expandable-card-title-container">
                             {title && <h3 className="expandable-card-expanded-title">{title}</h3>}
+                            {subtitle && <span className="expandable-card-subtitle">{subtitle}</span>}
                         </div>
                         <div className="expandable-card-body-actions">
                             {controls}
@@ -262,7 +280,7 @@ const ExpandableCard = ({
                     </div>
                 )}
                 <div className="expandable-card-components-group" style={{ paddingTop: 0 }}>
-                    {children}
+                    {loading ? renderLoading() : children}
                 </div>
             </motion.div>
         </StyledCard>

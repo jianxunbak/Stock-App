@@ -24,11 +24,13 @@ const StockOverviewCard = ({
     onRemoveComparison,
     onHide,
     collapsedWidth = 220,
-    collapsedHeight = 220
+    collapsedHeight = 220,
+    loading = false
 }) => {
-    if (!stockData) return null;
+    // If we have stockData, we use it. If we don't, we show loading.
+    const hasData = !!stockData;
+    const { overview, score, history } = stockData || {};
 
-    const { overview, score, history } = stockData;
 
     // Build menu items dynamically
     const menuItems = [
@@ -67,6 +69,19 @@ const StockOverviewCard = ({
         isFavorite
     };
 
+    if (!hasData) {
+        return (
+            <ExpandableCard
+                title="Stock Summary"
+                expanded={isOpen}
+                onToggle={onToggle}
+                onHide={onHide}
+                loading={loading || !hasData}
+                className={className}
+            />
+        );
+    }
+
     return (
         <ExpandableCard
             title="Stock Summary"
@@ -78,6 +93,7 @@ const StockOverviewCard = ({
             collapsedHeight={collapsedHeight}
             menuItems={menuItems}
             onRefresh={onRefresh}
+            loading={loading || !hasData}
             headerContent={
                 <div
                     className="stock-summary-container stacked"
@@ -89,24 +105,28 @@ const StockOverviewCard = ({
                             view="summary"
                         />
                     )}
-                    {score && (
-                        <StockHealthCard
-                            view="summary"
-                            score={score.max > 0 ? Math.round((score.total / score.max) * 100) : 0}
-                            type="Fundamentals"
-                        />
-                    )}
-                    {overview && (
-                        <PriceChartCard
-                            view="summary"
-                            ticker={overview.symbol}
-                            data={history?.slice(-20).map(d => ({ date: d.date, price: d.close }))}
-                            change={overview?.change || '+0.00'}
-                            currencySymbol={currencySymbol}
-                            currentRate={currentRate}
-                        />
-                    )}
-                </div>
+                    {
+                        score && (
+                            <StockHealthCard
+                                view="summary"
+                                score={score.max > 0 ? Math.round((score.total / score.max) * 100) : 0}
+                                type="Fundamentals"
+                            />
+                        )
+                    }
+                    {
+                        overview && (
+                            <PriceChartCard
+                                view="summary"
+                                ticker={overview.symbol}
+                                data={history?.slice(-20).map(d => ({ date: d.date, price: d.close }))}
+                                change={overview?.change || '+0.00'}
+                                currencySymbol={currencySymbol}
+                                currentRate={currentRate}
+                            />
+                        )
+                    }
+                </div >
             }
         >
             <div
@@ -166,7 +186,7 @@ const StockOverviewCard = ({
                     />
                 )}
             </div>
-        </ExpandableCard>
+        </ExpandableCard >
     );
 };
 

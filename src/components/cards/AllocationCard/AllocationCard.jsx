@@ -22,9 +22,19 @@ const AllocationCard = ({
     onHide,
     catTargets,
     sectorLimits,
-    onManageTargets
+    onManageTargets,
+    loading = false
 }) => {
-    if (!portfolioList || portfolioList.length === 0) return null;
+    if (!portfolioList || portfolioList.length === 0) {
+        return (
+            <ExpandableCard
+                title="Allocation"
+                loading={loading}
+                onHide={onHide}
+            />
+        );
+    }
+
 
     const getStatusColor = (name, pct, isSector = false) => {
         if (isSector) {
@@ -256,8 +266,10 @@ const AllocationCard = ({
             defaultExpanded={openCards.allocation}
             onToggle={() => toggleCard('allocation')}
             onHide={onHide}
+            loading={loading}
             menuItems={menuItems}
             headerContent={summaryCharts}
+
         >
             <div className={styles.allocationGrid}>
                 {portfolioLength === 0 ? (

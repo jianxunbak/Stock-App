@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
-import { Settings, LogOut, User as UserIcon, X, Edit2, MoreVertical, Check, Camera, Cake } from 'lucide-react';
+import { Settings, LogOut, User as UserIcon, X, Edit2, MoreVertical, Check, Camera, Cake, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { Reorder } from 'framer-motion';
 import Window from '../Window/Window';
 import CustomDatePicker from '../CustomDatePicker/CustomDatePicker';
 import Button from '../Button/Button';
@@ -32,8 +33,15 @@ const wealthCards = [
     { key: 'wealthSummary', label: 'Wealth Summary' },
     { key: 'stocks', label: 'Stocks' },
     { key: 'cpf', label: 'CPF' },
-    { key: 'savings', label: 'Savings' }
+    { key: 'savings', label: 'Savings' },
+    { key: 'otherInvestments', label: 'Other Investments' }
 ];
+
+const defaultOrder = {
+    portfolio: ['summary', 'allocation', 'ai', 'holdings'],
+    analysis: ['stockSummary', 'financialAnalysis', 'profitability', 'moat', 'debt', 'valuation', 'support', 'financials'],
+    wealth: ['wealthSummary', 'stocks', 'cpf', 'savings', 'otherInvestments']
+};
 
 const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
     const { theme, toggleTheme } = useTheme();
@@ -138,9 +146,11 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                 wealthSummary: true,
                 stocks: true,
                 cpf: true,
-                savings: true
+                savings: true,
+                otherInvestments: true
             }
-        }
+        },
+        cardOrder: defaultOrder
     });
 
     useEffect(() => {
@@ -153,6 +163,11 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                             portfolio: { ...prev.cardVisibility.portfolio, ...fetched.cardVisibility.portfolio },
                             analysis: { ...prev.cardVisibility.analysis, ...fetched.cardVisibility.analysis },
                             wealth: { ...prev.cardVisibility.wealth, ...fetched.cardVisibility.wealth }
+                        },
+                        cardOrder: {
+                            portfolio: fetched.cardOrder?.portfolio || prev.cardOrder.portfolio,
+                            analysis: fetched.cardOrder?.analysis || prev.cardOrder.analysis,
+                            wealth: fetched.cardOrder?.wealth || prev.cardOrder.wealth
                         }
                     }));
                 }
@@ -180,6 +195,36 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
     }, [isOpen, onClose]);
 
     const saveTimeoutRef = useRef(null);
+
+    const handleReorder = (page, newOrder) => {
+        const newSettings = {
+            ...settings,
+            cardOrder: {
+                ...settings.cardOrder,
+                [page]: newOrder
+            }
+        };
+
+        // Update local state (Optimistic)
+        setSettings(newSettings);
+
+        // Notify background pages immediately
+        window.dispatchEvent(new CustomEvent('user-settings-updated', {
+            detail: { settings: newSettings }
+        }));
+
+        // Debounced Save to Backend
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(async () => {
+            try {
+                if (user?.uid) {
+                    await saveUserSettings(user.uid, newSettings);
+                }
+            } catch (error) {
+                console.error("Failed to save settings:", error);
+            }
+        }, 800);
+    };
 
     const handleToggleVisibility = (page, cardKey) => {
         // 1. Calculate new settings locally
@@ -395,44 +440,98 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                     <div className={styles.settingsScroll}>
                         <div className={styles.settingsGroup}>
                             <h5>Portfolio Page</h5>
-                            <div className={styles.togglesGrid}>
-                                {portfolioCards.map(card => (
-                                    <div key={card.key} className={styles.toggleRow} onClick={() => handleToggleVisibility('portfolio', card.key)}>
-                                        <span className={styles.cardLabel}>{card.label}</span>
-                                        <div className={`${styles.customToggle} ${settings.cardVisibility.portfolio[card.key] ? styles.active : ''}`}>
-                                            <div className={styles.toggleKnob} />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <Reorder.Group
+                                axis="y"
+                                values={settings.cardOrder.portfolio || portfolioCards.map(c => c.key)}
+                                onReorder={(newOrder) => handleReorder('portfolio', newOrder)}
+                                className={styles.togglesGrid}
+                            >
+                                {(settings.cardOrder.portfolio || portfolioCards.map(c => c.key)).map((cardKey) => {
+                                    const card = portfolioCards.find(c => c.key === cardKey) || { key: cardKey, label: cardKey };
+
+                                    return (
+                                        <Reorder.Item
+                                            key={card.key}
+                                            value={card.key}
+                                            className={styles.toggleRow}
+                                        >
+                                            <div className={styles.dragHandle}>
+                                                <GripVertical size={16} />
+                                            </div>
+                                            <div className={styles.cardLabelWrapper} onClick={() => handleToggleVisibility('portfolio', card.key)}>
+                                                <span className={styles.cardLabel}>{card.label}</span>
+                                                <div className={`${styles.customToggle} ${settings.cardVisibility.portfolio[card.key] ? styles.active : ''}`}>
+                                                    <div className={styles.toggleKnob} />
+                                                </div>
+                                            </div>
+                                        </Reorder.Item>
+                                    );
+                                })}
+                            </Reorder.Group>
                         </div>
 
-                        <div className={styles.settingsGroup} style={{ marginTop: '1.5rem' }}>
+                        <div className={styles.settingsGroup}>
                             <h5>Analysis Page</h5>
-                            <div className={styles.togglesGrid}>
-                                {analysisCards.map(card => (
-                                    <div key={card.key} className={styles.toggleRow} onClick={() => handleToggleVisibility('analysis', card.key)}>
-                                        <span className={styles.cardLabel}>{card.label}</span>
-                                        <div className={`${styles.customToggle} ${settings.cardVisibility.analysis[card.key] ? styles.active : ''}`}>
-                                            <div className={styles.toggleKnob} />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <Reorder.Group
+                                axis="y"
+                                values={settings.cardOrder.analysis || analysisCards.map(c => c.key)}
+                                onReorder={(newOrder) => handleReorder('analysis', newOrder)}
+                                className={styles.togglesGrid}
+                            >
+                                {(settings.cardOrder.analysis || analysisCards.map(c => c.key)).map((cardKey) => {
+                                    const card = analysisCards.find(c => c.key === cardKey) || { key: cardKey, label: cardKey };
+
+                                    return (
+                                        <Reorder.Item
+                                            key={card.key}
+                                            value={card.key}
+                                            className={styles.toggleRow}
+                                        >
+                                            <div className={styles.dragHandle}>
+                                                <GripVertical size={16} />
+                                            </div>
+                                            <div className={styles.cardLabelWrapper} onClick={() => handleToggleVisibility('analysis', card.key)}>
+                                                <span className={styles.cardLabel}>{card.label}</span>
+                                                <div className={`${styles.customToggle} ${settings.cardVisibility.analysis[card.key] ? styles.active : ''}`}>
+                                                    <div className={styles.toggleKnob} />
+                                                </div>
+                                            </div>
+                                        </Reorder.Item>
+                                    );
+                                })}
+                            </Reorder.Group>
                         </div>
 
-                        <div className={styles.settingsGroup} style={{ marginTop: '1.5rem' }}>
+                        <div className={styles.settingsGroup}>
                             <h5>Wealth Page</h5>
-                            <div className={styles.togglesGrid}>
-                                {wealthCards.map(card => (
-                                    <div key={card.key} className={styles.toggleRow} onClick={() => handleToggleVisibility('wealth', card.key)}>
-                                        <span className={styles.cardLabel}>{card.label}</span>
-                                        <div className={`${styles.customToggle} ${settings.cardVisibility.wealth[card.key] ? styles.active : ''}`}>
-                                            <div className={styles.toggleKnob} />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <Reorder.Group
+                                axis="y"
+                                values={settings.cardOrder.wealth || wealthCards.map(c => c.key)}
+                                onReorder={(newOrder) => handleReorder('wealth', newOrder)}
+                                className={styles.togglesGrid}
+                            >
+                                {(settings.cardOrder.wealth || wealthCards.map(c => c.key)).map((cardKey) => {
+                                    const card = wealthCards.find(c => c.key === cardKey) || { key: cardKey, label: cardKey };
+
+                                    return (
+                                        <Reorder.Item
+                                            key={card.key}
+                                            value={card.key}
+                                            className={styles.toggleRow}
+                                        >
+                                            <div className={styles.dragHandle}>
+                                                <GripVertical size={16} />
+                                            </div>
+                                            <div className={styles.cardLabelWrapper} onClick={() => handleToggleVisibility('wealth', card.key)}>
+                                                <span className={styles.cardLabel}>{card.label}</span>
+                                                <div className={`${styles.customToggle} ${settings.cardVisibility.wealth[card.key] ? styles.active : ''}`}>
+                                                    <div className={styles.toggleKnob} />
+                                                </div>
+                                            </div>
+                                        </Reorder.Item>
+                                    );
+                                })}
+                            </Reorder.Group>
                         </div>
                     </div>
                 </div>

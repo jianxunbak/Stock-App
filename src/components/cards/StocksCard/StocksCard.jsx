@@ -5,6 +5,7 @@ import ScenarioEditorWindow from '../../ui/ScenarioEditorWindow/ScenarioEditorWi
 import { Settings } from 'lucide-react';
 import styles from './StocksCard.module.css';
 import { useUserSettings } from '../../../hooks/useUserSettings';
+import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const SCENARIO_COLORS = [
     'var(--neu-success)',      // Green
@@ -69,26 +70,20 @@ const StocksCard = ({
         if (settingsLoading) return;
 
         const timer = setTimeout(() => {
-            const currentStocks = {
+            const currentData = {
                 charts,
                 nextChartId,
                 nextScenarioId,
                 projectionYears
             };
 
-            const relevantSettings = {
-                charts: settings?.stocks?.charts,
-                nextChartId: settings?.stocks?.nextChartId,
-                nextScenarioId: settings?.stocks?.nextScenarioId,
-                projectionYears: settings?.stocks?.projectionYears
-            };
-
-            if (JSON.stringify(relevantSettings) !== JSON.stringify(currentStocks)) {
+            const { updatedAt, ...prevStocksWithoutTime } = settings?.stocks || {};
+            if (JSON.stringify(prevStocksWithoutTime) !== JSON.stringify(currentData)) {
                 // Merge with existing settings to preserve fields managed by other components (e.g. activeScenarioIds)
                 updateSettings({
                     stocks: {
-                        ...(settings?.stocks || {}),
-                        ...currentStocks
+                        ...currentData,
+                        updatedAt: new Date().toISOString()
                     }
                 });
             }
@@ -302,6 +297,9 @@ const StocksCard = ({
     const header = (
         <div className="summary-info">
             <div className="summary-name">Stocks</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
+                Last updated: {formatLastUpdated(settings?.stocks?.updatedAt)}
+            </div>
             <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -335,13 +333,16 @@ const StocksCard = ({
         <>
             <ExpandableCard
                 title="Stocks"
+                subtitle={`Last updated: ${formatLastUpdated(settings?.stocks?.updatedAt)}`}
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}
+                loading={settingsLoading}
                 className={className}
+
                 menuItems={[
                     {
                         label: 'Manage Scenarios',

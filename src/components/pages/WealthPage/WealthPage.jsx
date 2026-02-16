@@ -37,6 +37,7 @@ const WealthPage = () => {
         savings: true,
         otherInvestments: true
     });
+    const [cardOrder, setCardOrder] = useState(['wealthSummary', 'stocks', 'cpf', 'savings', 'otherInvestments']);
 
     // Card open/collapsed state
     const [openCards, setOpenCards] = useState({
@@ -123,6 +124,9 @@ const WealthPage = () => {
                     if (settings.cardVisibility?.wealth) {
                         setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.wealth }));
                     }
+                    if (settings.cardOrder?.wealth) {
+                        setCardOrder(settings.cardOrder.wealth);
+                    }
                     if (settings.cardOpenStates?.wealth) {
                         setOpenCards(prev => ({ ...prev, ...settings.cardOpenStates.wealth }));
                     }
@@ -137,6 +141,9 @@ const WealthPage = () => {
                 setUserSettings(settings);
                 if (settings?.cardVisibility?.wealth) {
                     setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.wealth }));
+                }
+                if (settings?.cardOrder?.wealth) {
+                    setCardOrder(settings.cardOrder.wealth);
                 }
                 if (settings?.cardOpenStates?.wealth) {
                     setOpenCards(prev => ({ ...prev, ...settings.cardOpenStates.wealth }));
@@ -218,10 +225,11 @@ const WealthPage = () => {
         navigate(`/analysis?ticker=${t}`);
     };
 
+    const isMobile = window.innerWidth < 768;
     const actionGroupContent = (
         <TopNavActions
             showSearch={true}
-            alwaysOpenSearch={true}
+            alwaysOpenSearch={!isMobile}
             searchTicker={ticker}
             setSearchTicker={setTicker}
             handleSearch={handleSearch}
@@ -245,7 +253,7 @@ const WealthPage = () => {
     return (
         <div className={styles.container}>
             <div className={styles.wrapper} style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '20px', left: '0px', zIndex: 60 }}>
+                <div style={{ position: 'absolute', top: '20px', left: '0px', zIndex: 80, pointerEvents: 'none' }}>
                     <TopNavLogo />
                 </div>
 
@@ -256,62 +264,76 @@ const WealthPage = () => {
                 />
 
                 <div className={styles.grid}>
-                    {/* Wealth Summary Card */}
-                    {cardVisibility.wealthSummary && (
-                        <div className={`${styles.colSpan3} ${openCards.wealthSummary ? styles.expandedWrapper : ''}`}>
-                            <WealthSummaryCard
-                                isOpen={openCards.wealthSummary}
-                                onToggle={(isOpen) => toggleCard('wealthSummary')}
-                                onHide={() => handleHideRequest('wealthSummary')}
-                            />
-                        </div>
-                    )}
+                    {cardOrder.map(cardKey => {
+                        const isSpan3 = cardKey === 'wealthSummary';
+                        const colSpanClass = isSpan3 ? styles.colSpan3 : styles.colSpan1;
+                        const isOpen = openCards[cardKey];
+                        const wrapperClass = `${colSpanClass} ${isOpen ? styles.expandedWrapper : ''}`;
 
-                    {/* Stocks Card */}
-                    {cardVisibility.stocks && (
-                        <div className={`${styles.colSpan1} ${openCards.stocks ? styles.expandedWrapper : ''}`}>
-                            <StocksCard
-                                isOpen={openCards.stocks}
-                                onToggle={(isOpen) => toggleCard('stocks')}
-                                onHide={() => handleHideRequest('stocks')}
-                                dateOfBirth={userSettings?.dateOfBirth}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'wealthSummary' && cardVisibility.wealthSummary) {
+                            return (
+                                <div key="wealthSummary" className={wrapperClass}>
+                                    <WealthSummaryCard
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('wealthSummary')}
+                                        onHide={() => handleHideRequest('wealthSummary')}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {/* CPF Card */}
-                    {cardVisibility.cpf && (
-                        <div className={`${styles.colSpan1} ${openCards.cpf ? styles.expandedWrapper : ''}`}>
-                            <CPFCard
-                                isOpen={openCards.cpf}
-                                onToggle={(isOpen) => toggleCard('cpf')}
-                                onHide={() => handleHideRequest('cpf')}
-                                dateOfBirth={userSettings?.dateOfBirth}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'stocks' && cardVisibility.stocks) {
+                            return (
+                                <div key="stocks" className={wrapperClass}>
+                                    <StocksCard
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('stocks')}
+                                        onHide={() => handleHideRequest('stocks')}
+                                        dateOfBirth={userSettings?.dateOfBirth}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {/* Savings Card */}
-                    {cardVisibility.savings && (
-                        <div className={`${styles.colSpan1} ${openCards.savings ? styles.expandedWrapper : ''}`}>
-                            <SavingsCard
-                                isOpen={openCards.savings}
-                                onToggle={(isOpen) => toggleCard('savings')}
-                                onHide={() => handleHideRequest('savings')}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'cpf' && cardVisibility.cpf) {
+                            return (
+                                <div key="cpf" className={wrapperClass}>
+                                    <CPFCard
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('cpf')}
+                                        onHide={() => handleHideRequest('cpf')}
+                                        dateOfBirth={userSettings?.dateOfBirth}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {/* Other Investments Card */}
-                    {cardVisibility.otherInvestments && (
-                        <div className={`${styles.colSpan1} ${openCards.otherInvestments ? styles.expandedWrapper : ''}`}>
-                            <OtherInvestmentsCard
-                                isOpen={openCards.otherInvestments}
-                                onToggle={(isOpen) => toggleCard('otherInvestments')}
-                                onHide={() => handleHideRequest('otherInvestments')}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'savings' && cardVisibility.savings) {
+                            return (
+                                <div key="savings" className={wrapperClass}>
+                                    <SavingsCard
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('savings')}
+                                        onHide={() => handleHideRequest('savings')}
+                                    />
+                                </div>
+                            );
+                        }
+
+                        if (cardKey === 'otherInvestments' && cardVisibility.otherInvestments) {
+                            return (
+                                <div key="otherInvestments" className={wrapperClass}>
+                                    <OtherInvestmentsCard
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('otherInvestments')}
+                                        onHide={() => handleHideRequest('otherInvestments')}
+                                    />
+                                </div>
+                            );
+                        }
+
+                        return null;
+                    })}
                 </div>
 
                 {showWatchlist && (

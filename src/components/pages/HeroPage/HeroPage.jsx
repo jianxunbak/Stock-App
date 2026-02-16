@@ -96,17 +96,24 @@ const HeroPage = () => {
 
     // --- Background Prefetching & Overview Data Strategy ---
     const { portfolioList } = usePortfolio();
-    const { settings } = useUserSettings();
+    const { settings, loading: settingsLoading } = useUserSettings();
     const [liveData, setLiveData] = useState({});
+    const [pricesLoading, setPricesLoading] = useState(false);
 
     // Fetch live prices for all portfolio items to calculate total value
     useEffect(() => {
-        if (!currentUser || !portfolioList?.length) return;
+        if (!currentUser || !portfolioList?.length) {
+            setPricesLoading(false);
+            return;
+        }
 
         const allTickers = [...new Set(portfolioList.flatMap(p => (p.portfolio || []).map(item => item.ticker?.toUpperCase())))].filter(Boolean);
+        const missingTickers = allTickers.filter(t => !liveData[t]);
 
-        allTickers.forEach((ticker, index) => {
-            if (!liveData[ticker]) {
+        if (missingTickers.length > 0) {
+            setPricesLoading(true);
+            let completedCount = 0;
+            missingTickers.forEach((ticker, index) => {
                 // Staggered fetch to avoid hitting rate limits too fast on hero page
                 setTimeout(() => {
                     fetchStockData(ticker).then(data => {
@@ -114,10 +121,19 @@ const HeroPage = () => {
                             ...prev,
                             [ticker]: { price: data.overview?.price || 0 }
                         }));
-                    }).catch(() => { });
+                    }).catch(() => { })
+                        .finally(() => {
+                            completedCount++;
+                            if (completedCount === missingTickers.length) {
+                                setPricesLoading(false);
+                            }
+                        });
                 }, index * 200);
-            }
-        });
+            });
+        } else if (allTickers.length > 0) {
+            // All already in liveData
+            setPricesLoading(false);
+        }
     }, [currentUser, portfolioList]);
 
     const totalPortfolioValue = useMemo(() => {
@@ -384,7 +400,11 @@ const HeroPage = () => {
                                                 <span>EST. NET WORTH</span>
                                             </div>
                                             <div className={styles.colValue}>
-                                                {estimatedNetWorth !== null ? formatCurrency(estimatedNetWorth) : '---'}
+                                                {settingsLoading ? (
+                                                    <div className={styles.spinnerWrapper}><div className={styles.smallSpinner} /></div>
+                                                ) : (
+                                                    estimatedNetWorth !== null ? formatCurrency(estimatedNetWorth) : '---'
+                                                )}
                                             </div>
                                         </div>
                                         <div className={styles.colDivider} />
@@ -394,7 +414,11 @@ const HeroPage = () => {
                                                 <span>PORTFOLIO VALUE</span>
                                             </div>
                                             <div className={styles.colValue}>
-                                                {totalPortfolioValue > 0 ? formatCurrency(totalPortfolioValue) : '---'}
+                                                {pricesLoading ? (
+                                                    <div className={styles.spinnerWrapper}><div className={styles.smallSpinner} /></div>
+                                                ) : (
+                                                    totalPortfolioValue > 0 ? formatCurrency(totalPortfolioValue) : '---'
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -414,7 +438,11 @@ const HeroPage = () => {
                                                 <span>PROJECTED NET WORTH</span>
                                             </div>
                                             <div className={styles.colValueProjected}>
-                                                {formatCurrency(projectedValues.netWorth)}
+                                                {settingsLoading || pricesLoading ? (
+                                                    <div className={styles.spinnerWrapper}><div className={styles.smallSpinner} /></div>
+                                                ) : (
+                                                    formatCurrency(projectedValues.netWorth)
+                                                )}
                                             </div>
                                         </div>
                                         <div className={styles.colDivider} />
@@ -423,7 +451,11 @@ const HeroPage = () => {
                                                 <span>PROJECTED STOCKS VALUE</span>
                                             </div>
                                             <div className={styles.colValueProjected}>
-                                                {formatCurrency(projectedValues.stocks)}
+                                                {settingsLoading || pricesLoading ? (
+                                                    <div className={styles.spinnerWrapper}><div className={styles.smallSpinner} /></div>
+                                                ) : (
+                                                    formatCurrency(projectedValues.stocks)
+                                                )}
                                             </div>
                                         </div>
                                     </div>

@@ -72,9 +72,10 @@
 }
 
 .expandable-card-subtitle {
-    font-size: 0.875rem;
-    color: var(--neu-text-secondary);
-    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--neu-text-tertiary);
+    margin-top: 0.15rem;
+    display: block;
 }
 
 /* Force zero padding on the inner content area of StyledCard */

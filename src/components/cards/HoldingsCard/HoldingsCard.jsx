@@ -32,8 +32,10 @@ const HoldingsCard = ({
     dayChange = 0,
     dayChangePercent = 0,
     isTestPortfolio = false,
-    onHide
+    onHide,
+    loading = false
 }) => {
+
     const navigate = useNavigate();
     const [expandedTickers, setExpandedTickers] = useState({});
 
@@ -174,7 +176,13 @@ const HoldingsCard = ({
         }
     };
 
-    if (!portfolioList || portfolioList.length === 0) return null;
+    if (!portfolioList || portfolioList.length === 0) {
+        if (loading) {
+            // ExpandableCard handles loading
+        } else {
+            return null;
+        }
+    }
 
     // Automatically hide cost basis columns for test portfolios
     const effectiveHiddenColumns = isTestPortfolio
@@ -319,9 +327,11 @@ const HoldingsCard = ({
                 defaultExpanded={openCards.holdings}
                 onToggle={() => toggleCard('holdings')}
                 onHide={onHide}
+                loading={loading}
                 headerContent={header}
                 className={styles.card}
                 menuItems={menuItems}
+
             >
                 <div className={styles.tableScroll}>
                     <table className={styles.table}>

@@ -2,7 +2,9 @@ import React from 'react';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
 import Button from '../../ui/Button';
 import { Trash2, Sparkles, Edit } from 'lucide-react';
+import InlineSpinner from '../../ui/InlineSpinner/InlineSpinner';
 import styles from './AiInsightsCard.module.css';
+
 
 const AiInsightsCard = ({
     portfolioList,
@@ -14,8 +16,10 @@ const AiInsightsCard = ({
     setShowClearAnalysisModal, // Pass the setter or handler
     notes = '',
     onSaveNotes,
-    onHide
+    onHide,
+    loading = false
 }) => {
+
     const [userNote, setUserNote] = React.useState(notes);
     const timeoutRef = React.useRef(null);
 
@@ -46,7 +50,16 @@ const AiInsightsCard = ({
         if (onSaveNotes) onSaveNotes(userNote);
     };
 
-    if (!portfolioList || portfolioList.length === 0) return null;
+    if (!portfolioList || portfolioList.length === 0) {
+        return (
+            <ExpandableCard
+                title="AI Insights"
+                loading={loading}
+                onHide={onHide}
+            />
+        );
+    }
+
 
     const menuItems = [
         {
@@ -100,14 +113,16 @@ const AiInsightsCard = ({
             defaultExpanded={openCards.ai}
             onToggle={() => toggleCard('ai')}
             onHide={onHide}
+            loading={loading}
             menuItems={menuItems}
             headerContent={summary}
+
         >
             <div className={styles.insightCard}>
                 <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {analyzing ? (
                         <div className={styles.evaluatingText}>
-                            <div className={styles.spinner}></div>
+                            <InlineSpinner size="16px" color="var(--text-secondary)" />
                             <span>AI Analyzing Portfolio...</span>
                         </div>
                     ) : (

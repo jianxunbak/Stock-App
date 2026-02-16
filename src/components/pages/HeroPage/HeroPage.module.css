@@ -1,5 +1,5 @@
 .container {
-    height: 100vh;
+    min-height: 100vh;
     max-width: 100%;
     background-color: var(--bg-primary);
     display: flex;
@@ -7,9 +7,9 @@
     justify-content: center;
     align-items: center;
     position: relative;
-    position: relative;
-    overflow: hidden;
-    /* padding: 20px */
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
 }
 
 .headerWrapper {
@@ -423,6 +423,34 @@
 }
 
 @media (max-width: 768px) {
+    .container {
+        justify-content: flex-start;
+        padding-top: 5rem;
+        padding-bottom: 2rem;
+    }
+
+    .content {
+        padding: 1rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .title {
+        font-size: 2.5rem;
+    }
+
+    .subtitle,
+    .subtitleInstruction {
+        font-size: 1rem;
+    }
+
+    .overviewSection {
+        margin-top: 2rem;
+        padding: 0 0.5rem;
+        box-sizing: border-box;
+    }
+
     .cardRow {
         flex-direction: column;
         align-items: flex-start;
@@ -436,5 +464,32 @@
     .colValue,
     .colValueProjected {
         font-size: 1.75rem;
+    }
+}
+
+.spinnerWrapper {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    height: 2.25rem;
+}
+
+.smallSpinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top-color: #60a5fa;
+    animation: hero-spin 1s linear infinite;
+}
+
+[data-theme="light"] .smallSpinner {
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-top-color: #3b82f6;
+}
+
+@keyframes hero-spin {
+    to {
+        transform: rotate(360deg);
     }
 }

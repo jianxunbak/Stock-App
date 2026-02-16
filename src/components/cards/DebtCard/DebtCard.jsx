@@ -14,12 +14,25 @@ const DebtCard = ({
     onToggle = null,
     onHide = null,
     className = "",
-    variant = 'default'
+    variant = 'default',
+    loading: parentLoading = false
 }) => {
-    const { stockData, loading, loadStockData } = useStockData();
+    const { stockData, loading: stockLoading, loadStockData } = useStockData();
+    const isLoading = parentLoading || stockLoading;
 
-    if (loading && !stockData) return <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
-    if (!stockData) return null;
+    if (!stockData) {
+        return (
+            <ExpandableCard
+                title="Conservative Debt"
+                expanded={isOpen}
+                onToggle={onToggle}
+                onHide={onHide}
+                loading={isLoading}
+                className={className}
+            />
+        );
+    }
+
 
     const { debt } = stockData;
     if (!debt) return null;
@@ -58,7 +71,9 @@ const DebtCard = ({
             onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
+            loading={isLoading}
             headerContent={header}
+
             className={className}
             menuItems={menuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}

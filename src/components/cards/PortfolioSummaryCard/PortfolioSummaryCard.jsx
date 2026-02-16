@@ -41,9 +41,18 @@ const PortfolioSummaryCard = ({
     renameValue,
     setRenameValue,
     onRenameSubmit,
-    onHide
+    onHide,
+    loading = false
 }) => {
-    if (!portfolioList || portfolioList.length === 0) return null;
+    if (!portfolioList || portfolioList.length === 0) {
+        return (
+            <ExpandableCard
+                title="Portfolio"
+                loading={loading}
+            />
+        );
+    }
+
 
     const currentPortfolioName = portfolioList.find(p => p.id === currentPortfolioId)?.name || 'Portfolio';
 
@@ -55,6 +64,8 @@ const PortfolioSummaryCard = ({
             defaultExpanded={openCards.summary} // Fallback
             onToggle={(state) => toggleCard('summary')}
             onHide={onHide}
+            loading={loading}
+
             menuItems={[
                 { label: 'Select Portfolio', onClick: onSelectPortfolio, indicatorNode: <Briefcase size={14} /> },
                 { label: 'New Portfolio', onClick: onNewPortfolio, indicatorNode: <Plus size={14} /> },

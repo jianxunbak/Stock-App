@@ -26,12 +26,11 @@ import { useNavigate } from 'react-router-dom';
 import UserProfileModal from '../../ui/Modals/UserProfileModal';
 import CascadingHeader from '../../ui/CascadingHeader/CascadingHeader';
 import { TopNavLogo, TopNavActions } from '../../ui/Navigation/TopNav';
-import FluidCard from '../../cards/FluidCard/FluidCard';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
 import StockOverviewCard from '../../cards/StockOverviewCard/StockOverviewCard';
 import Button from '../../ui/Button';
 import StockInfoModal from '../../ui/Modals/StockInfoModal';
-import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
+import InlineSpinner from '../../ui/InlineSpinner/InlineSpinner';
 
 import styles from './AnalysisPage.module.css';
 
@@ -130,6 +129,7 @@ const AnalysisPage = () => {
         support: true,
         financials: true
     });
+    const [cardOrder, setCardOrder] = useState(['stockSummary', 'financialAnalysis', 'profitability', 'moat', 'debt', 'valuation', 'support', 'financials']);
 
     const [hideModalState, setHideModalState] = useState({
         isOpen: false,
@@ -204,6 +204,9 @@ const AnalysisPage = () => {
                     if (settings.cardVisibility?.analysis) {
                         setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
                     }
+                    if (settings.cardOrder?.analysis) {
+                        setCardOrder(settings.cardOrder.analysis);
+                    }
                 });
             });
             return;
@@ -221,6 +224,9 @@ const AnalysisPage = () => {
                 }
                 if (settings?.cardVisibility?.analysis) {
                     setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
+                }
+                if (settings?.cardOrder?.analysis) {
+                    setCardOrder(settings.cardOrder.analysis);
                 }
                 if (settings?.analysisComparisons) setAnalysisComparisons(settings.analysisComparisons);
             });
@@ -397,7 +403,11 @@ const AnalysisPage = () => {
         };
     }, [stockData?.score, moatStatusLabel, isMoatEvaluating]);
 
-    if (authLoading) return <div>Loading...</div>; // Or a spinner
+    if (authLoading) return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw', background: 'var(--neu-bg)' }}>
+            <InlineSpinner size="40px" />
+        </div>
+    );
 
     const actionGroupContent = (
         <TopNavActions
@@ -424,7 +434,7 @@ const AnalysisPage = () => {
     return (
         <div className={styles.container}>
             <div className={styles.wrapper} style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '20px', left: '0px', zIndex: 60 }}>
+                <div style={{ position: 'absolute', top: '20px', left: '0px', zIndex: 80, pointerEvents: 'none' }}>
                     <TopNavLogo />
                 </div>
 
@@ -450,120 +460,150 @@ const AnalysisPage = () => {
                 </Window>
 
                 <div className={styles.grid}>
-                    {/* Unified Analysis Card (Expandable) */}
-                    {cardVisibility.stockSummary && (
-                        <div className={`${styles.colSpan3} ${!openCards.stockSummary ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <StockOverviewCard
-                                stockData={{ ...stockData, score: modifiedScore }}
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                                isOpen={openCards.stockSummary}
-                                onToggle={(isOpen) => setOpenCards(prev => ({ ...prev, stockSummary: isOpen }))}
-                                onAddToWatchlist={handleAddToWatchlist}
-                                onAddToPortfolio={() => setShowAddPortfolioModal(true)}
-                                onViewDetails={() => setShowStockInfo(true)}
-                                isFavorite={watchlist.some(item => item.ticker === stockData?.overview?.symbol)}
-                                onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
-                                onHide={() => handleHideRequest('stockSummary')}
-                                comparisonTickers={analysisComparisons}
-                                onAddComparison={handleAddAnalysisComparison}
-                                onRemoveComparison={handleRemoveAnalysisComparison}
-                            />
-                        </div>
-                    )}
+                    {cardOrder.map(cardKey => {
+                        const isSpan1 = ['debt', 'valuation', 'support'].includes(cardKey);
+                        const colSpanClass = isSpan1 ? styles.colSpan1 : styles.colSpan3;
+                        const isOpen = !!openCards[cardKey];
+                        const wrapperClass = `${colSpanClass} ${!isOpen ? styles.collapsedWrapper : styles.expandedWrapper}`;
 
+                        if (cardKey === 'stockSummary' && cardVisibility.stockSummary) {
+                            return (
+                                <div key="stockSummary" className={wrapperClass}>
+                                    <StockOverviewCard
+                                        stockData={{ ...stockData, score: modifiedScore }}
+                                        currencySymbol={currencySymbol}
+                                        currentRate={currentRate}
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('stockSummary')}
+                                        onAddToWatchlist={handleAddToWatchlist}
+                                        onAddToPortfolio={() => setShowAddPortfolioModal(true)}
+                                        onViewDetails={() => setShowStockInfo(true)}
+                                        isFavorite={watchlist.some(item => item.ticker === stockData?.overview?.symbol)}
+                                        onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
+                                        onHide={() => handleHideRequest('stockSummary')}
+                                        comparisonTickers={analysisComparisons}
+                                        onAddComparison={handleAddAnalysisComparison}
+                                        onRemoveComparison={handleRemoveAnalysisComparison}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
 
+                        if (cardKey === 'financialAnalysis' && cardVisibility.financialAnalysis) {
+                            return (
+                                <div key="financialAnalysis" className={wrapperClass}>
+                                    <GrowthCard
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('financialAnalysis')}
+                                        onHide={() => handleHideRequest('financialAnalysis')}
+                                        isETF={stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF'}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
 
+                        if (cardKey === 'profitability' && cardVisibility.profitability) {
+                            return (
+                                <div key="profitability" className={wrapperClass}>
+                                    <ProfitabilityCard
+                                        currency={currency}
+                                        currencySymbol={currencySymbol}
+                                        currentRate={currentRate}
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('profitability')}
+                                        onHide={() => handleHideRequest('profitability')}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {/* ... (existing imports, ensure FinancialSummary is imported) */}
+                        if (cardKey === 'moat' && cardVisibility.moat) {
+                            return (
+                                <div key="moat" className={wrapperClass}>
+                                    <MoatCard
+                                        key={stockData?.overview?.symbol || 'moat-card'}
+                                        onMoatStatusChange={setMoatStatusLabel}
+                                        onIsEvaluatingChange={setIsMoatEvaluating}
+                                        currency={currency}
+                                        currencySymbol={currencySymbol}
+                                        currentRate={currentRate}
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('moat')}
+                                        onHide={() => handleHideRequest('moat')}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {cardVisibility.financialAnalysis && (
-                        <div className={`${styles.colSpan3} ${!openCards.financialAnalysis ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <GrowthCard
-                                isOpen={openCards.financialAnalysis}
-                                onToggle={(isOpen) => setOpenCards(prev => ({ ...prev, financialAnalysis: isOpen }))}
-                                onHide={() => handleHideRequest('financialAnalysis')}
-                                isETF={stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF'}
-                            />
-                        </div>
-                    )}
-                    {cardVisibility.profitability && (
-                        <div className={`${styles.colSpan3} ${!openCards.profitability ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <ProfitabilityCard
-                                currency={currency}
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                                isOpen={openCards.profitability}
-                                onToggle={(isOpen) => toggleCard('profitability')}
-                                onHide={() => handleHideRequest('profitability')}
-                            />
-                        </div>
-                    )}
-                    {cardVisibility.moat && (
-                        <div className={`${styles.colSpan3} ${!openCards.moat ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <MoatCard
-                                key={stockData?.overview?.symbol || 'moat-card'}
-                                onMoatStatusChange={setMoatStatusLabel}
-                                onIsEvaluatingChange={setIsMoatEvaluating}
-                                currency={currency}
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                                isOpen={openCards.moat}
-                                onToggle={(isOpen) => toggleCard('moat')}
-                                onHide={() => handleHideRequest('moat')}
-                            />
-                        </div>
-                    )}
-                    {cardVisibility.debt && (
-                        <div className={`${styles.colSpan1} ${!openCards.debt ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <DebtCard
-                                currency={currency}
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                                isOpen={openCards.debt}
-                                onToggle={(isOpen) => toggleCard('debt')}
-                                onHide={() => handleHideRequest('debt')}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'debt' && cardVisibility.debt) {
+                            return (
+                                <div key="debt" className={wrapperClass}>
+                                    <DebtCard
+                                        currency={currency}
+                                        currencySymbol={currencySymbol}
+                                        currentRate={currentRate}
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('debt')}
+                                        onHide={() => handleHideRequest('debt')}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {cardVisibility.valuation && (
-                        <div className={`${styles.colSpan1} ${!openCards.valuation ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <ValuationCard
-                                currency={currency}
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                                isOpen={openCards.valuation}
-                                onToggle={(isOpen) => toggleCard('valuation')}
-                                onHide={() => handleHideRequest('valuation')}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'valuation' && cardVisibility.valuation) {
+                            return (
+                                <div key="valuation" className={wrapperClass}>
+                                    <ValuationCard
+                                        currency={currency}
+                                        currencySymbol={currencySymbol}
+                                        currentRate={currentRate}
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('valuation')}
+                                        onHide={() => handleHideRequest('valuation')}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {cardVisibility.support && (
-                        <div className={`${styles.colSpan1} ${!openCards.support ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <SupportResistanceCard
-                                currency={currency}
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                                isOpen={openCards.support}
-                                onToggle={(isOpen) => toggleCard('support')}
-                                onHide={() => handleHideRequest('support')}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'support' && cardVisibility.support) {
+                            return (
+                                <div key="support" className={wrapperClass}>
+                                    <SupportResistanceCard
+                                        currency={currency}
+                                        currencySymbol={currencySymbol}
+                                        currentRate={currentRate}
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('support')}
+                                        onHide={() => handleHideRequest('support')}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
 
-                    {cardVisibility.financials && (
-                        <div className={`${styles.colSpan3} ${!openCards.financials ? styles.collapsedWrapper : styles.expandedWrapper}`}>
-                            <FinancialTables
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                                isOpen={openCards.financials}
-                                onToggle={(isOpen) => toggleCard('financials')}
-                                onHide={() => handleHideRequest('financials')}
-                            />
-                        </div>
-                    )}
+                        if (cardKey === 'financials' && cardVisibility.financials) {
+                            return (
+                                <div key="financials" className={wrapperClass}>
+                                    <FinancialTables
+                                        currencySymbol={currencySymbol}
+                                        currentRate={currentRate}
+                                        isOpen={isOpen}
+                                        onToggle={() => toggleCard('financials')}
+                                        onHide={() => handleHideRequest('financials')}
+                                        loading={loading || initialLoading}
+                                    />
+                                </div>
+                            );
+                        }
+
+                        return null;
+                    })}
                 </div>
 
                 {
@@ -617,7 +657,6 @@ const AnalysisPage = () => {
                     cardLabel={hideModalState.cardLabel}
                 />
             </div >
-            {(loading || initialLoading) && <LoadingScreen fullScreen={true} message="Loading Data..." />}
         </div >
     );
 };

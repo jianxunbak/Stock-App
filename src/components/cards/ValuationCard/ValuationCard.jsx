@@ -17,10 +17,13 @@ const ValuationCard = ({
     onHide = null,
     className = "",
     variant = 'default',
+    loading: parentLoading = false,
     ...props
 }) => {
-    const { stockData, loading, loadStockData } = useStockData();
+    const { stockData, loading: stockLoading, loadStockData } = useStockData();
+    const isLoading = parentLoading || stockLoading;
     const [selectedMethodName, setSelectedMethodName] = useState(null);
+
 
     // Sync selected method when stockData changes
     useEffect(() => {
@@ -61,8 +64,18 @@ const ValuationCard = ({
         }
     }, [valuation]);
 
-    if (loading && !stockData) return <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
-    if (!stockData) return null;
+    if (!stockData) {
+        return (
+            <ExpandableCard
+                title="Intrinsic Value"
+                expanded={isOpen}
+                onToggle={onToggle}
+                onHide={onHide}
+                loading={isLoading}
+                className={className}
+            />
+        );
+    }
     if (!valuation && !isETF) return null;
 
     // Updated color logic based on percentage difference
@@ -151,6 +164,7 @@ const ValuationCard = ({
             onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
+            loading={isLoading}
             headerContent={header}
             className={className}
             menuItems={valMenuItems}

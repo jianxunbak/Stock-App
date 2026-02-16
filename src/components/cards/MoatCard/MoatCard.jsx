@@ -25,10 +25,13 @@ const MoatCard = ({
     onToggle = null,
     onHide = null,
     className = "",
-    variant = 'default'
+    variant = 'default',
+    loading: parentLoading = false
 }) => {
-    const { stockData, loading } = useStockData();
+    const { stockData, loading: stockLoading } = useStockData();
+    const isLoading = parentLoading || stockLoading;
     const { theme } = useTheme();
+
     const { currentUser } = useAuth();
 
     // Lazy load charts
@@ -51,7 +54,7 @@ const MoatCard = ({
         }
 
         return () => observer.disconnect();
-    }, [loading, stockData]);
+    }, [isLoading, stockData]);
 
     const [scores, setScores] = useState({
         brand: 0,
@@ -221,8 +224,18 @@ const MoatCard = ({
         }
     }, [moatStatus, isActuallyEvaluated, onMoatStatusChange]);
 
-    if (loading && !stockData) return <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
-    if (!stockData) return null;
+    if (!stockData) {
+        return (
+            <ExpandableCard
+                title="Economic Moat"
+                expanded={isOpen}
+                onToggle={onToggle}
+                onHide={onHide}
+                loading={isLoading}
+                className={className}
+            />
+        );
+    }
 
     const isETF = stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF';
 
@@ -301,6 +314,7 @@ const MoatCard = ({
             onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
+            loading={isLoading}
             headerContent={header}
             className={className}
             menuItems={menuItems}

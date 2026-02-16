@@ -5,6 +5,7 @@ import { Calendar, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
 import styles from './WealthSummaryCard.module.css';
 import { useUserSettings } from '../../../hooks/useUserSettings';
 import BaseChart from '../../ui/BaseChart/BaseChart';
+import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const WealthSummaryCard = ({
     isOpen = true,
@@ -57,6 +58,18 @@ const WealthSummaryCard = ({
         setStocksScenarioIds(newIds);
         updateSettings({ stocks: { ...settings.stocks, activeScenarioIds: newIds } });
     };
+
+    const overallLastUpdated = useMemo(() => {
+        const dates = [
+            settings?.stocks?.updatedAt,
+            settings?.savings?.updatedAt,
+            settings?.cpf?.updatedAt,
+            settings?.otherInvestments?.updatedAt
+        ].filter(Boolean).map(d => new Date(d));
+
+        if (dates.length === 0) return null;
+        return new Date(Math.max(...dates)).toISOString();
+    }, [settings]);
 
     const formatCurrency = (val) => {
         return new Intl.NumberFormat('en-US', {
@@ -344,6 +357,9 @@ const WealthSummaryCard = ({
     const header = (
         <div className="summary-info">
             <div className="summary-name">Estimated Net Worth</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
+                Last updated: {formatLastUpdated(overallLastUpdated)}
+            </div>
             <div className={styles.headerMeta}>
                 {targetYear} {targetAge !== null && `• Age ${targetAge}`}
             </div>
@@ -357,13 +373,16 @@ const WealthSummaryCard = ({
     return (
         <ExpandableCard
             title="Estimated Net Worth"
+            subtitle={`Last updated: ${formatLastUpdated(overallLastUpdated)}`}
             expanded={isOpen}
             onToggle={onToggle}
             onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={header}
+            loading={settingsLoading}
             className={className}
+
         >
             <div className={styles.container}>
                 {/* Net Worth Growth Chart */}

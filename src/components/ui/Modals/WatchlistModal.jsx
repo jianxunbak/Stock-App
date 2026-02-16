@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, RefreshCw, AlertTriangle, Eye, Check, GripVertical, ChevronUp, ChevronDown, MoreVertical, Maximize, X, Plus } from 'lucide-react';
+import InlineSpinner from '../InlineSpinner/InlineSpinner';
 import DropdownButton from '../DropdownButton/DropdownButton';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,6 +27,7 @@ const WATCHLIST_COLUMNS = [
 const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$', currentRate = 1 }) => {
     const { watchlist, removeFromWatchlist, updateWatchlistItem, setFullWatchlist } = useWatchlist();
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [loadingTickers, setLoadingTickers] = useState(new Set());
     const [tickerToDelete, setTickerToDelete] = useState(null);
     const [hiddenColumns, setHiddenColumns] = useState([]);
     const [showColumnModal, setShowColumnModal] = useState(false);
@@ -156,9 +158,11 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
     const refreshWatchlist = async (currentList) => {
         if (!currentList || currentList.length === 0) return;
         setIsRefreshing(true);
+        setLoadingTickers(new Set(currentList.map(item => item.ticker)));
 
         try {
-            const updatedList = await Promise.all(currentList.map(async (item) => {
+            const updatedItemsMap = new Map();
+            await Promise.all(currentList.map(async (item) => {
                 try {
                     const data = await fetchStockData(item.ticker);
                     const name = data.overview?.name || item.name;
@@ -176,7 +180,7 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                         else signal = "Hold";
                     }
 
-                    return {
+                    updatedItemsMap.set(item.ticker, {
                         ...item,
                         name: name,
                         price: currentPrice,
@@ -186,16 +190,26 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                         signal: signal,
                         notes: item.notes || '',
                         lastUpdated: new Date().toISOString()
-                    };
+                    });
                 } catch (e) {
-                    return item;
+                    updatedItemsMap.set(item.ticker, item);
+                } finally {
+                    setLoadingTickers(prev => {
+                        const next = new Set(prev);
+                        next.delete(item.ticker);
+                        return next;
+                    });
                 }
             }));
+
+            // Preserve current list order but update with new data
+            const updatedList = currentList.map(item => updatedItemsMap.get(item.ticker) || item);
             setFullWatchlist(updatedList);
         } catch (error) {
             console.error("Error refreshing watchlist:", error);
         } finally {
             setIsRefreshing(false);
+            setLoadingTickers(new Set());
         }
     };
 
@@ -512,7 +526,13 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                                                 onClick={() => handleNavigate(item.ticker)}
                                             >
                                                 <div className="watchlist-instrument-cell">
-                                                    <div className="watchlist-icon-placeholder" />
+                                                    {loadingTickers.has(item.ticker) ? (
+                                                        <div style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.75rem' }}>
+                                                            <InlineSpinner size="16px" color="var(--neu-brand)" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="watchlist-icon-placeholder" />
+                                                    )}
                                                     <div className="watchlist-instrument-info">
                                                         <div className="watchlist-ticker" style={{ textAlign: 'left' }}>{item.ticker}</div>
                                                         <div className="watchlist-company" style={{ fontSize: '0.8rem', color: 'var(--neu-text-secondary)', whiteSpace: 'normal', textAlign: 'left' }}>{item.name || item.ticker}</div>

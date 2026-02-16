@@ -7,6 +7,7 @@ import { Settings, TrendingUp, PieChart as PieChartIcon, ChevronDown, Layers } f
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import styles from './SavingsCard.module.css';
 import { useUserSettings } from '../../../hooks/useUserSettings';
+import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const SCENARIO_COLORS = [
     'var(--neu-success)',      // Green
@@ -89,19 +90,19 @@ const SavingsCard = ({
         if (settingsLoading) return;
 
         const timer = setTimeout(() => {
-            // Only update if different from what's in settings to avoid loops
-            const currentSavings = {
+            const currentData = {
                 scenarios,
                 nextScenarioId,
                 activeScenarioId,
                 projectionYears
             };
 
-            if (JSON.stringify(settings?.savings) !== JSON.stringify(currentSavings)) {
+            const { updatedAt, ...prevSavingsWithoutTime } = settings?.savings || {};
+            if (JSON.stringify(prevSavingsWithoutTime) !== JSON.stringify(currentData)) {
                 updateSettings({
                     savings: {
-                        ...(settings?.savings || {}),
-                        ...currentSavings
+                        ...currentData,
+                        updatedAt: new Date().toISOString()
                     }
                 });
             }
@@ -263,6 +264,9 @@ const SavingsCard = ({
     const header = (
         <div className="summary-info" style={{ padding: 0 }}>
             <div className="summary-name">Savings</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
+                Last updated: {formatLastUpdated(settings?.savings?.updatedAt)}
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '0.5rem' }}>
                 <div style={{ position: 'relative', width: '100px', height: '100px', flexShrink: 0 }}>
@@ -397,13 +401,16 @@ const SavingsCard = ({
         <>
             <ExpandableCard
                 title="Savings and Expenses"
+                subtitle={`Last updated: ${formatLastUpdated(settings?.savings?.updatedAt)}`}
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}
+                loading={settingsLoading}
                 className={className}
+
                 controls={
                     scenarios.length > 1 && (
                         <DropdownButton

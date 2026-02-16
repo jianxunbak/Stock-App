@@ -16,9 +16,11 @@ const ProfitabilityCard = ({
     onToggle = null,
     onHide = null,
     className = "",
-    variant = 'default'
+    variant = 'default',
+    loading: parentLoading = false
 }) => {
-    const { stockData, loading, loadStockData } = useStockData();
+    const { stockData, loading: stockLoading, loadStockData } = useStockData();
+    const isLoading = parentLoading || stockLoading;
     const { theme } = useTheme();
 
     // Lazy load charts
@@ -41,10 +43,21 @@ const ProfitabilityCard = ({
         }
 
         return () => observer.disconnect();
-    }, [loading, stockData]);
+    }, [isLoading, stockData]);
 
-    if (loading && !stockData) return <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
-    if (!stockData) return null;
+    if (!stockData) {
+        return (
+            <ExpandableCard
+                title="Profitability"
+                expanded={isOpen}
+                onToggle={onToggle}
+                onHide={onHide}
+                loading={isLoading}
+                className={className}
+            />
+        );
+    }
+
 
     const { profitability, growth } = stockData;
     if (!profitability || !growth) return null;
@@ -188,7 +201,9 @@ const ProfitabilityCard = ({
             onHide={onHide}
             collapsedWidth={220}
             collapsedHeight={220}
+            loading={isLoading}
             headerContent={header}
+
             className={className}
             menuItems={menuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}

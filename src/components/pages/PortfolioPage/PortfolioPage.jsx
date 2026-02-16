@@ -18,8 +18,8 @@ import WatchlistModal from '../../ui/Modals/WatchlistModal';
 import UserProfileModal from '../../ui/Modals/UserProfileModal';
 import LogoutConfirmationModal from '../../ui/Modals/LogoutConfirmationModal';
 import Button from '../../ui/Button';
-import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
 import HideConfirmationModal from '../../ui/Modals/HideConfirmationModal';
+
 
 // Refactored Components
 import PortfolioSummaryCard from '../../cards/PortfolioSummaryCard/PortfolioSummaryCard';
@@ -78,6 +78,7 @@ const PortfolioPage = () => {
         ai: true,
         holdings: true
     });
+    const [cardOrder, setCardOrder] = useState(['summary', 'allocation', 'ai', 'holdings']);
 
     const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
     const [catTargets, setCatTargets] = useState(DEFAULT_CAT_TARGETS);
@@ -117,6 +118,9 @@ const PortfolioPage = () => {
                     if (settings.cardVisibility?.portfolio) {
                         setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.portfolio }));
                     }
+                    if (settings.cardOrder?.portfolio) {
+                        setCardOrder(settings.cardOrder.portfolio);
+                    }
                 });
             });
             return;
@@ -131,6 +135,9 @@ const PortfolioPage = () => {
                 }
                 if (settings?.cardVisibility?.portfolio) {
                     setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.portfolio }));
+                }
+                if (settings?.cardOrder?.portfolio) {
+                    setCardOrder(settings.cardOrder.portfolio);
                 }
             });
         }
@@ -931,7 +938,7 @@ const PortfolioPage = () => {
         <div className={styles.container}>
             {/* Logo Wrapper aligned with grid */}
             <div style={{ maxWidth: '80rem', margin: '0 auto', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '2rem', left: '0', zIndex: 60 }}>
+                <div style={{ position: 'absolute', top: '2rem', left: '0', zIndex: 80, pointerEvents: 'none' }}>
                     {logoContainerContent}
                 </div>
             </div>
@@ -943,104 +950,124 @@ const PortfolioPage = () => {
             />
 
             <div className={styles.pageGrid}>
-                {cardVisibility.summary && (
-                    <PortfolioSummaryCard
-                        portfolioList={portfolioList}
-                        currentPortfolioId={currentPortfolioId}
-                        currencySymbol={currency === 'USD' ? '$' : 'S$'}
-                        totalValue={totalValue}
-                        totalPerformance={totalPerformance}
-                        totalCost={totalCost}
-                        healthScore={healthScore}
-                        twrData={twrData}
-                        healthCriteria={healthCriteria}
-                        isCriticalRisk={isCriticalRisk}
-                        mergedChartData={mergedChartData}
-                        comparisonStocks={comparisonStocks}
-                        weightedBeta={weightedBeta}
-                        weightedGrowth={weightedGrowth}
-                        hhi={hhi}
-                        weightedPeg={weightedPeg}
-                        weightedLiquidity={weightedLiquidity}
-                        theme={theme}
-                        openCards={openCards}
-                        toggleCard={toggleCard}
-                        onAddComparison={handleAddComparison}
-                        onRemoveComparison={handleRemoveComparison}
-                        onNewPortfolio={() => { setIsCreating(true); setNewPortfolioName(''); setNewPortfolioType(portfolioType); }}
-                        onRenamePortfolio={handleRenameStart}
-                        onDeletePortfolio={() => setShowDeleteModal(true)}
-                        onSelectPortfolio={() => setShowSelectPortfolioModal(true)}
-                        onShowDetails={() => setShowPortfolioDetails(true)}
-                        isMounted={true}
-                        isTestPortfolio={isTestPortfolio}
-                        // Inline Rename Props
-                        isRenaming={isRenaming}
-                        setIsRenaming={setIsRenaming}
-                        renameValue={renameValue}
-                        setRenameValue={setRenameValue}
-                        onRenameSubmit={handleRenameSubmit}
-                        onHide={() => handleHideRequest('summary')}
-                    />
-                )}
+                {cardOrder.map(cardKey => {
+                    if (cardKey === 'summary' && cardVisibility.summary) {
+                        return (
+                            <PortfolioSummaryCard
+                                key="summary"
+                                portfolioList={portfolioList}
+                                currentPortfolioId={currentPortfolioId}
+                                currencySymbol={currency === 'USD' ? '$' : 'S$'}
+                                totalValue={totalValue}
+                                totalPerformance={totalPerformance}
+                                totalCost={totalCost}
+                                healthScore={healthScore}
+                                twrData={twrData}
+                                healthCriteria={healthCriteria}
+                                isCriticalRisk={isCriticalRisk}
+                                mergedChartData={mergedChartData}
+                                comparisonStocks={comparisonStocks}
+                                weightedBeta={weightedBeta}
+                                weightedGrowth={weightedGrowth}
+                                hhi={hhi}
+                                weightedPeg={weightedPeg}
+                                weightedLiquidity={weightedLiquidity}
+                                theme={theme}
+                                openCards={openCards}
+                                toggleCard={toggleCard}
+                                onAddComparison={handleAddComparison}
+                                onRemoveComparison={handleRemoveComparison}
+                                onNewPortfolio={() => { setIsCreating(true); setNewPortfolioName(''); setNewPortfolioType(portfolioType); }}
+                                onRenamePortfolio={handleRenameStart}
+                                onDeletePortfolio={() => setShowDeleteModal(true)}
+                                onSelectPortfolio={() => setShowSelectPortfolioModal(true)}
+                                onShowDetails={() => setShowPortfolioDetails(true)}
+                                isMounted={true}
+                                isTestPortfolio={isTestPortfolio}
+                                // Inline Rename Props
+                                isRenaming={isRenaming}
+                                setIsRenaming={setIsRenaming}
+                                renameValue={renameValue}
+                                setRenameValue={setRenameValue}
+                                onRenameSubmit={handleRenameSubmit}
+                                onHide={() => handleHideRequest('summary')}
+                                loading={portfolioLoading || isLoadingData}
+                            />
+                        );
+                    }
 
-                {cardVisibility.allocation && (
-                    <AllocationCard
-                        portfolioList={portfolioList}
-                        portfolioLength={portfolio.length}
-                        openCards={openCards}
-                        toggleCard={toggleCard}
-                        categoryData={categoryData}
-                        sectorData={sectorData}
-                        totalValue={totalValue}
-                        currencySymbol={currency === 'USD' ? '$' : 'S$'}
-                        isMounted={true}
-                        onRefresh={() => window.location.reload()} // Simplified for now
-                        onHide={() => handleHideRequest('allocation')}
-                        catTargets={catTargets}
-                        sectorLimits={sectorLimits}
-                        onManageTargets={() => setShowAllocationEditor(true)}
-                    />
-                )}
+                    if (cardKey === 'allocation' && cardVisibility.allocation) {
+                        return (
+                            <AllocationCard
+                                key="allocation"
+                                portfolioList={portfolioList}
+                                portfolioLength={portfolio.length}
+                                openCards={openCards}
+                                toggleCard={toggleCard}
+                                categoryData={categoryData}
+                                sectorData={sectorData}
+                                totalValue={totalValue}
+                                currencySymbol={currency === 'USD' ? '$' : 'S$'}
+                                isMounted={true}
+                                onRefresh={() => window.location.reload()} // Simplified for now
+                                onHide={() => handleHideRequest('allocation')}
+                                loading={portfolioLoading || isLoadingData}
+                                catTargets={catTargets}
+                                sectorLimits={sectorLimits}
+                                onManageTargets={() => setShowAllocationEditor(true)}
+                            />
+                        );
+                    }
 
-                {cardVisibility.ai && (
-                    <AiInsightsCard
-                        portfolioList={portfolioList}
-                        analysis={analysis}
-                        analyzing={analyzing}
-                        openCards={openCards}
-                        toggleCard={toggleCard}
-                        handleAnalyzePortfolio={handleAnalyzePortfolio}
-                        setShowClearAnalysisModal={setShowClearAnalysisModal}
-                        notes={notes}
-                        onSaveNotes={saveNotes}
-                        onHide={() => handleHideRequest('ai')}
-                    />
-                )}
+                    if (cardKey === 'ai' && cardVisibility.ai) {
+                        return (
+                            <AiInsightsCard
+                                key="ai"
+                                portfolioList={portfolioList}
+                                analysis={analysis}
+                                analyzing={analyzing}
+                                openCards={openCards}
+                                toggleCard={toggleCard}
+                                handleAnalyzePortfolio={handleAnalyzePortfolio}
+                                setShowClearAnalysisModal={setShowClearAnalysisModal}
+                                notes={notes}
+                                onSaveNotes={saveNotes}
+                                onHide={() => handleHideRequest('ai')}
+                                loading={portfolioLoading || isLoadingData}
+                            />
+                        );
+                    }
 
-                {cardVisibility.holdings && (
-                    <HoldingsCard
-                        portfolioList={portfolio}
-                        displayList={displayList}
-                        openCards={openCards}
-                        toggleCard={toggleCard}
-                        hiddenColumns={hiddenColumns}
-                        currency={currency}
-                        currencySymbol={currency === 'USD' ? '$' : 'S$'}
-                        currentRate={currentRate}
-                        isMobile={isMobile}
-                        menuOpenHoldings={menuOpenHoldings}
-                        setMenuOpenHoldings={setMenuOpenHoldings}
-                        onAdd={() => setShowAddModal(true)}
-                        onCopy={handleCopyClick}
-                        onClear={handleClearAll}
-                        onColumnToggle={() => setShowColumnModal(true)}
-                        updatePortfolioItem={updatePortfolioItem}
-                        removeFromPortfolio={removeFromPortfolio}
-                        isTestPortfolio={isTestPortfolio}
-                        onHide={() => handleHideRequest('holdings')}
-                    />
-                )}
+                    if (cardKey === 'holdings' && cardVisibility.holdings) {
+                        return (
+                            <HoldingsCard
+                                key="holdings"
+                                portfolioList={portfolio}
+                                displayList={displayList}
+                                openCards={openCards}
+                                toggleCard={toggleCard}
+                                hiddenColumns={hiddenColumns}
+                                currency={currency}
+                                currencySymbol={currency === 'USD' ? '$' : 'S$'}
+                                currentRate={currentRate}
+                                isMobile={isMobile}
+                                menuOpenHoldings={menuOpenHoldings}
+                                setMenuOpenHoldings={setMenuOpenHoldings}
+                                onAdd={() => setShowAddModal(true)}
+                                onCopy={handleCopyClick}
+                                onClear={handleClearAll}
+                                onColumnToggle={() => setShowColumnModal(true)}
+                                updatePortfolioItem={updatePortfolioItem}
+                                removeFromPortfolio={removeFromPortfolio}
+                                isTestPortfolio={isTestPortfolio}
+                                onHide={() => handleHideRequest('holdings')}
+                                loading={portfolioLoading || isLoadingData}
+                            />
+                        );
+                    }
+
+                    return null;
+                })}
             </div>
 
             {/* Globals Modals */}
@@ -1511,7 +1538,6 @@ const PortfolioPage = () => {
                 </Window>
             )}
 
-            {portfolioLoading || isLoadingData ? <LoadingScreen fullScreen={true} message={`Loading... ${portfolioLoading ? '(Portfolio)' : ''} ${isLoadingData ? '(Market Data)' : ''}`} /> : null}
 
             {/* Search Error Window */}
             <Window

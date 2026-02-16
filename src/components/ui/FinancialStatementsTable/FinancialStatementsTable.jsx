@@ -28,8 +28,10 @@ const FinancialStatementsTable = ({
     onToggle = null,
     onHide = null,
     stackControls = false,
+    loading: parentLoading = false,
     ...props
 }) => {
+
     const { stockData, loading, loadStockData } = useStockData();
     const [activeTab, setActiveTab] = useState('income_statement');
     const [showToggleModal, setShowToggleModal] = useState(false);
@@ -130,8 +132,21 @@ const FinancialStatementsTable = ({
         }).format(val).replace('$', currencySymbol);
     };
 
-    if (loading && !stockData) return <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
-    if (!stockData || !stockData.financials) return null;
+    const isLoading = parentLoading || loading;
+
+    if (!stockData || !stockData.financials) {
+        return (
+            <ExpandableCard
+                title={title}
+                defaultExpanded={isOpen}
+                onToggle={onToggle}
+                onHide={onHide}
+                loading={isLoading}
+                className={`fs-table-card ${className}`}
+                {...props}
+            />
+        );
+    }
 
     // Header Content (Summary View)
     const income = financials.income_statement || { dates: [], metrics: [] };
@@ -187,6 +202,7 @@ const FinancialStatementsTable = ({
                 onToggle={onToggle}
                 collapsedWidth={220}
                 collapsedHeight={220}
+                loading={isLoading}
                 headerContent={header}
                 className={`fs-table-card ${className}`}
                 controls={isOpen ? combinedControls : null}
