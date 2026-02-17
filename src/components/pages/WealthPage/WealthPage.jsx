@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, startTransition, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchUserSettings, saveUserSettings } from '../../../services/api';
@@ -111,46 +111,35 @@ const WealthPage = () => {
 
     // Load User Preferences from DB
     const loadSettings = useCallback((e) => {
-        // 1. If we have a data-rich event (Optimistic Update from Modal)
+        const processSettings = (data) => {
+            if (!data) return;
+            startTransition(() => {
+                setUserSettings(prev => (JSON.stringify(prev) === JSON.stringify(data) ? prev : data));
+
+                if (data.cardVisibility?.wealth) {
+                    setCardVisibility(prev => {
+                        const next = { ...prev, ...data.cardVisibility.wealth };
+                        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+                    });
+                }
+                if (data.cardOrder?.wealth) {
+                    setCardOrder(prev => (JSON.stringify(prev) === JSON.stringify(data.cardOrder.wealth) ? prev : data.cardOrder.wealth));
+                }
+                if (data.cardOpenStates?.wealth) {
+                    setOpenCards(prev => {
+                        const next = { ...prev, ...data.cardOpenStates.wealth };
+                        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+                    });
+                }
+            });
+        };
+
         if (e?.detail?.settings) {
-            const settings = e.detail.settings;
-            setUserSettings(settings);
-
-            // Defer update to next idle period to prioritize Modal UI
-            const defer = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
-
-            defer(() => {
-                startTransition(() => {
-                    if (settings.cardVisibility?.wealth) {
-                        setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.wealth }));
-                    }
-                    if (settings.cardOrder?.wealth) {
-                        setCardOrder(settings.cardOrder.wealth);
-                    }
-                    if (settings.cardOpenStates?.wealth) {
-                        setOpenCards(prev => ({ ...prev, ...settings.cardOpenStates.wealth }));
-                    }
-                });
-            });
-            return;
+            processSettings(e.detail.settings);
+        } else if (currentUser?.uid && !userSettings) {
+            fetchUserSettings(currentUser.uid).then(processSettings);
         }
-
-        // 2. Regular Fetch (Initial load or fallback)
-        if (currentUser?.uid) {
-            fetchUserSettings(currentUser.uid).then(settings => {
-                setUserSettings(settings);
-                if (settings?.cardVisibility?.wealth) {
-                    setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.wealth }));
-                }
-                if (settings?.cardOrder?.wealth) {
-                    setCardOrder(settings.cardOrder.wealth);
-                }
-                if (settings?.cardOpenStates?.wealth) {
-                    setOpenCards(prev => ({ ...prev, ...settings.cardOpenStates.wealth }));
-                }
-            });
-        }
-    }, [currentUser?.uid]);
+    }, [currentUser?.uid, userSettings]);
 
     useEffect(() => {
         loadSettings();
@@ -160,39 +149,37 @@ const WealthPage = () => {
         return () => window.removeEventListener('user-settings-updated', loadSettings);
     }, [loadSettings]);
 
+    const lastToggleTime = useRef(0);
+
     // Toggle card expanded/collapsed
-    const toggleCard = async (card) => {
-        const newStates = { ...openCards, [card]: !openCards[card] };
+    const toggleCard = async (card, forcedState) => {
+        const now = Date.now();
+        // Ignore rapid-fire toggles (prevents Safari ghost clicks/double-toggles)
+        if (now - lastToggleTime.current < 450) return;
+        lastToggleTime.current = now;
+
+        const nextState = forcedState !== undefined ? forcedState : !openCards[card];
+        if (openCards[card] === nextState) return;
+
+        const newStates = { ...openCards, [card]: nextState };
         setOpenCards(newStates);
 
-        // Optimistically update local settings and broadcast
         if (currentUser?.uid) {
-            const updatedSettings = {
+            const newSettings = {
                 ...(userSettings || {}),
                 cardOpenStates: {
                     ...(userSettings?.cardOpenStates || {}),
                     wealth: newStates
                 }
             };
-            setUserSettings(updatedSettings);
+            setUserSettings(newSettings);
 
-            // Notify other components immediately to prevent stale state reverts
+            // Broadcast for OTHER pages, but loadSettings will handle the equality check
             window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: updatedSettings }
+                detail: { settings: newSettings }
             }));
 
             try {
-                // Fetch latest to ensure we don't overwrite concurrent changes to other fields (e.g. CPF balances)
-                const currentSettings = await fetchUserSettings(currentUser.uid);
-
-                // Construct final object: Latest DB State + Our Explicit Toggle Change
-                const newSettings = {
-                    ...currentSettings,
-                    cardOpenStates: {
-                        ...(currentSettings?.cardOpenStates || {}),
-                        wealth: newStates
-                    }
-                };
                 await saveUserSettings(currentUser.uid, newSettings);
             } catch (error) {
                 console.error("Failed to save card open states", error);
@@ -275,7 +262,7 @@ const WealthPage = () => {
                                 <div key="wealthSummary" className={wrapperClass}>
                                     <WealthSummaryCard
                                         isOpen={isOpen}
-                                        onToggle={() => toggleCard('wealthSummary')}
+                                        onToggle={(val) => toggleCard('wealthSummary', val)}
                                         onHide={() => handleHideRequest('wealthSummary')}
                                     />
                                 </div>
@@ -287,7 +274,7 @@ const WealthPage = () => {
                                 <div key="stocks" className={wrapperClass}>
                                     <StocksCard
                                         isOpen={isOpen}
-                                        onToggle={() => toggleCard('stocks')}
+                                        onToggle={(val) => toggleCard('stocks', val)}
                                         onHide={() => handleHideRequest('stocks')}
                                         dateOfBirth={userSettings?.dateOfBirth}
                                     />
@@ -300,7 +287,7 @@ const WealthPage = () => {
                                 <div key="cpf" className={wrapperClass}>
                                     <CPFCard
                                         isOpen={isOpen}
-                                        onToggle={() => toggleCard('cpf')}
+                                        onToggle={(val) => toggleCard('cpf', val)}
                                         onHide={() => handleHideRequest('cpf')}
                                         dateOfBirth={userSettings?.dateOfBirth}
                                     />
@@ -313,7 +300,7 @@ const WealthPage = () => {
                                 <div key="savings" className={wrapperClass}>
                                     <SavingsCard
                                         isOpen={isOpen}
-                                        onToggle={() => toggleCard('savings')}
+                                        onToggle={(val) => toggleCard('savings', val)}
                                         onHide={() => handleHideRequest('savings')}
                                     />
                                 </div>
@@ -325,7 +312,7 @@ const WealthPage = () => {
                                 <div key="otherInvestments" className={wrapperClass}>
                                     <OtherInvestmentsCard
                                         isOpen={isOpen}
-                                        onToggle={() => toggleCard('otherInvestments')}
+                                        onToggle={(val) => toggleCard('otherInvestments', val)}
                                         onHide={() => handleHideRequest('otherInvestments')}
                                     />
                                 </div>

@@ -154,9 +154,9 @@
 
 .planSelectors {
     display: flex;
-    /* grid-template-columns: 1fr; */
+    flex-wrap: wrap;
     gap: 1rem;
-    align-items: center;
+    align-items: flex-start;
 }
 
 @media (min-width: 650px) {

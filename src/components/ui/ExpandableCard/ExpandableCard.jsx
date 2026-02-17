@@ -84,22 +84,30 @@ const ExpandableCard = ({
         return baseItems;
     }, [menuItems, onRefresh, onHide]);
 
+    const lastToggleTimeComp = React.useRef(0);
+
     const handleToggle = (e) => {
-        // Prevent toggle if clicking a button or link inside header, EXCLUDING the toggle button itself
-        const isToggleButton =
-            e.target.closest('.expandable-card-btn') ||
-            e.target.closest('.styled-card-menu-trigger') ||
-            e.target.closest('.expandable-card-menu-btn') ||
-            e.target.closest('.dropdown-wrapper');
+        const now = Date.now();
+        // Internal component cooldown to prevent Safari ghost clicks/double-firing
+        if (now - lastToggleTimeComp.current < 450) return;
 
-        if (!isToggleButton && (e.target.closest('button') || e.target.closest('a'))) return;
+        // Find if we clicked an interactive element
+        const menuBtn = e.target.closest('.expandable-card-menu-btn') || e.target.closest('.dropdown-wrapper');
+        const toggleBtn = e.target.closest('.expandable-card-btn');
+        const otherInteractive = e.target.closest('button') || e.target.closest('a') || e.target.closest('input');
 
-        // If it's a dropdown or other action, don't toggle expansion
-        if (isToggleButton && !e.target.closest('.expandable-card-btn')) {
-            e.stopPropagation();
+        // 1. If we clicked a menu or dropdown, stop propagation and return
+        if (menuBtn) {
+            if (e && e.stopPropagation) e.stopPropagation();
             return;
         }
 
+        // 2. If we clicked a button/link that IS NOT our toggle button, ignore
+        if (otherInteractive && !toggleBtn) {
+            return;
+        }
+
+        lastToggleTimeComp.current = now;
         const newState = !isExpanded;
 
         // Only update internal state if uncontrolled
@@ -145,6 +153,7 @@ const ExpandableCard = ({
                 overflow: 'visible',
                 width: isExpanded ? '100%' : collapsedWidth,
                 height: isExpanded ? 'auto' : collapsedHeight,
+                isolation: 'isolate', // Safari clipping fix
                 ...style
             }}
         >
@@ -163,9 +172,10 @@ const ExpandableCard = ({
                     top: 0,
                     left: 0,
                     width: '100%',
-                    zIndex: 10,
-                    cursor: 'pointer',
-                    overflow: 'visible'
+                    zIndex: isExpanded ? 1 : 10,
+                    cursor: isExpanded ? 'default' : 'pointer',
+                    overflow: 'visible',
+                    pointerEvents: isExpanded ? 'none' : 'auto'
                 }}
             >
                 <div
@@ -182,15 +192,12 @@ const ExpandableCard = ({
                 >
                     {/* Top Row: Title, Controls & Toggle */}
                     <div className={`collapsed-controls-row ${stackControls ? 'vertical-stack' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <div className="expandable-card-title-container">
-                            {/* Title removed to avoid duplication with summary content */}
+                        <div className="collapsed-left-controls">
+                            {!isExpanded && controls}
                         </div>
                         <div className="expandable-card-header-actions">
                             {!isExpanded && (
                                 <>
-                                    <div className="collapsed-custom-controls">
-                                        {controls}
-                                    </div>
                                     {combinedMenuItems && (
                                         <DropdownButton
                                             items={combinedMenuItems}
@@ -251,7 +258,11 @@ const ExpandableCard = ({
             >
                 {isExpanded && (
                     <div className={`expandable-card-controls-group ${stackControls ? 'vertical-stack' : ''}`}>
-                        <div className="expandable-card-title-container">
+                        <div
+                            className="expandable-card-title-container"
+                            onClick={handleToggle}
+                            style={{ cursor: 'pointer' }}
+                        >
                             {title && <h3 className="expandable-card-expanded-title">{title}</h3>}
                             {subtitle && <span className="expandable-card-subtitle">{subtitle}</span>}
                         </div>

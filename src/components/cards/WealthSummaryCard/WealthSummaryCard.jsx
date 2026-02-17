@@ -22,41 +22,58 @@ const WealthSummaryCard = ({
     const [savingsScenarioId, setSavingsScenarioId] = useState(null);
     const [stocksScenarioIds, setStocksScenarioIds] = useState({}); // { chartId: scenarioId }
 
+    // To track what we've already synced from global settings
+    const [lastSyncedSettings, setLastSyncedSettings] = useState(null);
+
     // Sync with settings
     useEffect(() => {
-        if (settings?.savings?.activeScenarioId) {
-            setSavingsScenarioId(settings.savings.activeScenarioId);
+        if (!settings) return;
+
+        // 1. Savings Scenario Sync
+        const incomingSavingsId = settings?.savings?.activeScenarioId;
+        const lastSavingsId = lastSyncedSettings?.savings?.activeScenarioId;
+        if (incomingSavingsId && incomingSavingsId !== lastSavingsId) {
+            setSavingsScenarioId(incomingSavingsId);
         }
-        if (settings?.stocks?.activeScenarioIds) {
-            setStocksScenarioIds(settings.stocks.activeScenarioIds);
-        } else if (settings?.stocks?.charts) {
+
+        // 2. Stocks Scenario Sync
+        const incomingStocksIds = settings?.stocks?.activeScenarioIds;
+        const lastStocksIds = lastSyncedSettings?.stocks?.activeScenarioIds;
+        if (incomingStocksIds && JSON.stringify(incomingStocksIds) !== JSON.stringify(lastStocksIds)) {
+            setStocksScenarioIds(incomingStocksIds);
+        } else if (!incomingStocksIds && settings?.stocks?.charts && !lastSyncedSettings) {
+            // Default initialization if no active ids yet
             const defaults = {};
             settings.stocks.charts.forEach(c => {
                 if (c.scenarios?.length > 0) defaults[c.id] = c.scenarios[0].id;
             });
             setStocksScenarioIds(defaults);
         }
-        if (settings?.wealth?.projectedYear !== undefined) {
-            setProjectedYear(settings.wealth.projectedYear);
+
+        // 3. Projected Year Sync
+        const incomingYear = settings?.wealth?.projectedYear;
+        const lastYear = lastSyncedSettings?.wealth?.projectedYear;
+        if (incomingYear !== undefined && incomingYear !== lastYear) {
+            setProjectedYear(incomingYear);
         }
-    }, [settings]);
+
+        setLastSyncedSettings(settings);
+    }, [settings, lastSyncedSettings]);
 
     const handleProjectedYearChange = (year) => {
         setProjectedYear(year);
-        if (year !== '') {
-            updateSettings({ wealth: { ...settings.wealth, projectedYear: year } });
-        }
+        // Note: We no longer sync this back to the database as per user request
     };
 
     const handleSavingsScenarioChange = (id) => {
         setSavingsScenarioId(id);
-        updateSettings({ savings: { ...settings.savings, activeScenarioId: id } });
+        // Note: We no longer sync this back to the database as per user request
     };
 
     const handleStocksScenarioChange = (chartId, scenarioId) => {
         const newIds = { ...stocksScenarioIds, [chartId]: scenarioId };
         setStocksScenarioIds(newIds);
-        updateSettings({ stocks: { ...settings.stocks, activeScenarioIds: newIds } });
+        // Note: We no longer sync this back to the database as per user request
     };
 
     const overallLastUpdated = useMemo(() => {

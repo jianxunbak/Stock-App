@@ -4,11 +4,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    /* Generally center vertically, can be aligned start if content is tall */
     cursor: pointer;
     width: 100%;
     min-height: 48px;
-    /* Ensure a consistent minimum height */
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .expandable-card {

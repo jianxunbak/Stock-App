@@ -70,6 +70,25 @@
     /* Default to text color if not overridden */
 }
 
+.dropdown-items-container {
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--neu-border-subtle) transparent;
+}
+
+/* Custom scrollbar for Webkit */
+.dropdown-items-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.dropdown-items-container::-webkit-scrollbar-thumb {
+    background: var(--neu-border-subtle);
+    border-radius: 4px;
+}
+
 .dropdown-divider {
     height: 1px;
     background: var(--neu-shadow-dark);
