@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, startTransition, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { fetchUserSettings, saveUserSettings } from '../../../services/api';
+import { fetchUserSettings, saveUserSettings, fetchCurrencyRate } from '../../../services/api';
 import { ArrowLeft } from 'lucide-react';
 import CascadingHeader from '../../ui/CascadingHeader/CascadingHeader';
 import { TopNavLogo, TopNavActions } from '../../ui/Navigation/TopNav';
@@ -22,12 +22,64 @@ const WealthPage = () => {
     const [showWatchlist, setShowWatchlist] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [ticker, setTicker] = useState('');
-    const [currency, setCurrency] = useState('USD');
+    const [displayCurrency, setDisplayCurrency] = useState('USD');
+    const [baseCurrency, setBaseCurrency] = useState('USD');
+    const [baseToDisplayRate, setBaseToDisplayRate] = useState(1);
+    const [usdToDisplayRate, setUsdToDisplayRate] = useState(1);
+    const [sgdToDisplayRate, setSgdToDisplayRate] = useState(1);
 
-    // Currency conversion rates (base: USD)
-    const RATES = { 'USD': 1, 'SGD': 1.35, 'EUR': 0.92, 'GBP': 0.79 };
-    const currentRate = RATES[currency];
-    const currencySymbol = currency === 'EUR' ? '€' : (currency === 'GBP' ? '£' : '$');
+    const displayCurrencySymbol = useMemo(() => {
+        if (displayCurrency === 'SGD') return 'S$';
+        if (displayCurrency === 'EUR') return '€';
+        if (displayCurrency === 'GBP') return '£';
+        return '$';
+    }, [displayCurrency]);
+
+    const baseCurrencySymbol = useMemo(() => {
+        if (baseCurrency === 'SGD') return 'S$';
+        if (baseCurrency === 'EUR') return '€';
+        if (baseCurrency === 'GBP') return '£';
+        return '$';
+    }, [baseCurrency]);
+
+    // Fetch currency rates when currencies change
+    useEffect(() => {
+        const updateRates = async () => {
+            const cache = {};
+            const getRate = async (curr) => {
+                if (curr === 'USD') return 1;
+                if (cache[curr]) return cache[curr];
+                const res = await fetchCurrencyRate(curr);
+                const rate = res?.rate || res || 1;
+                cache[curr] = rate;
+                return rate;
+            };
+
+            const displayRate = await getRate(displayCurrency);
+
+            // 1. Base to Display Rate
+            if (baseCurrency === displayCurrency) {
+                setBaseToDisplayRate(1);
+            } else {
+                const baseRate = await getRate(baseCurrency);
+                setBaseToDisplayRate(displayRate / baseRate);
+            }
+
+            // 2. USD to Display Rate
+            setUsdToDisplayRate(displayRate);
+
+            // 3. SGD to Display Rate
+            if (displayCurrency === 'SGD') {
+                setSgdToDisplayRate(1);
+            } else {
+                const sgdRate = await getRate('SGD');
+                setSgdToDisplayRate(displayRate / sgdRate);
+            }
+        };
+
+        updateRates();
+    }, [displayCurrency, baseCurrency]);
+
 
     // Card visibility state
     const [cardVisibility, setCardVisibility] = useState({
@@ -99,7 +151,7 @@ const WealthPage = () => {
 
             // Notify other components
             window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: newSettings }
+                detail: { settings: newSettings, source: 'internal' }
             }));
         }
 
@@ -110,9 +162,18 @@ const WealthPage = () => {
     const [userSettings, setUserSettings] = useState(null);
 
     // Load User Preferences from DB
+    const ignoreRemoteSyncUntil = useRef(0);
+
     const loadSettings = useCallback((e) => {
+        if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') {
+            return;
+        }
+
         const processSettings = (data) => {
             if (!data) return;
+            // SYNC SHIELD: If we recently toggled, ignore remote data during the settlement period
+            if (Date.now() < ignoreRemoteSyncUntil.current) return;
+
             startTransition(() => {
                 setUserSettings(prev => (JSON.stringify(prev) === JSON.stringify(data) ? prev : data));
 
@@ -121,6 +182,9 @@ const WealthPage = () => {
                         const next = { ...prev, ...data.cardVisibility.wealth };
                         return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
                     });
+                }
+                if (data.baseCurrency) {
+                    setBaseCurrency(data.baseCurrency);
                 }
                 if (data.cardOrder?.wealth) {
                     setCardOrder(prev => (JSON.stringify(prev) === JSON.stringify(data.cardOrder.wealth) ? prev : data.cardOrder.wealth));
@@ -134,12 +198,24 @@ const WealthPage = () => {
             });
         };
 
+        if (e?.detail?.source === 'internal') return;
+
         if (e?.detail?.settings) {
             processSettings(e.detail.settings);
-        } else if (currentUser?.uid && !userSettings) {
-            fetchUserSettings(currentUser.uid).then(processSettings);
+        } else if (currentUser?.uid) {
+            fetchUserSettings(currentUser.uid).then(settings => {
+                // SYNC SHIELD: Catch in-flight requests that might be stale
+                if (Date.now() < ignoreRemoteSyncUntil.current) return;
+                // If settings are null (new user or empty), set to empty object to stop loading
+                processSettings(settings || {});
+            }).catch(err => {
+                console.error("Failed to fetch settings", err);
+                // On error, also unblock loading
+                processSettings({});
+            });
         }
-    }, [currentUser?.uid, userSettings]);
+    }, [currentUser?.uid]);
+
 
     useEffect(() => {
         loadSettings();
@@ -155,11 +231,14 @@ const WealthPage = () => {
     const toggleCard = async (card, forcedState) => {
         const now = Date.now();
         // Ignore rapid-fire toggles (prevents Safari ghost clicks/double-toggles)
-        if (now - lastToggleTime.current < 450) return;
+        if (now - lastToggleTime.current < 1000) return;
         lastToggleTime.current = now;
 
         const nextState = forcedState !== undefined ? forcedState : !openCards[card];
         if (openCards[card] === nextState) return;
+
+        // Block remote sync for 2 seconds to allow DB to update and avoid stale overwrites
+        ignoreRemoteSyncUntil.current = Date.now() + 2000;
 
         const newStates = { ...openCards, [card]: nextState };
         setOpenCards(newStates);
@@ -176,7 +255,7 @@ const WealthPage = () => {
 
             // Broadcast for OTHER pages, but loadSettings will handle the equality check
             window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: newSettings }
+                detail: { settings: newSettings, source: 'internal' }
             }));
 
             try {
@@ -186,6 +265,32 @@ const WealthPage = () => {
             }
         }
     };
+
+    // Centralized settings update handler for child components
+    const handleUpdateSettings = async (newSettingsFragment) => {
+        if (!currentUser?.uid) return;
+
+        // 1. Optimistic Update
+        const updatedSettings = { ...userSettings, ...newSettingsFragment };
+        setUserSettings(updatedSettings);
+
+        // 2. Broadcast immediately
+        window.dispatchEvent(new CustomEvent('user-settings-updated', {
+            detail: { settings: updatedSettings, source: 'internal' }
+        }));
+
+        // 3. Save to Backend
+        try {
+            // Block remote sync briefly to avoid "flicker" from our own write echoing back
+            ignoreRemoteSyncUntil.current = Date.now() + 2000;
+
+            // We trust our local state (updatedSettings) is the most recent
+            await saveUserSettings(currentUser.uid, updatedSettings);
+        } catch (error) {
+            console.error("Failed to save settings:", error);
+        }
+    };
+
 
     // Auth Protection
     useEffect(() => {
@@ -220,8 +325,8 @@ const WealthPage = () => {
             searchTicker={ticker}
             setSearchTicker={setTicker}
             handleSearch={handleSearch}
-            currency={currency}
-            setCurrency={setCurrency}
+            currency={displayCurrency}
+            setCurrency={setDisplayCurrency}
             setShowWatchlist={setShowWatchlist}
             setShowProfileModal={setShowProfileModal}
             handleLogout={handleLogout}
@@ -264,6 +369,15 @@ const WealthPage = () => {
                                         isOpen={isOpen}
                                         onToggle={(val) => toggleCard('wealthSummary', val)}
                                         onHide={() => handleHideRequest('wealthSummary')}
+                                        baseCurrency={baseCurrency}
+                                        baseCurrencySymbol={baseCurrencySymbol}
+                                        displayCurrency={displayCurrency}
+                                        displayCurrencySymbol={displayCurrencySymbol}
+                                        baseToDisplayRate={baseToDisplayRate}
+                                        usdToDisplayRate={usdToDisplayRate}
+                                        settings={userSettings}
+                                        onUpdateSettings={handleUpdateSettings}
+                                        loading={!userSettings}
                                     />
                                 </div>
                             );
@@ -277,6 +391,15 @@ const WealthPage = () => {
                                         onToggle={(val) => toggleCard('stocks', val)}
                                         onHide={() => handleHideRequest('stocks')}
                                         dateOfBirth={userSettings?.dateOfBirth}
+                                        baseCurrency={baseCurrency}
+                                        baseCurrencySymbol={baseCurrencySymbol}
+                                        displayCurrency={displayCurrency}
+                                        displayCurrencySymbol={displayCurrencySymbol}
+                                        baseToDisplayRate={baseToDisplayRate}
+                                        usdToDisplayRate={usdToDisplayRate}
+                                        settings={userSettings}
+                                        onUpdateSettings={handleUpdateSettings}
+                                        loading={!userSettings}
                                     />
                                 </div>
                             );
@@ -290,6 +413,16 @@ const WealthPage = () => {
                                         onToggle={(val) => toggleCard('cpf', val)}
                                         onHide={() => handleHideRequest('cpf')}
                                         dateOfBirth={userSettings?.dateOfBirth}
+                                        baseCurrency={baseCurrency}
+                                        baseCurrencySymbol={baseCurrencySymbol}
+                                        displayCurrency={displayCurrency}
+                                        displayCurrencySymbol={displayCurrencySymbol}
+                                        baseToDisplayRate={baseToDisplayRate}
+                                        usdToDisplayRate={usdToDisplayRate}
+                                        sgdToDisplayRate={sgdToDisplayRate}
+                                        settings={userSettings}
+                                        onUpdateSettings={handleUpdateSettings}
+                                        loading={!userSettings}
                                     />
                                 </div>
                             );
@@ -302,6 +435,15 @@ const WealthPage = () => {
                                         isOpen={isOpen}
                                         onToggle={(val) => toggleCard('savings', val)}
                                         onHide={() => handleHideRequest('savings')}
+                                        baseCurrency={baseCurrency}
+                                        baseCurrencySymbol={baseCurrencySymbol}
+                                        displayCurrency={displayCurrency}
+                                        displayCurrencySymbol={displayCurrencySymbol}
+                                        baseToDisplayRate={baseToDisplayRate}
+                                        usdToDisplayRate={usdToDisplayRate}
+                                        settings={userSettings}
+                                        onUpdateSettings={handleUpdateSettings}
+                                        loading={!userSettings}
                                     />
                                 </div>
                             );
@@ -314,6 +456,15 @@ const WealthPage = () => {
                                         isOpen={isOpen}
                                         onToggle={(val) => toggleCard('otherInvestments', val)}
                                         onHide={() => handleHideRequest('otherInvestments')}
+                                        baseCurrency={baseCurrency}
+                                        baseCurrencySymbol={baseCurrencySymbol}
+                                        displayCurrency={displayCurrency}
+                                        displayCurrencySymbol={displayCurrencySymbol}
+                                        baseToDisplayRate={baseToDisplayRate}
+                                        usdToDisplayRate={usdToDisplayRate}
+                                        settings={userSettings}
+                                        onUpdateSettings={handleUpdateSettings}
+                                        loading={!userSettings}
                                     />
                                 </div>
                             );
@@ -327,9 +478,9 @@ const WealthPage = () => {
                     <WatchlistModal
                         isOpen={showWatchlist}
                         onClose={() => setShowWatchlist(false)}
-                        currency={currency}
-                        currencySymbol={currencySymbol}
-                        currentRate={currentRate}
+                        currency={displayCurrency}
+                        currencySymbol={displayCurrencySymbol}
+                        currentRate={usdToDisplayRate}
                     />
                 )}
 

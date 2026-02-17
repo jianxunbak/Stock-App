@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, setDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { withFirestoreProtection } from '../utils/firestoreUtils';
 
 // Helper to generate a unique ID
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -63,10 +64,10 @@ export const usePortfolio = (portfolioId) => {
         if (!currentUser || !portfolioId) return;
         try {
             const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
-            await updateDoc(docRef, {
+            await withFirestoreProtection(() => updateDoc(docRef, {
                 comparisonStocks: newStocks,
                 updatedAt: new Date().toISOString()
-            });
+            }), 'Update Comparison Stocks');
         } catch (error) {
             console.error("Error updating comparison stocks:", error);
         }
@@ -92,7 +93,7 @@ export const usePortfolio = (portfolioId) => {
                     console.info("Starting migration of Main Portfolio to Multi-Portfolio system...");
 
                     // 1. Create the new portfolio document
-                    const newPortRef = await addDoc(collection(db, 'users', currentUser.uid, 'test_portfolios'), {
+                    const newPortRef = await withFirestoreProtection(() => addDoc(collection(db, 'users', currentUser.uid, 'test_portfolios'), {
                         name: "Main Portfolio",
                         type: "main",
                         portfolio: legacyPortfolio.map(item => ({
@@ -103,18 +104,18 @@ export const usePortfolio = (portfolioId) => {
                         analysis: userData.analysis || '',
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
-                    });
+                    }), 'Migrate Portfolio (Add)');
 
                     // 2. Mark as migrated (but keep old data for safety for now, or clear it if preferred)
                     // We'll just mark it so we don't migrate again.
-                    await updateDoc(userRef, {
+                    await withFirestoreProtection(() => updateDoc(userRef, {
                         mainPortfolioMigrated: true,
                         // Optionally clear legacy data:
                         // portfolio: [], 
                         // analysis: ''
-                    });
+                    }), 'Migrate Portfolio (Update User)');
 
-                    console.info(`Migration complete. Created new portfolio ID: ${newPortRef.id}`);
+                    if (newPortRef) console.info(`Migration complete. Created new portfolio ID: ${newPortRef.id}`);
                 }
             } catch (error) {
                 console.error("Migration error:", error);
@@ -162,10 +163,10 @@ export const usePortfolio = (portfolioId) => {
         if (!currentUser || !targetId) return;
         try {
             const userRef = doc(db, 'users', currentUser.uid);
-            await setDoc(userRef, {
+            await withFirestoreProtection(() => setDoc(userRef, {
                 lastActive: new Date().toISOString(),
                 hasMultiPortfolios: true
-            }, { merge: true });
+            }, { merge: true }), 'Update lastActive');
 
             const portRef = doc(db, 'users', currentUser.uid, 'test_portfolios', targetId);
             const newItem = {
@@ -174,10 +175,10 @@ export const usePortfolio = (portfolioId) => {
                 createdAt: new Date().toISOString()
             };
 
-            await updateDoc(portRef, {
+            await withFirestoreProtection(() => updateDoc(portRef, {
                 portfolio: arrayUnion(newItem),
                 updatedAt: new Date().toISOString()
-            });
+            }), `Add to Portfolio: ${item.ticker}`);
 
             console.info(`[FIRESTORE SUCCESS] Added ${item.ticker} to portfolio: ${targetId}`);
         } catch (error) {
@@ -196,7 +197,7 @@ export const usePortfolio = (portfolioId) => {
         try {
             const newList = portfolio.filter(item => item.id !== id);
             const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
-            await updateDoc(docRef, { portfolio: newList, updatedAt: new Date().toISOString() });
+            await withFirestoreProtection(() => updateDoc(docRef, { portfolio: newList, updatedAt: new Date().toISOString() }), 'Remove from Portfolio');
         } catch (error) {
             console.error("Error removing from portfolio:", error);
         }
@@ -209,7 +210,7 @@ export const usePortfolio = (portfolioId) => {
                 item.id === id ? { ...item, ...updates } : item
             );
             const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
-            await updateDoc(docRef, { portfolio: newList, updatedAt: new Date().toISOString() });
+            await withFirestoreProtection(() => updateDoc(docRef, { portfolio: newList, updatedAt: new Date().toISOString() }), 'Update Portfolio Item');
         } catch (error) {
             console.error("Error updating portfolio item:", error);
         }
@@ -221,16 +222,16 @@ export const usePortfolio = (portfolioId) => {
             const userRef = doc(db, 'users', currentUser.uid);
             await setDoc(userRef, { lastActive: new Date().toISOString() }, { merge: true });
 
-            const newPortRef = await addDoc(collection(db, 'users', currentUser.uid, 'test_portfolios'), {
+            const newPortRef = await withFirestoreProtection(() => addDoc(collection(db, 'users', currentUser.uid, 'test_portfolios'), {
                 name,
                 type,
                 portfolio: [],
                 analysis: '',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
-            });
+            }), 'Create Portfolio');
 
-            return newPortRef.id;
+            return newPortRef?.id;
         } catch (error) {
             console.error("Error creating portfolio:", error);
             return null;
@@ -240,7 +241,7 @@ export const usePortfolio = (portfolioId) => {
     const deletePortfolio = async (pId) => {
         if (!currentUser || !pId) return;
         try {
-            await deleteDoc(doc(db, 'users', currentUser.uid, 'test_portfolios', pId));
+            await withFirestoreProtection(() => deleteDoc(doc(db, 'users', currentUser.uid, 'test_portfolios', pId)), 'Delete Portfolio');
         } catch (error) {
             console.error("Error deleting portfolio:", error);
         }
@@ -250,10 +251,10 @@ export const usePortfolio = (portfolioId) => {
         if (!currentUser || !portfolioId) return;
         try {
             const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
-            await updateDoc(docRef, {
+            await withFirestoreProtection(() => updateDoc(docRef, {
                 analysis: '',
                 analysis_timestamp: null
-            });
+            }), 'Clear Analysis');
         } catch (error) {
             console.error("Error clearing analysis:", error);
         }
@@ -272,10 +273,10 @@ export const usePortfolio = (portfolioId) => {
             const targetSnap = await getDoc(targetPortRef);
             const currentItems = targetSnap.exists() ? (targetSnap.data().portfolio || []) : [];
 
-            await updateDoc(targetPortRef, {
+            await withFirestoreProtection(() => updateDoc(targetPortRef, {
                 portfolio: [...currentItems, ...newItems],
                 updatedAt: new Date().toISOString()
-            });
+            }), 'Copy Items');
 
             console.info(`[FIRESTORE SUCCESS] Copied ${newItems.length} items to portfolio ${targetPortfolioId}`);
         } catch (error) {
@@ -295,7 +296,7 @@ export const usePortfolio = (portfolioId) => {
             if (newType) {
                 updates.type = newType;
             }
-            await updateDoc(docRef, updates);
+            await withFirestoreProtection(() => updateDoc(docRef, updates), 'Rename Portfolio');
         } catch (error) {
             console.error("Error renaming portfolio:", error);
             throw error;
@@ -306,10 +307,10 @@ export const usePortfolio = (portfolioId) => {
         if (!currentUser || !portfolioId) return;
         try {
             const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
-            await updateDoc(docRef, {
+            await withFirestoreProtection(() => updateDoc(docRef, {
                 portfolio: [],
                 updatedAt: new Date().toISOString()
-            });
+            }), 'Clear Portfolio');
         } catch (error) {
             console.error("Error clearing portfolio:", error);
         }
@@ -319,10 +320,10 @@ export const usePortfolio = (portfolioId) => {
         if (!currentUser || !portfolioId) return;
         try {
             const docRef = doc(db, 'users', currentUser.uid, 'test_portfolios', portfolioId);
-            await updateDoc(docRef, {
+            await withFirestoreProtection(() => updateDoc(docRef, {
                 notes: newNotes,
                 updatedAt: new Date().toISOString()
-            });
+            }), 'Save Notes');
         } catch (error) {
             console.error("Error saving notes:", error);
         }

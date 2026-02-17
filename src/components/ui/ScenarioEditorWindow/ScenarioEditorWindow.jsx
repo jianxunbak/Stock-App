@@ -22,7 +22,9 @@ const ScenarioEditorWindow = ({
     onAddScenario,
     onRemoveScenario,
     onUpdateScenario,
-    onToggleScenarioVisibility
+    onToggleScenarioVisibility,
+    baseCurrency = 'USD',
+    baseCurrencySymbol = '$'
 }) => {
     const getFrequencyLabel = (value) => {
         return FREQUENCY_OPTIONS.find(opt => opt.value === value)?.label || value;
@@ -130,7 +132,7 @@ const ScenarioEditorWindow = ({
 
                                     <div className={styles.calculatorForm}>
                                         <div className={styles.inputGroup}>
-                                            <label className={styles.inputLabel}>Initial Deposit</label>
+                                            <label className={styles.inputLabel}>Initial Deposit ({baseCurrencySymbol})</label>
                                             <input
                                                 type="number"
                                                 className={styles.numberInput}
@@ -142,7 +144,7 @@ const ScenarioEditorWindow = ({
                                         </div>
 
                                         <div className={styles.inputGroup}>
-                                            <label className={styles.inputLabel}>Contribution Amount</label>
+                                            <label className={styles.inputLabel}>Contribution Amount ({baseCurrencySymbol})</label>
                                             <input
                                                 type="number"
                                                 className={styles.numberInput}

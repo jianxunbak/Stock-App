@@ -142,6 +142,18 @@
     font-weight: 600;
 }
 
+.statValueHighlight {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--neu-primary);
+}
+
+.statValueSecondary {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--neu-text-secondary);
+}
+
 .divider {
     height: 1px;
     background: var(--glass-border);
@@ -462,4 +474,22 @@
     margin: 0;
     font-size: 0.8rem;
     line-height: 1.4;
+}
+
+.refList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
+}
+
+.refList li {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.refList li strong {
+    color: var(--text-primary);
 }

@@ -8,7 +8,7 @@ import styles from './AddStockToPortfolioModal.module.css';
 
 // --- Main Modal Component ---
 
-const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioList = [], isMobile, currentRate = 1 }) => {
+const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioList = [], isMobile, currentRate = 1, currencySymbol = '$' }) => {
     const [selectedPortfolioIds, setSelectedPortfolioIds] = useState([]);
     const [shares, setShares] = useState('');
     const [cost, setCost] = useState('');
@@ -122,7 +122,7 @@ const AddStockToPortfolioModal = ({ isOpen, onClose, ticker, onAdd, portfolioLis
                     </div>
 
                     <div className={styles.formGroup}>
-                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost Basis</label>
+                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost Basis ({currencySymbol})</label>
                         <input
                             type="number"
                             step="any"

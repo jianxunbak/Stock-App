@@ -4,7 +4,6 @@ import BaseChart from '../../ui/BaseChart/BaseChart';
 import ScenarioEditorWindow from '../../ui/ScenarioEditorWindow/ScenarioEditorWindow';
 import { Settings } from 'lucide-react';
 import styles from './StocksCard.module.css';
-import { useUserSettings } from '../../../hooks/useUserSettings';
 import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const SCENARIO_COLORS = [
@@ -20,10 +19,17 @@ const StocksCard = ({
     onToggle = null,
     onHide = null,
     className = "",
-    dateOfBirth = null
+    dateOfBirth = null,
+    baseCurrency = 'USD',
+    baseCurrencySymbol = '$',
+    displayCurrency = 'USD',
+    displayCurrencySymbol = '$',
+    baseToDisplayRate = 1,
+    usdToDisplayRate = 1,
+    settings = null,
+    onUpdateSettings = null,
+    loading = false
 }) => {
-    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
-
     // Charts state - each chart contains its own scenarios
     const [charts, setCharts] = useState([
         {
@@ -67,7 +73,7 @@ const StocksCard = ({
 
     // Save to settings (Debounced)
     useEffect(() => {
-        if (settingsLoading) return;
+        if (loading || !onUpdateSettings) return;
 
         const timer = setTimeout(() => {
             const currentData = {
@@ -78,9 +84,11 @@ const StocksCard = ({
             };
 
             const { updatedAt, ...prevStocksWithoutTime } = settings?.stocks || {};
-            if (JSON.stringify(prevStocksWithoutTime) !== JSON.stringify(currentData)) {
+            // If we have no settings yet, we might want to wait, OR if we are initializing, we shouldn't save back immediately
+            // But if isInitialized is true, it means we have loaded data, so any change is a user change.
+            if (JSON.stringify(prevStocksWithoutTime) !== JSON.stringify(currentData) && isInitialized) {
                 // Merge with existing settings to preserve fields managed by other components (e.g. activeScenarioIds)
-                updateSettings({
+                onUpdateSettings({
                     stocks: {
                         ...currentData,
                         updatedAt: new Date().toISOString()
@@ -90,7 +98,7 @@ const StocksCard = ({
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [charts, nextChartId, nextScenarioId, projectionYears, settingsLoading, updateSettings, settings?.stocks]);
+    }, [charts, nextChartId, nextScenarioId, projectionYears, loading, onUpdateSettings, settings?.stocks, isInitialized]);
 
     // ---- Chart CRUD ----
     const addChart = () => {
@@ -223,17 +231,23 @@ const StocksCard = ({
                         const contributionAmount = Number(scenario.contributionAmount || 0);
 
                         const annualRate = estimatedRate / 100;
-                        const periodsPerYear = scenario.contributionFrequency === 'monthly' ? 12 :
+                        const freq = scenario.contributionFrequency === 'monthly' ? 12 :
                             scenario.contributionFrequency === 'quarterly' ? 4 : 1;
-                        const ratePerPeriod = annualRate / periodsPerYear;
-                        const totalPeriods = year * periodsPerYear;
 
-                        let totalInvested = initialDeposit;
-                        let totalValue = initialDeposit;
+                        const annualContribution = contributionAmount * freq;
 
-                        for (let period = 1; period <= totalPeriods; period++) {
-                            totalInvested += contributionAmount;
-                            totalValue = (totalValue + contributionAmount) * (1 + ratePerPeriod);
+                        // Invested: Initial + (Annual * Years)
+                        // Note: year is the loop variable (0, 1, 2...)
+                        let totalInvested = initialDeposit + (annualContribution * year);
+
+                        // Value: FV = P(1+r)^t + PMT * ((1+r)^t - 1)/r (Ordinary Annuity)
+                        let totalValue = 0;
+                        if (annualRate === 0) {
+                            totalValue = totalInvested;
+                        } else {
+                            const p_term = initialDeposit * Math.pow(1 + annualRate, year);
+                            const pmt_term = annualContribution * (Math.pow(1 + annualRate, year) - 1) / annualRate;
+                            totalValue = p_term + pmt_term;
                         }
 
                         point[`invested_${scenario.id}`] = Math.round(totalInvested * 100) / 100;
@@ -270,7 +284,16 @@ const StocksCard = ({
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'USD',
+            currency: displayCurrency,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(value * baseToDisplayRate);
+    };
+
+    const formatBaseCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: baseCurrency,
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(value);
@@ -340,7 +363,7 @@ const StocksCard = ({
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}
-                loading={settingsLoading}
+                loading={loading}
                 className={className}
 
                 menuItems={[
@@ -353,7 +376,7 @@ const StocksCard = ({
             >
                 <div className={styles.container}>
                     <div className={styles.globalControls} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <h4 className={styles.sectionTitle} style={{ margin: 0 }}>Projected Stocks Growth</h4>
+                        <h4 className={styles.sectionTitle} style={{ margin: 0 }}>Projected Stocks Growth ({baseCurrency})</h4>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
@@ -390,15 +413,15 @@ const StocksCard = ({
                                         <BaseChart
                                             data={chartData}
                                             series={series}
-                                            currency="$"
                                             showGrid={true}
                                             showXAxis={true}
                                             showYAxis={true}
                                             height={300}
                                             yAxisFormatter={(val) => {
-                                                if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-                                                if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
-                                                return `$${val}`;
+                                                const convertedVal = val * baseToDisplayRate;
+                                                if (convertedVal >= 1000000) return `${displayCurrencySymbol}${(convertedVal / 1000000).toFixed(1)}M`;
+                                                if (convertedVal >= 1000) return `${displayCurrencySymbol}${(convertedVal / 1000).toFixed(0)}k`;
+                                                return `${displayCurrencySymbol}${convertedVal.toFixed(0)}`;
                                             }}
                                             tooltipValueFormatter={(val) => formatCurrency(val)}
                                             tooltipLabelFormatter={(label, payload) => {
@@ -414,7 +437,7 @@ const StocksCard = ({
                                     {/* Scenario Summary with integrated legend */}
                                     <div className={styles.summaryGrid}>
                                         {visibleScenarios.map(scenario => {
-                                            const lastPoint = chartData[scenario.yearsOfGrowth];
+                                            const lastPoint = chartData[chartData.length - 1];
                                             const invested = lastPoint?.[`invested_${scenario.id}`] || 0;
                                             const value = lastPoint?.[`value_${scenario.id}`] || 0;
                                             const gains = value - invested;
@@ -470,6 +493,8 @@ const StocksCard = ({
                 isOpen={showEditor}
                 onClose={() => setShowEditor(false)}
                 charts={charts}
+                baseCurrency={baseCurrency}
+                baseCurrencySymbol={baseCurrencySymbol}
                 onAddChart={addChart}
                 onRemoveChart={removeChart}
                 onUpdateChart={updateChart}

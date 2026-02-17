@@ -242,10 +242,11 @@ const CurrencySelector = ({ currency, setCurrency, isMobile = false }) => {
                     }
                 }
             }}
-            className={`${styles.currencyContainer} ${isExpanded ? styles.expanded : ''}`}
+            className={`${styles.currencyContainer} ${isExpanded ? styles.expanded : ''} ${isMobile && isExpanded ? styles.mobileExpanded : ''}`}
             initial={false}
             animate={{
-                width: isExpanded ? expandedWidth : collapsedWidth,
+                width: isMobile ? collapsedWidth : (isExpanded ? expandedWidth : collapsedWidth),
+                height: isMobile && isExpanded ? '4.8rem' : collapsedWidth,
                 scaleX: isExpanded ? 1.02 : 1,
                 scaleY: isExpanded ? 0.99 : 1,
             }}
@@ -272,7 +273,7 @@ const CurrencySelector = ({ currency, setCurrency, isMobile = false }) => {
                 ) : (
                     <motion.div
                         key="options"
-                        className={styles.currencyOptions}
+                        className={`${styles.currencyOptions} ${isMobile ? styles.mobileOptions : ''}`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

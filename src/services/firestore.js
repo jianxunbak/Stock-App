@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { withFirestoreProtection } from "../utils/firestoreUtils";
 
 // --- Theme Operations ---
 
@@ -8,7 +9,7 @@ export const saveUserTheme = async (userId, theme) => {
     try {
         const userRef = doc(db, "users", userId);
         // Use setDoc with merge: true to create if doesn't exist or update if it does
-        await setDoc(userRef, { theme }, { merge: true });
+        await withFirestoreProtection(() => setDoc(userRef, { theme }, { merge: true }), 'Save Theme');
     } catch (error) {
         console.error("Error saving theme to Firestore:", error);
     }
@@ -38,8 +39,8 @@ export const saveWatchlist = async (userId, watchlist) => {
     }
     try {
         const userRef = doc(db, "users", userId);
-        await setDoc(userRef, { watchlist }, { merge: true });
-        console.log("Watchlist saved successfully to Firestore!");
+        await withFirestoreProtection(() => setDoc(userRef, { watchlist }, { merge: true }), 'Save Watchlist');
+        // console.log("Watchlist saved successfully to Firestore!");
     } catch (error) {
         console.error("Error saving watchlist to Firestore:", error);
     }
@@ -64,7 +65,7 @@ export const savePortfolio = async (userId, portfolio) => {
     if (!userId) return;
     try {
         const userRef = doc(db, "users", userId);
-        await setDoc(userRef, { portfolio }, { merge: true });
+        await withFirestoreProtection(() => setDoc(userRef, { portfolio }, { merge: true }), 'Save Portfolio');
     } catch (error) {
         console.error("Error saving portfolio to Firestore:", error);
     }

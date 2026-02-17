@@ -202,9 +202,13 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                 }
             }));
 
-            // Preserve current list order but update with new data
-            const updatedList = currentList.map(item => updatedItemsMap.get(item.ticker) || item);
-            setFullWatchlist(updatedList);
+            // Merge updates into the LATEST watchlist state to avoid race conditions
+            setFullWatchlist(prevList =>
+                prevList.map(item => {
+                    const freshData = updatedItemsMap.get(item.ticker);
+                    return freshData ? { ...item, ...freshData } : item;
+                })
+            );
         } catch (error) {
             console.error("Error refreshing watchlist:", error);
         } finally {

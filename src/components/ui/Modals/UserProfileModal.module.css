@@ -21,8 +21,18 @@
     border-radius: 1.5rem;
     box-sizing: border-box;
     position: relative;
-    overflow: hidden;
+    /* overflow: hidden; */
     align-items: center;
+}
+
+.editActions {
+    display: flex;
+    gap: 0.8rem;
+    width: 100%;
+    justify-content: center;
+    margin-top: 0.5rem;
+    position: relative;
+    z-index: 20;
 }
 
 .rightCol {
@@ -139,6 +149,48 @@
     font-size: 0.8rem;
     color: var(--neu-brand);
     font-weight: 600;
+}
+
+/* Home Currency Display */
+.baseCurrencyDisplay {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.25rem;
+    background: transparent;
+    border: none;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: flex-start;
+}
+
+.baseCurrencyLabel {
+    font-size: 0.85rem;
+    color: var(--neu-text-tertiary);
+    font-weight: 500;
+}
+
+.baseCurrencyValue {
+    font-size: 0.9rem;
+    color: var(--neu-brand);
+    font-weight: 700;
+}
+
+.currencySelectWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 0.4rem;
+}
+
+.inputLabel {
+    font-size: 0.7rem;
+    color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-align: left;
 }
 
 /* DOB Input in Edit Mode */
@@ -378,13 +430,6 @@
 
 .avatarContainer:hover .avatarOverlay {
     opacity: 1;
-}
-
-.editInputs {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    width: 100%;
 }
 
 .editInputs {

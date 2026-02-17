@@ -21,7 +21,6 @@ import {
     YAxis
 } from 'recharts';
 import styles from './CPFCard.module.css';
-import { useUserSettings } from '../../../hooks/useUserSettings';
 import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const CPFCard = ({
@@ -29,14 +28,24 @@ const CPFCard = ({
     onToggle = null,
     onHide = null,
     className = "",
-    dateOfBirth = null
+    dateOfBirth = null,
+    baseCurrency = 'USD',
+    baseCurrencySymbol = '$',
+    displayCurrency = 'USD',
+    displayCurrencySymbol = '$',
+    baseToDisplayRate = 1,
+    usdToDisplayRate = 1,
+    sgdToDisplayRate = 1,
+    settings = null,
+    onUpdateSettings = null,
+    loading = false
 }) => {
-    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
 
     // Default states
     const [age, setAge] = useState(30);
     const [monthlySalary, setMonthlySalary] = useState(6000);
     const [annualBonus, setAnnualBonus] = useState(12000);
+    const [salaryGrowth, setSalaryGrowth] = useState(0); // New State: Annual Growth %
     const [projectionYears, setProjectionYears] = useState(30);
     const [balances, setBalances] = useState({
         oa: 50000,
@@ -56,26 +65,27 @@ const CPFCard = ({
         if (settings?.cpf && !isInitialized) {
             if (settings.cpf.monthlySalary !== undefined) setMonthlySalary(settings.cpf.monthlySalary);
             if (settings.cpf.annualBonus !== undefined) setAnnualBonus(settings.cpf.annualBonus);
+            if (settings.cpf.salaryGrowth !== undefined) setSalaryGrowth(settings.cpf.salaryGrowth);
             if (settings.cpf.projectionYears !== undefined) setProjectionYears(settings.cpf.projectionYears);
             if (settings.cpf.balances) setBalances(settings.cpf.balances);
             setIsInitialized(true);
         }
     }, [settings, isInitialized]);
 
-    // Save to user settings (Debounced)
     useEffect(() => {
-        if (settingsLoading) return;
+        if (loading || !onUpdateSettings) return;
         const timer = setTimeout(() => {
             const currentData = {
                 monthlySalary,
                 annualBonus,
+                salaryGrowth,
                 projectionYears,
                 balances
             };
             // Only update if data changed to avoid infinite loop
             const { updatedAt: prevTime, ...prevCpfWithoutTime } = settings?.cpf || {};
-            if (JSON.stringify(prevCpfWithoutTime) !== JSON.stringify(currentData)) {
-                updateSettings({
+            if (JSON.stringify(prevCpfWithoutTime) !== JSON.stringify(currentData) && isInitialized) {
+                onUpdateSettings({
                     cpf: {
                         ...currentData,
                         updatedAt: new Date().toISOString()
@@ -84,7 +94,7 @@ const CPFCard = ({
             }
         }, 1000);
         return () => clearTimeout(timer);
-    }, [monthlySalary, annualBonus, projectionYears, balances, settingsLoading, updateSettings, settings?.cpf]);
+    }, [monthlySalary, annualBonus, salaryGrowth, projectionYears, balances, loading, onUpdateSettings, settings?.cpf, isInitialized]);
 
     // Calculate age from DOB if available
     useEffect(() => {
@@ -96,172 +106,333 @@ const CPFCard = ({
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
                 calculatedAge--;
             }
-            // For 2026 simulation, use age in 2026
-            const ageIn2026 = calculatedAge + (2026 - today.getFullYear());
-            setAge(ageIn2026 > 0 ? ageIn2026 : 30);
+            // Base simulation on actual attained age today
+            setAge(calculatedAge > 0 ? calculatedAge : 30);
         }
     }, [dateOfBirth]);
 
-    // CPF 2026 Logic Helpers
-    const CEILINGS = {
-        OW: 8000,
-        ANNUAL: 102000,
-        FRS: 213000 // Estimated FRS for 2026
+    // --- CPF 2026+ Base Logic Helpers (Step 3: Dynamic Allocation) ---
+    const YEAR_CONFIGS = {
+        2026: { owCeiling: 8000, annualLimit: 102000 },
     };
 
-    const getContributionRates = (currentAge) => {
-        if (currentAge <= 55) return { employer: 0.17, employee: 0.20, total: 0.37 };
-        if (currentAge <= 60) return { employer: 0.16, employee: 0.18, total: 0.34 };
-        if (currentAge <= 65) return { employer: 0.125, employee: 0.125, total: 0.25 };
-        if (currentAge <= 70) return { employer: 0.09, employee: 0.075, total: 0.165 };
-        return { employer: 0.075, employee: 0.05, total: 0.125 };
+    const getYearlyConfig = (year) => {
+        return YEAR_CONFIGS[2026];
     };
 
-    const getAllocationRatios = (currentAge) => {
-        if (currentAge <= 35) return { oa: 0.6217, sa: 0.1621, ma: 0.2162 };
-        if (currentAge <= 45) return { oa: 0.5677, sa: 0.1891, ma: 0.2432 };
-        if (currentAge <= 50) return { oa: 0.5136, sa: 0.2162, ma: 0.2702 };
-        if (currentAge <= 55) return { oa: 0.4055, sa: 0.3108, ma: 0.2837 };
-        return { oa: 0.4055, ra: 0.3108, ma: 0.2837 }; // 55+ logic uses RA
+    // Helper to get exact OA/SA/MA rates based on age
+    const getSpecificRates = (age) => {
+        // <= 35 (Standard 2026: 23, 6, 8 => Total 37%) 
+        if (age <= 35) return { oa: 0.2300, sa: 0.0600, ma: 0.0800, total: 0.3700 };
+
+        // 35-45 (User Rule: 21.01, 6.99, 9.0 => Total 37%)
+        if (age <= 45) return { oa: 0.2101, sa: 0.0699, ma: 0.0900, total: 0.3700 };
+
+        // 45-50 (User Rule: 19.01, 7.99, 10.0 => Total 37%)
+        if (age <= 50) return { oa: 0.1901, sa: 0.0799, ma: 0.1000, total: 0.3700 };
+
+        // 50-55 (User Rule: 15.01, 11.49, 10.5 => Total 37%)
+        if (age <= 55) return { oa: 0.1501, sa: 0.1149, ma: 0.1050, total: 0.3700 };
+
+        // > 55 (Standard tapering - approximate based on 2026)
+        if (age <= 60) return { oa: 0.1150, sa: 0.1100, ma: 0.1000, total: 0.3250 };
+        if (age <= 65) return { oa: 0.0450, sa: 0.0950, ma: 0.1100, total: 0.2500 };
+        if (age <= 70) return { oa: 0.0200, sa: 0.0600, ma: 0.0850, total: 0.1650 };
+        return { oa: 0.0100, sa: 0.0100, ma: 0.1050, total: 0.1250 };
     };
 
+    // Step 3: Compound Interest Foundation Logic + Ceilings + Dynamic Rates
     const calculationResult = useMemo(() => {
-        let currentOA = Number(balances.oa || 0);
-        let currentSA = age >= 55 ? 0 : Number(balances.sa || 0);
-        let currentMA = Number(balances.ma || 0);
-        let currentRA = age >= 55 ? (Number(balances.ra || 0) + Number(balances.sa || 0)) : 0;
+        const startYear = 2026;
+        let currentAge = age;
+        const birthMonthIndex = dateOfBirth ? new Date(dateOfBirth).getMonth() : 0;
+
+        let at55Snapshot = { withdrawable: 0, ra: 0, target: 0, ageReached: false };
+
+        let bal = {
+            oa: Number(balances.oa || 0),
+            sa: Number(balances.sa || 0),
+            ma: Number(balances.ma || 0),
+            ra: Number(balances.ra || 0)
+        };
+
+        const currentTotal = bal.oa + bal.sa + bal.ma + bal.ra;
 
         let projection = [];
-        let yearlyInterest = { oa: 0, sa: 0, ma: 0, ra: 0 };
+        let yearlyInterest = { total: 0, breakdown: { oa: 0, sa: 0, ma: 0, ra: 0 } };
 
-        // Project for specified years or until age 100
-        const currentYear = 2026;
+        projection.push({
+            year: startYear,
+            age: currentAge,
+            oa: bal.oa,
+            sa_ra: bal.sa + bal.ra,
+            ma: bal.ma,
+            total: currentTotal
+        });
+
         const maxYears = Math.min(projectionYears, 100 - age);
 
-        for (let year = 0; year <= maxYears; year++) {
-            const currentAge = age + year;
-            const rates = getContributionRates(currentAge);
-            const allocation = getAllocationRatios(currentAge);
+        for (let y = 0; y < maxYears; y++) {
+            const year = startYear + y + 1;
+            const config = getYearlyConfig(year);
+            const annualWageCeiling = config.annualLimit || 102000;
 
-            let yearOAInterest = 0;
-            let yearSAInterest = 0;
-            let yearMAInterest = 0;
-            let yearRAInterest = 0;
+            let pendingInterest = { oa: 0, sa: 0, ma: 0, ra: 0 };
 
-            // Monthly simulation within the year
-            for (let month = 0; month < 12; month++) {
-                // 1. Interest accrual
-                const monthlyIntOA = currentOA * (0.025 / 12);
-                const monthlyIntSA = currentSA * (0.04 / 12);
-                const monthlyIntMA = currentMA * (0.04 / 12);
-                const monthlyIntRA = currentRA * (0.04 / 12);
+            // Step 2: Annual Ceiling Counter (resets every year)
+            let totalWagesYearToDate = 0;
 
-                yearOAInterest += monthlyIntOA;
-                yearSAInterest += monthlyIntSA;
-                yearMAInterest += monthlyIntMA;
-                yearRAInterest += monthlyIntRA;
+            for (let m = 0; m < 12; m++) {
+                const isPostBday = m > birthMonthIndex;
+                const lookupAge = isPostBday ? currentAge + 1 : currentAge;
 
-                // Extra Interest
+                // Step 3: Get specific rates for this age
+                const rates = getSpecificRates(lookupAge);
+
+                // Apply Salary Growth Logic
+                // We use the base monthlySalary and annualBonus, compounded by salaryGrowth for the current year (y)
+                const growthFactor = Math.pow(1 + (Number(salaryGrowth) / 100), y);
+                const currentMonthlySalary = Number(monthlySalary || 0) * growthFactor;
+                const currentAnnualBonus = Number(annualBonus || 0) * growthFactor;
+
+                const sNum = currentMonthlySalary;
+
+                // Rule 1: Monthly Wage Ceiling (OW)
+                const ow = Math.min(sNum, config.owCeiling);
+
+                const isBonus = m === 11;
+                const bNum = currentAnnualBonus;
+                const aw = isBonus ? bNum : 0;
+
+                const potentialSubject = ow + aw;
+
+                // Rule 2: Annual Ceiling Logic
+                const remainingQuota = Math.max(0, annualWageCeiling - totalWagesYearToDate);
+                const actualSubject = Math.min(potentialSubject, remainingQuota);
+
+                // Update counter
+                totalWagesYearToDate += actualSubject;
+
+                // Step 3: Direct Percentage Calculation
+                const contribOA = actualSubject * rates.oa;
+                const contribSA = actualSubject * rates.sa;
+                const contribMA = actualSubject * rates.ma;
+
+                bal.oa += contribOA;
+                bal.sa += contribSA;
+                bal.ma += contribMA;
+
+                // --- Step 5: MediSave Overflow Check (Monthly) ---
+                // BHS Limit: $79,000 in 2026, +3% yearly
+                // FRS Limit: ~$213,000 in 2026 (Half of ERS), +3% yearly
+                const currentBHS = 79000 * Math.pow(1.03, year - 2026);
+                const currentFRS = 213000 * Math.pow(1.03, year - 2026);
+
+                const handleOverflow = () => {
+                    if (bal.ma > currentBHS) {
+                        const excessMA = bal.ma - currentBHS;
+                        bal.ma = currentBHS;
+
+                        // Overflow to SA (or RA if age >= 55)
+                        if (currentAge < 55) {
+                            // Check FRS limit for SA
+                            if (bal.sa + excessMA > currentFRS) {
+                                // Fill SA to FRS
+                                const spaceInSA = Math.max(0, currentFRS - bal.sa);
+                                bal.sa += spaceInSA;
+                                const remainingExcess = excessMA - spaceInSA;
+                                // Remainder to OA
+                                bal.oa += remainingExcess;
+                            } else {
+                                bal.sa += excessMA;
+                            }
+                        } else {
+                            // For Age >= 55, overflow to RA (up to ERS) then OA
+                            const currentERS = 426000 * Math.pow(1.03, year - 2026);
+                            if (bal.ra + excessMA > currentERS) {
+                                const spaceInRA = Math.max(0, currentERS - bal.ra);
+                                bal.ra += spaceInRA;
+                                const remainingExcess = excessMA - spaceInRA;
+                                bal.oa += remainingExcess;
+                            } else {
+                                bal.ra += excessMA;
+                            }
+                        }
+                    }
+                };
+
+                handleOverflow(); // Apply immediate BHS overflow check
+
+                pendingInterest.oa += bal.oa * (0.025 / 12);
+                pendingInterest.sa += bal.sa * (0.04 / 12);
+                pendingInterest.ma += bal.ma * (0.04 / 12);
+                pendingInterest.ra += bal.ra * (0.04 / 12);
+
+                // --- Step 4: Extra 1% Interest Hierarchy ---
+                // Cap: $60k combined. OA portion capped at $20k.
+                let extraBase = 60000;
+                let extraInterest = 0;
+
+                // 1. MA (First priority)
+                const maQualify = Math.min(bal.ma, extraBase);
+                extraBase -= maQualify;
+                extraInterest += maQualify * (0.01 / 12);
+
+                // 2. SA / RA (Second priority) -> uses remaining cap
+                const saRaBal = (currentAge < 55) ? bal.sa : bal.ra;
+                const saQualify = Math.min(saRaBal, extraBase);
+                extraBase -= saQualify;
+                extraInterest += saQualify * (0.01 / 12);
+
+                // 3. OA (Third priority) -> capped at remaining base AND $20k
+                const oaCap = 20000;
+                const oaQualify = Math.min(bal.oa, extraBase, oaCap);
+                // extraBase -= oaQualify; // Not needed anymore for calculation
+                extraInterest += oaQualify * (0.01 / 12);
+
+                // Credit Extra Interest to SA (or RA if age >= 55) (User Rule: Credit to SA)
                 if (currentAge < 55) {
-                    const eligibleOA = Math.min(currentOA, 20000);
-                    const remaining60k = Math.max(0, 60000 - eligibleOA);
-                    const eligibleOthers = Math.min(currentSA + currentMA, remaining60k);
-                    yearSAInterest += (eligibleOA + eligibleOthers) * (0.01 / 12);
+                    pendingInterest.sa += extraInterest;
                 } else {
-                    const eligibleOA = Math.min(currentOA, 20000);
-                    const totalRA_MA = currentRA + currentMA;
-                    let rem3 = 30000;
-                    let extra = 0;
-                    const tOA = Math.min(eligibleOA, rem3);
-                    extra += tOA * (0.02 / 12);
-                    rem3 -= tOA;
-                    const tOthers = Math.min(totalRA_MA, rem3);
-                    extra += tOthers * (0.02 / 12);
-                    rem3 -= tOthers;
-                    let n3 = 30000;
-                    const tOA2 = Math.min(Math.max(0, eligibleOA - tOA), n3);
-                    extra += tOA2 * (0.01 / 12);
-                    n3 -= tOA2;
-                    const tOthers2 = Math.min(Math.max(0, totalRA_MA - tOthers), n3);
-                    extra += tOthers2 * (0.01 / 12);
-                    yearRAInterest += extra;
+                    pendingInterest.ra += extraInterest;
                 }
 
-                // 2. Contributions
-                const isBonusMonth = month === 11;
-                const owSubject = Math.min(Number(monthlySalary || 0), CEILINGS.OW);
-                const totalOWForYear = owSubject * (month + 1);
-                const awSubject = isBonusMonth ? Math.max(0, Math.min(Number(annualBonus || 0), CEILINGS.ANNUAL - totalOWForYear)) : 0;
-                const totalSubject = owSubject + awSubject;
+                // --- Step 6: Age 55 Retirement Transition (Birthday Month) ---
+                if (lookupAge === 55 && m === birthMonthIndex) {
+                    // 1. Calculate Retirement Sums (Base 2026, +3.5% growth)
+                    const yearsFrom2026 = year - 2026;
+                    const projectedBRS = 110200 * Math.pow(1.035, yearsFrom2026);
+                    const projectedFRS = 220400 * Math.pow(1.035, yearsFrom2026);
+                    const projectedERS = 440800 * Math.pow(1.035, yearsFrom2026);
 
-                const totalContr = Math.round(totalSubject * rates.total);
+                    // 2. Cascading RA Fill Logic
+                    // 2a. Transfer 1: SA -> RA (up to FRS)
+                    const spaceInRA = Math.max(0, projectedFRS - bal.ra);
+                    const fromSA = Math.min(bal.sa, spaceInRA);
+                    bal.ra += fromSA;
+                    bal.sa -= fromSA;
 
-                const iOA_base = Math.round(totalContr * allocation.oa);
-                const iMA = Math.round(totalContr * allocation.ma);
-                const iOthers = totalContr - iOA_base - iMA;
+                    // 2b. Transfer 2: OA -> RA (if RA < FRS)
+                    const remainingSpaceInRA = Math.max(0, projectedFRS - bal.ra);
+                    const fromOA = Math.min(bal.oa, remainingSpaceInRA);
+                    bal.ra += fromOA;
+                    bal.oa -= fromOA;
 
-                let iOA = iOA_base;
-                let iSA = 0;
-                let iRA = 0;
+                    // 3. SA Closure & Sweep (Remaining SA to OA)
+                    if (bal.sa > 0) {
+                        bal.oa += bal.sa;
+                        bal.sa = 0;
+                    }
+
+                    // Capture snapshot at 55
+                    at55Snapshot = {
+                        withdrawable: bal.oa,
+                        ra: bal.ra,
+                        target: projectedFRS,
+                        ageReached: true
+                    };
+                }
+
+                // --- Step 6b: Future SA Contributions Redirect (Age >= 55) ---
+                // "All future working contributions... redirected to RA... or OA".
+                const isAfter55 = (currentAge > 55) || (currentAge === 55 && m > birthMonthIndex);
+                if (isAfter55 && bal.sa > 0) {
+                    const amount = bal.sa;
+                    bal.sa = 0;
+
+                    const currentERS = 440800 * Math.pow(1.035, year - 2026);
+                    const spaceInRA = Math.max(0, currentERS - bal.ra);
+                    const toRA = Math.min(amount, spaceInRA);
+                    bal.ra += toRA;
+
+                    const toOA = amount - toRA;
+                    bal.oa += toOA;
+                }
+            }
+
+            bal.oa += pendingInterest.oa;
+            bal.sa += pendingInterest.sa;
+            bal.ma += pendingInterest.ma;
+            bal.ra += pendingInterest.ra;
+
+            // Re-apply overflow check after year-end interest
+            const currentBHS_YE = 79000 * Math.pow(1.03, year - 2026);
+            const currentFRS_YE = 213000 * Math.pow(1.03, year - 2026);
+
+            if (bal.ma > currentBHS_YE) {
+                const excessMA = bal.ma - currentBHS_YE;
+                bal.ma = currentBHS_YE;
 
                 if (currentAge < 55) {
-                    iSA = iOthers;
-                } else {
-                    if (currentRA < CEILINGS.FRS) {
-                        const room = CEILINGS.FRS - currentRA;
-                        const toRA = Math.min(iOthers, room);
-                        iRA = toRA;
-                        iOA += (iOthers - toRA);
+                    if (bal.sa + excessMA > currentFRS_YE) {
+                        const spaceInSA = Math.max(0, currentFRS_YE - bal.sa);
+                        bal.sa += spaceInSA;
+                        const remaining = excessMA - spaceInSA;
+                        bal.oa += remaining;
                     } else {
-                        iOA += iOthers;
+                        bal.sa += excessMA;
+                    }
+                } else {
+                    const currentERS_YE = 426000 * Math.pow(1.03, year - 2026);
+                    if (bal.ra + excessMA > currentERS_YE) {
+                        const spaceInRA = Math.max(0, currentERS_YE - bal.ra);
+                        bal.ra += spaceInRA;
+                        const remaining = excessMA - spaceInRA;
+                        bal.oa += remaining;
+                    } else {
+                        bal.ra += excessMA;
                     }
                 }
-
-                currentOA += iOA;
-                currentSA += iSA;
-                currentMA += iMA;
-                currentRA += iRA;
             }
 
-            // Credit interest at year end
-            currentOA += yearOAInterest;
-            currentSA += yearSAInterest;
-            currentMA += yearMAInterest;
-            currentRA += yearRAInterest;
-
-            if (year === 0) {
-                yearlyInterest = {
-                    oa: yearOAInterest,
-                    sa: yearSAInterest,
-                    ma: yearMAInterest,
-                    ra: yearRAInterest,
-                    total: yearOAInterest + yearSAInterest + yearMAInterest + yearRAInterest
-                };
-            }
+            currentAge++;
 
             projection.push({
-                year: currentYear + year,
+                year: year,
                 age: currentAge,
-                oa: Math.round(currentOA),
-                sa_ra: Math.round(currentSA + currentRA),
-                ma: Math.round(currentMA),
-                total: Math.round(currentOA + currentSA + currentMA + currentRA)
+                oa: bal.oa,
+                sa_ra: bal.sa + bal.ra,
+                ma: bal.ma,
+                total: bal.oa + bal.sa + bal.ma + bal.ra
             });
+
+            if (y === 0) {
+                yearlyInterest = {
+                    total: pendingInterest.oa + pendingInterest.sa + pendingInterest.ma + pendingInterest.ra,
+                    breakdown: { ...pendingInterest }
+                };
+            }
         }
 
         return {
             projection,
             yearlyInterest,
             finalBalances: {
-                oa: projection[0].oa,
-                sa: age < 55 ? projection[0].sa_ra : 0,
-                ma: projection[0].ma,
-                ra: age >= 55 ? projection[0].sa_ra : 0
-            }
+                oa: bal.oa,
+                sa: bal.sa,
+                ma: bal.ma,
+                ra: bal.ra
+            },
+            at55: at55Snapshot
         };
-    }, [age, monthlySalary, annualBonus, projectionYears, balances]);
+    }, [age, monthlySalary, annualBonus, salaryGrowth, projectionYears, balances, dateOfBirth]);
 
-    const formatCurrency = (val) => new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD', maximumFractionDigits: 0 }).format(val);
+    // Display values with currency conversion (SGD -> Display)
+    const formatCurrency = (val) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: displayCurrency,
+            maximumFractionDigits: 0
+        }).format(val * sgdToDisplayRate);
+    };
+
+    const formatSGD = (val) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'SGD',
+            maximumFractionDigits: 0
+        }).format(val);
+    };
 
     const handleInputChange = (setter) => (e) => {
         const val = e.target.value;
@@ -274,8 +445,12 @@ const CPFCard = ({
         }
     };
 
-    const startBalance = Number(balances.oa || 0) + Number(balances.sa || 0) + Number(balances.ma || 0) + Number(balances.ra || 0);
-
+    const startBalance = {
+        oa: Number(balances.oa || 0),
+        sa: Number(balances.sa || 0),
+        ma: Number(balances.ma || 0),
+        ra: Number(balances.ra || 0)
+    };
     const finalProjectedData = calculationResult.projection[calculationResult.projection.length - 1];
     const finalProjectedTotal = finalProjectedData ? finalProjectedData.total : 0;
 
@@ -288,7 +463,7 @@ const CPFCard = ({
             <div className={styles.headerGrid} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <div className={styles.headerItem} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                     <span className={styles.headerLabel}>Current Total</span>
-                    <span className={styles.headerValueSuccess}>{formatCurrency(startBalance)}</span>
+                    <span className={styles.headerValueSuccess}>{formatCurrency(startBalance.oa + startBalance.sa + startBalance.ma + startBalance.ra)}</span>
                 </div>
                 <div className={styles.headerItem} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                     <span className={styles.headerLabel}>Projected Total</span>
@@ -300,9 +475,10 @@ const CPFCard = ({
 
     const pieData = [
         { name: 'OA', value: Math.round(calculationResult.finalBalances.oa), color: '#3b82f6' },
-        { name: age < 55 ? 'SA' : 'RA', value: Math.round(calculationResult.finalBalances.sa || calculationResult.finalBalances.ra), color: '#f59e0b' },
+        { name: 'SA', value: Math.round(calculationResult.finalBalances.sa), color: '#f59e0b' },
+        { name: 'RA', value: Math.round(calculationResult.finalBalances.ra), color: '#8b5cf6' }, // Purple for RA
         { name: 'MA', value: Math.round(calculationResult.finalBalances.ma), color: '#10b981' },
-    ];
+    ].filter(item => item.value > 0);
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
@@ -336,6 +512,13 @@ const CPFCard = ({
                                 <span className={styles.tooltipValue}>{formatCurrency(p.value)}</span>
                             </div>
                         ))}
+                        <div className={styles.divider} style={{ margin: '0.5rem 0' }} />
+                        <div className={styles.tooltipItem} style={{ color: 'var(--neu-text-primary)' }}>
+                            <span className={styles.tooltipName} style={{ fontWeight: 700 }}>Total:</span>
+                            <span className={styles.tooltipValue} style={{ fontWeight: 700 }}>
+                                {formatCurrency(payload.reduce((sum, p) => sum + Number(p.value || 0), 0))}
+                            </span>
+                        </div>
                     </div>
                 </div>
             );
@@ -367,7 +550,7 @@ const CPFCard = ({
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}
-                loading={settingsLoading}
+                loading={loading}
                 className={`${styles.card} ${className}`}
                 menuItems={menuItems}
 
@@ -434,6 +617,10 @@ const CPFCard = ({
                                 <h4 className={styles.sectionHeaderTitle}>Account Distribution & Interest (2026)</h4>
                                 <div className={styles.summaryTopRow}>
                                     <div className={styles.chartContainer}>
+                                        <div className={styles.chartOverlay}>
+                                            <span className={styles.overlayLabel}>Projected Total</span>
+                                            <span className={styles.overlayValue}>{formatCurrency(finalProjectedTotal)}</span>
+                                        </div>
                                         <ResponsiveContainer width="100%" height={180}>
                                             <PieChart>
                                                 <Pie
@@ -451,26 +638,27 @@ const CPFCard = ({
                                                 <Tooltip content={<CustomTooltip />} />
                                             </PieChart>
                                         </ResponsiveContainer>
-                                        <div className={styles.chartOverlay}>
-                                            <span className={styles.overlayLabel}>Balance</span>
-                                            <span className={styles.overlayValue}>{formatCurrency(calculationResult.projection[0]?.total || 0)}</span>
-                                        </div>
                                     </div>
 
                                     <div className={styles.statsPanel}>
                                         <div className={styles.statLine}>
                                             <div className={styles.statDot} style={{ background: '#3b82f6' }} />
-                                            <span className={styles.statLabel}>OA Balance</span>
+                                            <span className={styles.statLabel}>Projected OA</span>
                                             <span className={styles.statValue}>{formatCurrency(calculationResult.finalBalances.oa)}</span>
                                         </div>
                                         <div className={styles.statLine}>
                                             <div className={styles.statDot} style={{ background: '#f59e0b' }} />
-                                            <span className={styles.statLabel}>{age < 55 ? 'SA Balance' : 'RA Balance'}</span>
-                                            <span className={styles.statValue}>{formatCurrency(calculationResult.finalBalances.sa || calculationResult.finalBalances.ra)}</span>
+                                            <span className={styles.statLabel}>Projected SA</span>
+                                            <span className={styles.statValue}>{formatCurrency(calculationResult.finalBalances.sa)}</span>
+                                        </div>
+                                        <div className={styles.statLine}>
+                                            <div className={styles.statDot} style={{ background: '#8b5cf6' }} />
+                                            <span className={styles.statLabel}>Projected RA</span>
+                                            <span className={styles.statValue}>{formatCurrency(calculationResult.finalBalances.ra)}</span>
                                         </div>
                                         <div className={styles.statLine}>
                                             <div className={styles.statDot} style={{ background: '#10b981' }} />
-                                            <span className={styles.statLabel}>MA Balance</span>
+                                            <span className={styles.statLabel}>Projected MA</span>
                                             <span className={styles.statValue}>{formatCurrency(calculationResult.finalBalances.ma)}</span>
                                         </div>
                                         <div className={styles.divider} />
@@ -478,6 +666,27 @@ const CPFCard = ({
                                             <span className={styles.statLabelEmphasized}>Yearly Interest</span>
                                             <span className={styles.statValueSuccess}>+{formatCurrency(calculationResult.yearlyInterest.total)}</span>
                                         </div>
+
+                                        {calculationResult.at55.ageReached && (
+                                            <>
+                                                <div className={styles.divider} />
+                                                <div className={styles.statLine}>
+                                                    <span className={styles.statLabelEmphasized}>Simulation at Age 55</span>
+                                                </div>
+                                                <div className={styles.statLine}>
+                                                    <span className={styles.statLabel}>Target (ERS 2025)</span>
+                                                    <span className={styles.statValueSecondary}>{formatCurrency(calculationResult.at55.target)}</span>
+                                                </div>
+                                                <div className={styles.statLine}>
+                                                    <span className={styles.statLabel}>Locked RA (Funded)</span>
+                                                    <span className={styles.statValueSecondary}>{formatCurrency(calculationResult.at55.ra)}</span>
+                                                </div>
+                                                <div className={styles.statLine}>
+                                                    <span className={styles.statLabel}>Withdrawable (OA+Excess)</span>
+                                                    <span className={styles.statValueHighlight}>{formatCurrency(calculationResult.at55.withdrawable)}</span>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -516,7 +725,7 @@ const CPFCard = ({
                             )}
                         </div>
                         <div className={styles.inputGroup}>
-                            <label className={styles.label}>Monthly Salary (OW)</label>
+                            <label className={styles.inputLabel}>Monthly Salary (S$)</label>
                             <div className={styles.inputWrapper}>
                                 <input
                                     type="number"
@@ -528,7 +737,7 @@ const CPFCard = ({
                             </div>
                         </div>
                         <div className={styles.inputGroup}>
-                            <label className={styles.label}>Annual Bonus (AW)</label>
+                            <label className={styles.inputLabel}>Annual Bonus (S$)</label>
                             <div className={styles.inputWrapper}>
                                 <input
                                     type="number"
@@ -540,12 +749,25 @@ const CPFCard = ({
                             </div>
                         </div>
 
+                        <div className={styles.inputGroup}>
+                            <label className={styles.inputLabel}>Annual Salary Growth (%)</label>
+                            <div className={styles.inputWrapper}>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    className={styles.neuInput}
+                                    value={salaryGrowth}
+                                    onChange={handleInputChange(setSalaryGrowth)}
+                                />
+                            </div>
+                        </div>
+
                         <div className={styles.sectionDivider} />
                         <h4 className={styles.subTitle}>Starting Balances (Jan 2026)</h4>
 
                         <div className={styles.inputGridMini}>
                             <div className={styles.inputGroupMini}>
-                                <label className={styles.label}>OA ($)</label>
+                                <label className={styles.label}>OA (S$)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -555,7 +777,7 @@ const CPFCard = ({
                                 />
                             </div>
                             <div className={styles.inputGroupMini}>
-                                <label className={styles.label}>{age < 55 ? 'SA' : 'RA'} ($)</label>
+                                <label className={styles.label}>{age < 55 ? 'SA' : 'RA'} (S$)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -568,7 +790,7 @@ const CPFCard = ({
                                 />
                             </div>
                             <div className={styles.inputGroupMini}>
-                                <label className={styles.label}>MA ($)</label>
+                                <label className={styles.label}>MA (S$)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -604,7 +826,7 @@ const CPFCard = ({
                     </section>
 
                     <section className={styles.refSection}>
-                        <h4 className={styles.refTitle}>Allocation Ratios</h4>
+                        <h4 className={styles.refTitle}>Allocation Ratios (2026 Framework)</h4>
                         <div className={styles.refAllocGrid}>
                             <div className={styles.refAllocHeader}>
                                 <span>Age</span>
@@ -616,20 +838,30 @@ const CPFCard = ({
                             <div className={styles.refAllocRow}><span>35 - 45</span> <span>56.77%</span> <span>18.91%</span> <span>24.32%</span></div>
                             <div className={styles.refAllocRow}><span>45 - 50</span> <span>51.36%</span> <span>21.62%</span> <span>27.02%</span></div>
                             <div className={styles.refAllocRow}><span>50 - 55</span> <span>40.55%</span> <span>31.08%</span> <span>28.37%</span></div>
-                            <div className={styles.refAllocRow}><span>55+</span> <span>40.55%</span> <span>31.08%(RA)</span> <span>28.37%</span></div>
+                            <div className={styles.refAllocRow}><span>55+ (SA Closed)</span> <span>Overflows</span> <span>To RA</span> <span>28.37%</span></div>
                         </div>
                     </section>
 
                     <section className={styles.refSection}>
-                        <h4 className={styles.refTitle}>Interest Rates (Projected 2026)</h4>
+                        <h4 className={styles.refTitle}>Interest Rates & Hierarchy</h4>
                         <div className={styles.refGrid}>
                             <div className={styles.refRow}><span>Ordinary Account (OA)</span> <strong>2.5% p.a.</strong></div>
                             <div className={styles.refRow}><span>SA / MA / RA</span> <strong>4.0% p.a.</strong></div>
                         </div>
                         <div className={styles.refNote}>
-                            <Info size={14} />
-                            <p>Extra interest: +1% on first $60k (capped $20k OA) for &lt; 55. Tiered extra interest for 55+.</p>
+                            <p><strong>Extra Interest Hierarchy:</strong> MA &gt; SA/RA &gt; OA. The first $60k of combined balances (capped $20k OA) earns +1%. For age 55+, the first $30k earns +2%.</p>
                         </div>
+                    </section>
+
+                    <section className={styles.refSection}>
+                        <h4 className={styles.refTitle}>Mandatory 2026 Rules</h4>
+                        <ul className={styles.refList}>
+                            <li><strong>Monthly Salary Ceiling:</strong> $8,000.</li>
+                            <li><strong>AW (Bonus) Ceiling:</strong> $102,000 - Total Ordinary Wages (Capped).</li>
+                            <li><strong>Basic Healthcare Sum (BHS):</strong> $79,000 (Grows 3% p.a.).</li>
+                            <li><strong>Retirement Account (ERS):</strong> Enhanced Retirement Sum (4x BRS) target at age 55. ($426k in 2026, grows 3.5% p.a.).</li>
+                            <li><strong>SA Closure at 55:</strong> SA merged into RA/OA. Subsequent MA overflows go to RA/OA based on ERS cap.</li>
+                        </ul>
                     </section>
                 </div>
             </Window >

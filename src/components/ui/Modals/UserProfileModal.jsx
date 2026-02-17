@@ -80,8 +80,11 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewURL, setPreviewURL] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState(null);
     const [dateOfBirth, setDateOfBirth] = useState('');
     const [editDateOfBirth, setEditDateOfBirth] = useState('');
+    const [baseCurrency, setBaseCurrency] = useState('USD');
+    const [editBaseCurrency, setEditBaseCurrency] = useState('USD');
     const fileInputRef = useRef(null);
 
     const calculateAge = (dob) => {
@@ -108,8 +111,9 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
             setEditPhotoURL(user.photoURL || '');
             setPreviewURL(user.photoURL || '');
             setEditDateOfBirth(dateOfBirth || '');
+            setEditBaseCurrency(baseCurrency || 'USD');
         }
-    }, [user, isEditing, dateOfBirth]);
+    }, [user, isEditing, dateOfBirth, baseCurrency]);
 
     const handleFileChange = (e) => {
         if (e.target.files[0]) {
@@ -121,6 +125,7 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
 
     const handleSaveProfile = async () => {
         setIsSaving(true);
+        setSaveError(null);
         try {
             let photoURL = editPhotoURL;
 
@@ -130,18 +135,29 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
 
             await updateUserProfile(editName, photoURL);
 
-            // Save DOB to settings
+            // Save DOB and Base Currency to settings
             setDateOfBirth(editDateOfBirth);
+            setBaseCurrency(editBaseCurrency);
             if (user?.uid) {
-                const newSettings = { ...settings, dateOfBirth: editDateOfBirth };
+                const newSettings = {
+                    ...settings,
+                    dateOfBirth: editDateOfBirth,
+                    baseCurrency: editBaseCurrency
+                };
                 setSettings(newSettings);
                 await saveUserSettings(user.uid, newSettings);
+
+                // Notify background pages immediately
+                window.dispatchEvent(new CustomEvent('user-settings-updated', {
+                    detail: { settings: newSettings }
+                }));
             }
 
             setIsEditing(false);
             setSelectedFile(null);
         } catch (error) {
             console.error("Failed to update profile:", error);
+            setSaveError("Failed to save. Please try again.");
         } finally {
             setIsSaving(false);
         }
@@ -150,6 +166,7 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
     const handleCancel = () => {
         setIsEditing(false);
         setSelectedFile(null);
+        setSaveError(null);
         setPreviewURL(user?.photoURL || '');
     };
     const [settings, setSettings] = useState({
@@ -201,6 +218,9 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                 }
                 if (fetched?.dateOfBirth) {
                     setDateOfBirth(fetched.dateOfBirth);
+                }
+                if (fetched?.baseCurrency) {
+                    setBaseCurrency(fetched.baseCurrency);
                 }
             });
         }
@@ -374,7 +394,25 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                                             triggerClassName={styles.profileInput}
                                         />
                                     </div>
+                                    <div className={styles.currencySelectWrapper}>
+                                        <label className={styles.inputLabel}>Home Currency</label>
+                                        <DropdownButton
+                                            label={editBaseCurrency}
+                                            variant="ghost"
+                                            buttonStyle={{ width: '100%', justifyContent: 'space-between', padding: '0.6rem 1rem' }}
+                                            items={[
+                                                { label: 'USD - US Dollar', onClick: () => setEditBaseCurrency('USD') },
+                                                { label: 'SGD - Singapore Dollar', onClick: () => setEditBaseCurrency('SGD') }
+                                            ]}
+                                            closeOnSelect={true}
+                                        />
+                                    </div>
                                 </div>
+                                {saveError && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '0.5rem', textAlign: 'center' }}>
+                                        {saveError}
+                                    </div>
+                                )}
                                 <div className={styles.editActions}>
                                     <Button
                                         variant="icon"
@@ -436,6 +474,10 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                                         </span>
                                     </div>
                                 )}
+                                <div className={styles.baseCurrencyDisplay}>
+                                    <span className={styles.baseCurrencyLabel}>Home Currency:</span>
+                                    <span className={styles.baseCurrencyValue}>{baseCurrency}</span>
+                                </div>
                             </>
                         )}
                     </div>
@@ -538,7 +580,7 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
                     </div>
                 </div>
             </div>
-        </Window>
+        </Window >
     );
 });
 

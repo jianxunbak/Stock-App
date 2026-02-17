@@ -6,7 +6,6 @@ import SavingsEditorWindow from '../../ui/SavingsEditorWindow/SavingsEditorWindo
 import { Settings, TrendingUp, PieChart as PieChartIcon, ChevronDown, Layers } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import styles from './SavingsCard.module.css';
-import { useUserSettings } from '../../../hooks/useUserSettings';
 import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const SCENARIO_COLORS = [
@@ -49,10 +48,17 @@ const SavingsCard = ({
     isOpen = true,
     onToggle = null,
     onHide = null,
-    className = ""
+    className = "",
+    baseCurrency = 'USD',
+    baseCurrencySymbol = '$',
+    displayCurrency = 'USD',
+    displayCurrencySymbol = '$',
+    baseToDisplayRate = 1,
+    usdToDisplayRate = 1,
+    settings = null,
+    onUpdateSettings = null,
+    loading = false
 }) => {
-    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
-
     const [scenarios, setScenarios] = useState([
         {
             id: 1,
@@ -60,6 +66,7 @@ const SavingsCard = ({
             monthlyPay: 5000,
             initialSavings: 10000,
             bankInterestRate: 2,
+            annualExpenseGrowth: 2,
             years: 10,
             visible: true,
             color: SCENARIO_COLORS[0],
@@ -68,6 +75,7 @@ const SavingsCard = ({
     ]);
     const [nextScenarioId, setNextScenarioId] = useState(2);
     const [activeScenarioId, setActiveScenarioId] = useState(1);
+    const [cardName, setCardName] = useState('Savings and Expenses');
     const [projectionYears, setProjectionYears] = useState(10);
     const [showEditor, setShowEditor] = useState(false);
 
@@ -81,25 +89,28 @@ const SavingsCard = ({
             if (settings.savings.nextScenarioId) setNextScenarioId(settings.savings.nextScenarioId);
             if (settings.savings.activeScenarioId) setActiveScenarioId(settings.savings.activeScenarioId);
             if (settings.savings.projectionYears) setProjectionYears(settings.savings.projectionYears);
+            if (settings.savings.name) setCardName(settings.savings.name);
             setIsInitialized(true);
         }
     }, [settings, isInitialized]);
 
     // Save to settings (Debounced)
     useEffect(() => {
-        if (settingsLoading) return;
+        if (loading || !onUpdateSettings) return;
 
         const timer = setTimeout(() => {
             const currentData = {
                 scenarios,
                 nextScenarioId,
                 activeScenarioId,
-                projectionYears
+                projectionYears,
+                name: cardName
             };
 
             const { updatedAt, ...prevSavingsWithoutTime } = settings?.savings || {};
-            if (JSON.stringify(prevSavingsWithoutTime) !== JSON.stringify(currentData)) {
-                updateSettings({
+            // Only save if data has changed AND we have initialized from DB (avoids overwriting with defaults on load)
+            if (JSON.stringify(prevSavingsWithoutTime) !== JSON.stringify(currentData) && isInitialized) {
+                onUpdateSettings({
                     savings: {
                         ...currentData,
                         updatedAt: new Date().toISOString()
@@ -109,7 +120,7 @@ const SavingsCard = ({
         }, 300); // 300ms debounce
 
         return () => clearTimeout(timer);
-    }, [scenarios, nextScenarioId, activeScenarioId, projectionYears, settingsLoading, updateSettings, settings?.savings]);
+    }, [scenarios, nextScenarioId, activeScenarioId, projectionYears, cardName, loading, onUpdateSettings, settings?.savings, isInitialized]);
 
     // Helpers
     const calculateMetrics = (scenario) => {
@@ -185,8 +196,17 @@ const SavingsCard = ({
                 if (year === 0) {
                     point[`savings_${s.id}`] = balances[s.id];
                 } else {
-                    const { monthlySavings } = calculateMetrics(s);
-                    const annualSavings = monthlySavings * 12;
+                    const { totalExpenses, cpf } = calculateMetrics(s);
+                    const expenseGrowthRate = Number(s.annualExpenseGrowth || 0) / 100;
+
+                    // Apply annual growth to expenses
+                    const grownMonthlyExpenses = totalExpenses * Math.pow(1 + expenseGrowthRate, year);
+
+                    const monthlyPay = Number(s.monthlyPay || 0);
+                    // Base savings for this specific year
+                    const currentYearMonthlySavings = monthlyPay - cpf - grownMonthlyExpenses;
+                    const annualSavings = currentYearMonthlySavings * 12;
+
                     const interestRate = Number(s.bankInterestRate || 0) / 100;
 
                     // Annual compounding: (Balance * Interest) + Annual Savings
@@ -253,7 +273,16 @@ const SavingsCard = ({
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'USD',
+            currency: displayCurrency,
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(value * baseToDisplayRate);
+    };
+
+    const formatBaseCurrency = (value) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: baseCurrency,
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(value);
@@ -366,6 +395,7 @@ const SavingsCard = ({
             monthlyPay: cpfSalary,
             initialSavings: 10000,
             bankInterestRate: 2,
+            annualExpenseGrowth: 2,
             years: 10,
             visible: true,
             color: SCENARIO_COLORS[scenarios.length % SCENARIO_COLORS.length],
@@ -408,7 +438,8 @@ const SavingsCard = ({
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}
-                loading={settingsLoading}
+                // Only block if we have NO data. Otherwise show stale data.
+                loading={!settings && loading}
                 className={className}
 
                 controls={
@@ -440,7 +471,7 @@ const SavingsCard = ({
                         <div className={styles.chartSection}>
                             <div className={styles.sectionHeader}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <h4 className={styles.sectionTitle}>Projected Savings</h4>
+                                    <h4 className={styles.sectionTitle}>Projected Savings ({baseCurrency})</h4>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
@@ -481,9 +512,10 @@ const SavingsCard = ({
                                     }}
                                     showYAxis={true}
                                     yAxisFormatter={(val) => {
-                                        if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-                                        if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
-                                        return `$${val}`;
+                                        const convertedVal = val * baseToDisplayRate;
+                                        if (convertedVal >= 1000000) return `${displayCurrencySymbol}${(convertedVal / 1000000).toFixed(1)}M`;
+                                        if (convertedVal >= 1000) return `${displayCurrencySymbol}${(convertedVal / 1000).toFixed(0)}k`;
+                                        return `${displayCurrencySymbol}${convertedVal.toFixed(0)}`;
                                     }}
                                     tooltipValueFormatter={(val) => formatCurrency(val)}
                                 />
@@ -550,8 +582,12 @@ const SavingsCard = ({
                 isOpen={showEditor}
                 onClose={() => setShowEditor(false)}
                 scenarios={scenarios}
+                cardName={cardName}
+                onUpdateCardName={setCardName}
                 settings={settings}
                 stocksCharts={settings?.stocks?.charts || []}
+                baseCurrency={baseCurrency}
+                baseCurrencySymbol={baseCurrencySymbol}
                 onAddScenario={addScenario}
                 onRemoveScenario={removeScenario}
                 onUpdateScenario={updateScenario}

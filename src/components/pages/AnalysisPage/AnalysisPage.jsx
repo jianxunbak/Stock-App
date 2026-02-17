@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useStockData } from '../../../hooks/useStockData';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchUserSettings, saveUserSettings, fetchStockData } from '../../../services/api';
+import { useUserSettings } from '../../../hooks/useUserSettings';
 
 import MetricCard from '../../ui/MetricCard/MetricCard';
 
@@ -81,13 +82,15 @@ const AnalysisPage = () => {
     const urlTicker = searchParams.get('ticker');
     const navigate = useNavigate();
     const { currentUser, logout, loading: authLoading } = useAuth();
+    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
+    const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
 
-    const [currency, setCurrency] = useState('USD');
+    // console.log("AnalysisPage Settings:", { settings, settingsLoading });
 
     // Currency conversion rates (base: USD)
     const RATES = { 'USD': 1, 'SGD': 1.35, 'EUR': 0.92, 'GBP': 0.79 };
     const currentRate = RATES[currency];
-    const currencySymbol = currency === 'EUR' ? '€' : (currency === 'GBP' ? '£' : '$');
+    const currencySymbol = currency === 'EUR' ? '€' : (currency === 'GBP' ? '£' : (currency === 'SGD' ? 'S$' : '$'));
 
     const [initialLoading, setInitialLoading] = useState(() => {
         const params = new URLSearchParams(window.location.search);
@@ -182,7 +185,7 @@ const AnalysisPage = () => {
 
             // Notify other components (like UserProfileModal if it were open)
             window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: newSettings }
+                detail: { settings: newSettings, source: 'internal' }
             }));
         }
 
@@ -192,7 +195,13 @@ const AnalysisPage = () => {
     const handleCloseProfileModal = useCallback(() => setShowProfileModal(false), []);
 
     // Load User Preferences from DB
+    const ignoreRemoteSyncUntil = useRef(0);
+
     const loadSettings = useCallback((e) => {
+        if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') {
+            return;
+        }
+
         // 1. If we have a data-rich event (Optimistic Update from Modal)
         if (e?.detail?.settings) {
             const settings = e.detail.settings;
@@ -207,6 +216,9 @@ const AnalysisPage = () => {
                     if (settings.cardOrder?.analysis) {
                         setCardOrder(settings.cardOrder.analysis);
                     }
+                    if (settings.baseCurrency) {
+                        setCurrency(settings.baseCurrency);
+                    }
                 });
             });
             return;
@@ -215,6 +227,9 @@ const AnalysisPage = () => {
         // 2. Regular Fetch (Initial load or fallback)
         if (currentUser?.uid) {
             fetchUserSettings(currentUser.uid).then(settings => {
+                // SYNC SHIELD: Catch in-flight requests that might be stale
+                if (Date.now() < ignoreRemoteSyncUntil.current) return;
+
                 if (settings?.analysisCardStates) {
                     setOpenCards(prev => {
                         const newState = { ...prev, ...settings.analysisCardStates };
@@ -227,6 +242,9 @@ const AnalysisPage = () => {
                 }
                 if (settings?.cardOrder?.analysis) {
                     setCardOrder(settings.cardOrder.analysis);
+                }
+                if (settings?.baseCurrency) {
+                    setCurrency(settings.baseCurrency);
                 }
                 if (settings?.analysisComparisons) setAnalysisComparisons(settings.analysisComparisons);
             });
@@ -241,7 +259,16 @@ const AnalysisPage = () => {
         return () => window.removeEventListener('user-settings-updated', loadSettings);
     }, [loadSettings]);
 
+    const lastToggleTime = useRef(0);
+
     const toggleCard = (card) => {
+        const now = Date.now();
+        if (now - lastToggleTime.current < 1000) return;
+        lastToggleTime.current = now;
+
+        // Block remote sync for 2 seconds to allow DB to update and avoid stale overwrites
+        ignoreRemoteSyncUntil.current = Date.now() + 2000;
+
         setOpenCards(prev => {
             const newState = { ...prev, [card]: !prev[card] };
 
@@ -626,6 +653,7 @@ const AnalysisPage = () => {
                     onAdd={handleAddStockToPortfolio}
                     isMobile={isMobile}
                     currentRate={currentRate}
+                    currencySymbol={currencySymbol}
                 />
 
                 {

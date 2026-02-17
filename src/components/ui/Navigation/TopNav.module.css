@@ -106,6 +106,14 @@
     box-shadow: var(--neu-card-shadow);
 }
 
+.currencyContainer.mobileExpanded {
+    width: 2.22rem;
+    height: 4.8rem;
+    display: flex;
+    flex-direction: column;
+    padding: 0.15rem 0;
+}
+
 .animationWrapper {
     width: 100%;
     height: 100%;
@@ -142,11 +150,19 @@
     justify-content: center;
 }
 
+.mobileOptions {
+    flex-direction: column;
+    padding: 0;
+    gap: 0.15rem;
+}
+
 .currencyOption {
-    padding: 0.2rem 0.6rem;
+    padding: 0;
+    height: 1.9rem;
+    width: 1.95rem;
     border-radius: var(--neu-radius-sm);
-    font-size: 0.6rem;
-    font-weight: 700;
+    font-size: 0.65rem;
+    font-weight: 800;
     color: var(--neu-text-secondary);
     background: var(--neu-bg);
     box-shadow: var(--neu-card-shadow);
@@ -156,6 +172,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0 auto;
 }
 
 .currencyOption:hover {

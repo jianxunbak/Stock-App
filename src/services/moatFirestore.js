@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import { withFirestoreProtection } from "../utils/firestoreUtils";
 
 // --- Public (AI) Analysis ---
 // Stored in 'moat_analysis_public' collection
@@ -16,11 +17,11 @@ export const savePublicMoatAnalysis = async (ticker, data) => {
 
     try {
         const docRef = doc(db, "moat_analysis_public", ticker.toUpperCase());
-        await setDoc(docRef, {
+        await withFirestoreProtection(() => setDoc(docRef, {
             ...data,
             lastUpdated: new Date().toISOString(),
             isAi: true // Flag to indicate this is an AI evaluation
-        }, { merge: true });
+        }, { merge: true }), `Save Public Moat: ${ticker}`);
         console.log(`Public AI moat analysis for ${ticker} saved.`);
     } catch (error) {
         console.error("Error saving public moat analysis:", error);
@@ -56,11 +57,11 @@ export const savePrivateMoatAnalysis = async (userId, ticker, data) => {
         const docRef = doc(db, "users", userId, "moat_analysis", ticker.toUpperCase());
         console.log(`[savePrivateMoatAnalysis] DocRef path: users/${userId}/moat_analysis/${ticker.toUpperCase()}`);
 
-        await setDoc(docRef, {
+        await withFirestoreProtection(() => setDoc(docRef, {
             ...data,
             lastUpdated: new Date().toISOString(),
             isAi: false // Flag to indicate this is a user evaluation
-        }, { merge: true });
+        }, { merge: true }), `Save Private Moat: ${ticker}`);
         console.log(`[savePrivateMoatAnalysis] SUCCESS: Private user moat analysis for ${ticker} saved.`);
     } catch (error) {
         console.error("[savePrivateMoatAnalysis] ERROR saving private moat analysis:", error);
@@ -88,7 +89,7 @@ export const deletePrivateMoatAnalysis = async (userId, ticker) => {
     if (!userId || !ticker) return;
     try {
         const docRef = doc(db, "users", userId, "moat_analysis", ticker.toUpperCase());
-        await deleteDoc(docRef);
+        await withFirestoreProtection(() => deleteDoc(docRef), `Delete Moat: ${ticker}`);
         console.log(`Private moat analysis for ${ticker} deleted (reverted to public).`);
     } catch (error) {
         console.error("Error deleting private moat analysis:", error);

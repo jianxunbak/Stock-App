@@ -7,7 +7,7 @@
     /* padding: 20px 40px; */
     padding-top: 1rem;
     padding-bottom: 1rem;
-    pointer-events: auto;
+    pointer-events: none;
     /* Allow interaction with header background */
     background: linear-gradient(to bottom, var(--bg-primary), transparent);
 

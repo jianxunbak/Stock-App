@@ -5,7 +5,7 @@ import styles from './PortfolioPage.module.css';
 
 // Hooks & Services
 import { usePortfolio } from '../../../hooks/usePortfolio';
-import { fetchStockData, fetchCurrencyRate, calculatePortfolioTWR, analyzePortfolio, fetchUserSettings, saveUserSettings } from '../../../services/api';
+import { fetchStockData, fetchStockDataBatch, fetchCurrencyRate, calculatePortfolioTWR, analyzePortfolio, fetchUserSettings, saveUserSettings } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useTheme } from '../../../context/ThemeContext';
 
@@ -96,14 +96,18 @@ const PortfolioPage = () => {
     // Save targets to settings (Debounced)
     useEffect(() => {
         if (settingsLoading) return;
+
         const timer = setTimeout(() => {
             const currentAlloc = { catTargets, sectorLimits };
-            if (JSON.stringify(settings?.allocation) !== JSON.stringify(currentAlloc)) {
+            const savedAlloc = settings?.allocation || { catTargets: DEFAULT_CAT_TARGETS, sectorLimits: DEFAULT_SECTOR_LIMITS };
+
+            if (JSON.stringify(savedAlloc) !== JSON.stringify(currentAlloc)) {
+                // console.log("Updating settings allocation", { savedAlloc, currentAlloc });
                 updateSettings({ allocation: currentAlloc });
             }
-        }, 1000);
+        }, 1500); // Increased debounce to 1.5s
         return () => clearTimeout(timer);
-    }, [catTargets, sectorLimits, settingsLoading]);
+    }, [catTargets, sectorLimits, settingsLoading, settings?.allocation]);
 
     // Load User Preferences for Portfolio ID and Visibility
     const loadSettings = useCallback((e) => {
@@ -120,6 +124,9 @@ const PortfolioPage = () => {
                     }
                     if (settings.cardOrder?.portfolio) {
                         setCardOrder(settings.cardOrder.portfolio);
+                    }
+                    if (settings.baseCurrency) {
+                        setCurrency(settings.baseCurrency);
                     }
                 });
             });
@@ -138,6 +145,9 @@ const PortfolioPage = () => {
                 }
                 if (settings?.cardOrder?.portfolio) {
                     setCardOrder(settings.cardOrder.portfolio);
+                }
+                if (settings?.baseCurrency) {
+                    setCurrency(settings.baseCurrency);
                 }
             });
         }
@@ -162,7 +172,7 @@ const PortfolioPage = () => {
     // --- State ---
     const [liveData, setLiveData] = useState({});
     const [isLoadingData, setIsLoadingData] = useState(false);
-    const [currency, setCurrency] = useState('USD');
+    const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
     const [hiddenColumns, setHiddenColumns] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showWatchlist, setShowWatchlist] = useState(false);
@@ -206,6 +216,7 @@ const PortfolioPage = () => {
 
     const [searchTicker, setSearchTicker] = useState('');
     const [currentRate, setCurrentRate] = useState(1);
+    const currencySymbol = currency === 'EUR' ? '€' : (currency === 'GBP' ? '£' : (currency === 'SGD' ? 'S$' : '$'));
 
     const [hideModalState, setHideModalState] = useState({
         isOpen: false,
@@ -243,10 +254,11 @@ const PortfolioPage = () => {
         // Save to DB
         if (currentUser?.uid) {
             const currentSettings = await fetchUserSettings(currentUser.uid);
+            // Add safety check for currentSettings
             const newSettings = {
                 ...currentSettings,
                 cardVisibility: {
-                    ...currentSettings?.cardVisibility,
+                    ...(currentSettings?.cardVisibility || {}), // Ensure cardVisibility is an object
                     portfolio: newVisibility
                 }
             };
@@ -331,8 +343,13 @@ const PortfolioPage = () => {
 
     // Currency Effect
     useEffect(() => {
-        if (currency === 'USD') setCurrentRate(1);
-        else fetchCurrencyRate(currency).then(r => setCurrentRate(r || 1));
+        if (currency === 'USD') {
+            setCurrentRate(1);
+        } else {
+            fetchCurrencyRate(currency).then(r => {
+                setCurrentRate(r?.rate || r || 1);
+            });
+        }
     }, [currency]);
 
     // Sync Portfolio Type with Current Selection AND Filter logic
@@ -382,6 +399,7 @@ const PortfolioPage = () => {
     useEffect(() => {
         if (portfolio.length === 0) {
             setLiveData({});
+            setIsLoadingData(false); // Fix: Clear loading state if portfolio is empty
             return;
         }
 
@@ -391,43 +409,42 @@ const PortfolioPage = () => {
         if (missing.length > 0) {
             setIsLoadingData(true);
             const loadData = async () => {
-                await Promise.all(missing.map(async (ticker) => {
-                    try {
-                        const data = await fetchStockData(ticker);
+                try {
+                    const batchData = await fetchStockDataBatch(missing);
+                    const processedData = {};
 
-                        // Fix: Correctly extract from overview
+                    Object.entries(batchData).forEach(([ticker, data]) => {
                         const price = data.overview?.price || 0;
                         const beta = data.overview?.beta || 1;
                         const sector = data.overview?.sector || 'Unknown';
                         const pegRatio = data.overview?.pegRatio || 0;
 
-                        // Fix: Extract from valuation raw_assumptions or use 0
-                        const totalCash = data.valuation?.raw_assumptions?.cash_and_equivalents || 0;
-                        const totalDebt = data.valuation?.raw_assumptions?.total_debt || 0;
-
-                        // Fix: Extract growth from valuation assumptions string or default
+                        // Extract growth
                         let growth = 0;
                         const growthStr = data.valuation?.assumptions?.["Growth Rate (Yr 1-5)"] ||
                             data.valuation?.assumptions?.["Projected Sales Growth"];
-
                         if (growthStr) {
                             growth = parseFloat(String(growthStr).replace('%', '').replace(',', ''));
                         } else {
-                            // Deep fallback if no valuation assumptions found
                             growth = (data.growth?.revenueGrowth || 0) * 100;
                         }
 
-                        setLiveData(prev => ({
-                            ...prev,
-                            [ticker]: { price, beta, sector, growth, pegRatio, totalCash, totalDebt }
-                        }));
-                    } catch (e) {
-                        console.error(`Failed to fetch ${ticker}`, e);
-                    }
-                }));
-                setIsLoadingData(false);
+                        const totalCash = data.valuation?.raw_assumptions?.cash_and_equivalents || 0;
+                        const totalDebt = data.valuation?.raw_assumptions?.total_debt || 0;
+
+                        processedData[ticker] = { price, beta, sector, growth, pegRatio, totalCash, totalDebt };
+                    });
+
+                    setLiveData(prev => ({ ...prev, ...processedData }));
+                } catch (e) {
+                    console.error("Failed to fetch batch portfolio data", e);
+                } finally {
+                    setIsLoadingData(false);
+                }
             };
             loadData();
+        } else {
+            setIsLoadingData(false); // Fix: Ensure loading is cleared if no tickers are missing
         }
     }, [portfolio]); // Removed liveData to prevent infinite loop
 
@@ -957,7 +974,7 @@ const PortfolioPage = () => {
                                 key="summary"
                                 portfolioList={portfolioList}
                                 currentPortfolioId={currentPortfolioId}
-                                currencySymbol={currency === 'USD' ? '$' : 'S$'}
+                                currencySymbol={currencySymbol}
                                 totalValue={totalValue}
                                 totalPerformance={totalPerformance}
                                 totalCost={totalCost}
@@ -1007,7 +1024,7 @@ const PortfolioPage = () => {
                                 categoryData={categoryData}
                                 sectorData={sectorData}
                                 totalValue={totalValue}
-                                currencySymbol={currency === 'USD' ? '$' : 'S$'}
+                                currencySymbol={currencySymbol}
                                 isMounted={true}
                                 onRefresh={() => window.location.reload()} // Simplified for now
                                 onHide={() => handleHideRequest('allocation')}
@@ -1048,7 +1065,7 @@ const PortfolioPage = () => {
                                 toggleCard={toggleCard}
                                 hiddenColumns={hiddenColumns}
                                 currency={currency}
-                                currencySymbol={currency === 'USD' ? '$' : 'S$'}
+                                currencySymbol={currencySymbol}
                                 currentRate={currentRate}
                                 isMobile={isMobile}
                                 menuOpenHoldings={menuOpenHoldings}
@@ -1125,7 +1142,7 @@ const PortfolioPage = () => {
                             {!isTestPortfolio && (
                                 <>
                                     <div className={styles.formGroup}>
-                                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost</label>
+                                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost ({currencySymbol})</label>
                                         <input
                                             type="number"
                                             value={newCost}
@@ -1154,7 +1171,7 @@ const PortfolioPage = () => {
                 </Window>
             )}
 
-            {showWatchlist && <WatchlistModal isOpen={showWatchlist} onClose={() => setShowWatchlist(false)} currency={currency} currencySymbol={currency === 'USD' ? '$' : 'S$'} currentRate={currentRate} />}
+            {showWatchlist && <WatchlistModal isOpen={showWatchlist} onClose={() => setShowWatchlist(false)} currency={currency} currencySymbol={currencySymbol} currentRate={currentRate} />}
             {showProfileModal && currentUser && <UserProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} user={currentUser} onLogout={() => setShowLogoutConfirm(true)} />}
 
             <LogoutConfirmationModal

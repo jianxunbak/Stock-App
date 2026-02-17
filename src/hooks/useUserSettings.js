@@ -4,7 +4,9 @@ import { useAuth } from '../context/AuthContext';
 
 export const useUserSettings = () => {
     const { currentUser } = useAuth();
-    const [settings, setSettings] = useState(null);
+    // Initialize with {} so UI doesn't block. 
+    // If we use null, !settings is true, causing "loading" props to be true in cards.
+    const [settings, setSettings] = useState({});
     const [loading, setLoading] = useState(true);
 
     const loadSettings = useCallback(async () => {
@@ -28,7 +30,12 @@ export const useUserSettings = () => {
         // Listen for updates from other components
         const handleSettingsUpdate = (event) => {
             if (event.detail && event.detail.settings) {
-                setSettings(event.detail.settings);
+                // Only update if it's different to avoid redundant renders of the same optimistic state
+                const nextSettings = event.detail.settings;
+                setSettings(prev => {
+                    if (JSON.stringify(prev) === JSON.stringify(nextSettings)) return prev;
+                    return nextSettings;
+                });
             }
         };
 
@@ -48,28 +55,17 @@ export const useUserSettings = () => {
 
         // Broadcast update immediately for other components (Optimistic)
         window.dispatchEvent(new CustomEvent('user-settings-updated', {
-            detail: { settings: updated }
+            detail: { settings: updated, source: 'internal' }
         }));
 
         try {
-            // Fetch latest to avoid overwriting concurrent changes if any (though unlikely for single user)
-            // Fetch latest to avoid overwriting concurrent changes if any
-            const latest = await fetchUserSettings(currentUser.uid);
-            // MERGE STRATEGY: 
-            // 1. Take 'latest' (DB) as base to get changes from other devices/components.
-            // 2. Overlay ONLY 'newSettings' (the requested delta) to ensure we don't overwrite unrelated fields with stale local state.
-            const final = { ...latest, ...newSettings };
-            await saveUserSettings(currentUser.uid, final);
-
-            // Only broadcast again if the server response is different from our optimistic update
-            if (JSON.stringify(final) !== JSON.stringify(updated)) {
-                window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                    detail: { settings: final }
-                }));
-            }
+            // PHASE 2 FIX: Skip fetching latest. We trust the optimistic 'updated' state 
+            // since we handle merges via the 'user-settings-updated' event system anyway.
+            // This cuts out 1 network request and avoids "Save Storm" timeouts.
+            await saveUserSettings(currentUser.uid, updated);
         } catch (error) {
             console.error("Error saving settings:", error);
-            // Rollback on error? Maybe not necessary for settings
+            // Optional: Rollback logic could go here
         }
     };
 

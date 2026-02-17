@@ -7,62 +7,68 @@ const stockCache = new Map();
 // Track in-flight requests to deduplicate calls
 const activeRequests = new Map();
 
-export const fetchStockData = async (ticker, forceRefresh = false) => {
-    // 1. Check Frontend Cache (Fastest: 0ms)
-    if (!forceRefresh && stockCache.has(ticker)) {
-        const cached = stockCache.get(ticker);
-        // Valid for 1 minute in memory to ensure "Hero -> Portfolio" transition is instant
-        if (Date.now() - cached.timestamp < 1 * 60 * 1000) {
-            console.log(`%c⚡ Local Cache Hit for ${ticker}`, "color: #ff00ff;");
-            return cached.data;
+// Debounce state for saveUserSettings
+let saveTimeout = null;
+let pendingSave = null;
+
+
+export const fetchStockPricesBatch = async (tickers) => {
+    if (!tickers || tickers.length === 0) return {};
+    const start = Date.now();
+    try {
+        const response = await axios.post(`${API_URL}/stocks/batch-prices`, { tickers });
+        const duration = Date.now() - start;
+        if (duration > 500) {
+            console.log(`%c🐢 Batch Fetch took ${duration}ms`, "color: #ffaa00; font-weight: bold;");
+        } else {
+            console.log(`%c🚀 Batch Fetch took ${duration}ms`, "color: #00ff00;");
         }
+        return response.data;
+    } catch (error) {
+        console.error("Batch fetch failed:", error);
+        return {}; // Return empty object on failure to avoid breaking UI
     }
+};
 
-    // 2. Check Active Requests (Deduplication)
-    if (activeRequests.has(ticker)) {
-        console.log(`%c🔗 Reusing in-flight request for ${ticker}`, "color: #ffaa00; font-style: italic;");
-        return activeRequests.get(ticker);
-    }
+export const fetchStockData = async (ticker) => {
+    const cacheKey = `stock_${ticker}`;
+    if (activeRequests.has(cacheKey)) return activeRequests.get(cacheKey);
 
-    // 3. Perform Fetch
-    const fetchPromise = (async () => {
+    const promise = (async () => {
         try {
-            // console.log(`Requesting ${ticker} data...`);
-            const response = await axios.get(`${API_URL}/stock/${ticker}`, {
-                params: { refresh: forceRefresh },
-                timeout: 60000 // 60 seconds timeout
-            });
-
-            // Save to Frontend Cache
-            stockCache.set(ticker, {
-                timestamp: Date.now(),
-                data: response.data
-            });
-
-            const source = response.data._source || 'UNKNOWN';
-            if (source === 'FIREBASE') {
-                // console.log(`%cFetched ${ticker} from Firebase`, "color: #00befa; font-weight: bold;");
-            } else if (source === 'YFINANCE') {
-                // console.log(`%cFetched ${ticker} from yFinance`, "color: #f59e0b; font-weight: bold;");
-            } else {
-                // console.log(`%cFetched ${ticker} data`, "color: #00ff00; font-weight: bold;");
-            }
+            const response = await axios.get(`${API_URL}/stock/${ticker}`);
             return response.data;
         } catch (error) {
-            if (error.code === 'ECONNABORTED') {
-                console.error("Fetch timed out for:", ticker);
-                throw new Error("Validation taking too long. The server might be busy or the stock is complex to analyze.");
-            }
-            console.error("Error fetching stock data:", error);
+            console.error(`Error fetching stock data for ${ticker}:`, error);
             throw error;
         } finally {
-            // Remove from active requests when done (success or fail)
-            activeRequests.delete(ticker);
+            activeRequests.delete(cacheKey);
         }
     })();
 
-    activeRequests.set(ticker, fetchPromise);
-    return fetchPromise;
+    activeRequests.set(cacheKey, promise);
+    return promise;
+};
+
+export const fetchStockDataBatch = async (tickers) => {
+    if (!tickers || tickers.length === 0) return {};
+    const cacheKey = `batch_data_${tickers.sort().join(',')}`;
+    if (activeRequests.has(cacheKey)) return activeRequests.get(cacheKey);
+
+    const promise = (async () => {
+        try {
+            const response = await axios.post(`${API_URL}/stocks/batch-data`, { tickers });
+            return response.data;
+        } catch (error) {
+            console.error("Batch stock data fetch failed:", error);
+            return {};
+        } finally {
+            activeRequests.delete(cacheKey);
+        }
+    })();
+
+    activeRequests.set(cacheKey, promise);
+    return promise;
 };
 
 export const fetchChartData = async (ticker, timeframe) => {
@@ -76,18 +82,26 @@ export const fetchChartData = async (ticker, timeframe) => {
 };
 
 export const fetchCurrencyRate = async (targetCurrency) => {
-    try {
-        // Changed to GET request to match backend
-        const response = await axios.get(`${API_URL}/currency-rate`, {
-            params: { target: targetCurrency }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching currency rate:", error);
-        // Return fallback to avoid breaking UI (using previous hardcodes as safety net)
-        if (targetCurrency === 'SGD') return { rate: 1.35 };
-        return { rate: 1 };
-    }
+    const cacheKey = `rate_${targetCurrency}`;
+    if (activeRequests.has(cacheKey)) return activeRequests.get(cacheKey);
+
+    const promise = (async () => {
+        try {
+            const response = await axios.get(`${API_URL}/currency-rate`, {
+                params: { target: targetCurrency }
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Error fetching currency rate:", error);
+            if (targetCurrency === 'SGD') return { rate: 1.35 };
+            return { rate: 1 };
+        } finally {
+            activeRequests.delete(cacheKey);
+        }
+    })();
+
+    activeRequests.set(cacheKey, promise);
+    return promise;
 };
 
 export const calculatePortfolioTWR = async (portfolioItems, uid, comparisonTickers = []) => {
@@ -119,21 +133,53 @@ export const analyzePortfolio = async (portfolioItems, metrics, uid, forceRefres
 };
 
 export const fetchUserSettings = async (uid) => {
-    try {
-        const response = await axios.get(`${API_URL}/settings/${uid}`);
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching user settings:", error);
-        return {};
-    }
+    if (!uid) return {};
+    const cacheKey = `settings_${uid}`;
+    if (activeRequests.has(cacheKey)) return activeRequests.get(cacheKey);
+
+    const promise = (async () => {
+        try {
+            const response = await axios.get(`${API_URL}/settings/${uid}`, {
+                timeout: 10000
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Error fetching user settings:", error);
+            return {};
+        } finally {
+            activeRequests.delete(cacheKey);
+        }
+    })();
+
+    activeRequests.set(cacheKey, promise);
+    return promise;
 };
 
 export const saveUserSettings = async (uid, settings) => {
-    try {
-        const response = await axios.post(`${API_URL}/settings/${uid}`, { settings });
-        return response.data;
-    } catch (error) {
-        console.error("Error saving user settings:", error);
-        throw error;
-    }
+    if (!uid) return;
+
+    // Debounce saves across the entire app to prevent "Save Storms"
+    return new Promise((resolve, reject) => {
+        pendingSave = { uid, settings, resolve, reject };
+
+        if (saveTimeout) clearTimeout(saveTimeout);
+
+        saveTimeout = setTimeout(async () => {
+            const current = pendingSave;
+            if (!current) return;
+
+            try {
+                const response = await axios.post(`${API_URL}/settings/${current.uid}`, { settings: current.settings }, {
+                    timeout: 30000
+                });
+                current.resolve(response.data);
+            } catch (error) {
+                console.error("Error saving user settings:", error);
+                current.reject(error);
+            } finally {
+                saveTimeout = null;
+                pendingSave = null;
+            }
+        }, 800); // 800ms debounce
+    });
 };

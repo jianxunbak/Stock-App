@@ -8,14 +8,43 @@ import numpy as np
 import os
 import requests
 import json
+import hashlib
 from dotenv import load_dotenv
 import pathlib
 import time
 from datetime import datetime, timedelta, timezone
 import firebase_admin
 from firebase_admin import credentials, firestore
-import concurrent.futures
+import concurrent.futures # Ensure concurrent.futures is imported for ThreadPoolExecutor
 import math
+
+# Background executor for non-blocking Firestore operations
+background_executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+
+def background_cache_save(ticker, data):
+    """Saves to Firestore in the background to prevent blocking the API response."""
+    try:
+        if db:
+            db.collection('stock_cache').document(ticker).set({
+                'timestamp': datetime.now(timezone.utc),
+                'payload': data
+            }, timeout=10) # 10s timeout for background save
+            # print(f"DEBUG: Background cache save complete for {ticker}")
+    except Exception as e:
+        print(f"WARNING: Background cache save failed for {ticker}: {e}")
+
+def sanitize_data(data):
+    """
+    Recursively replaces NaN/Inf floats with None to ensure JSON compliance.
+    """
+    if isinstance(data, dict):
+        return {k: sanitize_data(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_data(v) for v in data]
+    elif isinstance(data, float):
+        if math.isnan(data) or math.isinf(data):
+            return None
+    return data
 
 # Load .env from the project root (one level up from backend/)
 env_path = pathlib.Path(__file__).parent.parent / '.env'
@@ -74,46 +103,74 @@ def calculate_manual_beta(ticker_symbol):
         print(f"Error calculating manual beta: {e}")
         return 1.0
 
+# Simple in-memory cache for forex rates
+forex_cache = {}
+FOREX_CACHE_EXPIRY = 3600 # 1 hour
+
+# Simple in-memory cache for stock prices (batch)
+price_cache = {}
+PRICE_CACHE_EXPIRY = 300 # 5 minutes
+
 def get_forex_rate(target_currency: str, base_currency: str = "USD"):
     """
     Fetches the live exchange rate from Base -> Target.
     Uses Frankfurter API first, falls back to yfinance.
+    Uses a simple in-memory cache to avoid pinning the backend.
     """
+    target_currency = target_currency.upper()
+    base_currency = base_currency.upper()
+    cache_key = f"{base_currency}_{target_currency}"
+    
+    # Check cache
+    if cache_key in forex_cache:
+        val, ts = forex_cache[cache_key]
+        if time.time() - ts < FOREX_CACHE_EXPIRY:
+            # print(f"DEBUG: Returning cached forex rate for {cache_key}: {val}")
+            return val
+
     # 1. Try Frankfurter API (Free, no key)
-    # URL: https://api.frankfurter.app/latest?from=USD&to=SGD
     try:
         url = f"https://api.frankfurter.app/latest?from={base_currency}&to={target_currency}"
-        print(f"DEBUG: Fetching forex rate from {url}")
-        resp = requests.get(url, timeout=5)
+        resp = requests.get(url, timeout=3) # Short timeout
         if resp.status_code == 200:
             data = resp.json()
             rate = data.get("rates", {}).get(target_currency)
             if rate:
-                print(f"DEBUG: Frankfurter rate for {base_currency}->{target_currency}: {rate}")
-                return float(rate)
+                val = float(rate)
+                forex_cache[cache_key] = (val, time.time())
+                return val
     except Exception as e:
-        print(f"WARNING: Frankfurter API failed: {e}")
+        print(f"WARNING: Frankfurter API failed ({cache_key}): {e}")
 
     # 2. Fallback to yfinance
-    # Ticker format: "USDSGD=X"
     try:
         ticker = f"{base_currency}{target_currency}=X"
-        print(f"DEBUG: Fetching fallback forex rate from yfinance ({ticker})")
-        df = yf.download(ticker, period="1d", interval="1d", progress=False)
-        if not df.empty:
-            # yfinance returns a DataFrame, get the last 'Close'
-            rate = df['Close'].iloc[-1]
-            if isinstance(rate, pd.Series):
-                 rate = rate.iloc[0] # handle if multi-index or series
+        # Use simple .fast_info for speed if it's a single ticker
+        dat = yf.Ticker(ticker).fast_info
+        rate = dat.last_price
+        
+        if rate:
+            val = float(rate)
+            forex_cache[cache_key] = (val, time.time())
+            return val
             
-            # Additional check for numpy scalar
-            if hasattr(rate, "item"):
-                rate = rate.item()
-                
-            print(f"DEBUG: yfinance rate for {ticker}: {rate}")
-            return float(rate)
+        # Harder fallback: historical 1d
+        df = yf.download(ticker, period="1d", interval="1d", progress=False, threads=False)
+        if not df.empty:
+            rate = df['Close'].iloc[-1]
+            if isinstance(rate, pd.Series): rate = rate.iloc[0]
+            val = float(rate)
+            forex_cache[cache_key] = (val, time.time())
+            return val
     except Exception as e:
-        print(f"ERROR: yfinance forex fallback failed: {e}")
+        print(f"ERROR: yfinance forex fallback failed for {ticker}: {e}")
+
+    # 3. Final Fallback (Approximate Consts)
+    fallbacks = {
+        "SGD": 1.35, "EUR": 0.92, "GBP": 0.79, "CNY": 7.20, "HKD": 7.8, "JPY": 150.0
+    }
+    return fallbacks.get(target_currency, 1.0)
+
 
     # 3. Final Fallback (Approximate Consts if everything fails)
     fallbacks = {
@@ -176,9 +233,12 @@ except Exception as e:
     print(f"WARNING: Firebase Init Failed: {e}")
     db = None
 
+# Global executor for stock prices to avoid overwhelming Yahoo or creating too many threads
+price_executor = concurrent.futures.ThreadPoolExecutor(max_workers=30)
+
 # --- Health Check Endpoint ---
 @app.get("/api/health/cache")
-async def health_check_cache():
+def health_check_cache():
     return {
         "status": "online",
         "firebase_connected": db is not None,
@@ -728,46 +788,49 @@ def get_stock_data(ticker: str, force_refresh: bool = False):
                     payload = data['payload']
                     
                     # --- HYBRID CACHE: Refresh Price Only ---
-                    try:
-                        # Fetch ONLY live price (fast operation, ~0.2s)
-                        fast_stock = yf.Ticker(ticker)
-                        # fast_info is much faster than .info
-                        latest_price = fast_stock.fast_info.last_price 
+                    # Optimized: Only refresh if data is older than 5 minutes
+                    cache_age = datetime.now(timezone.utc) - timestamp
+                    if cache_age > timedelta(minutes=5):
+                        try:
+                            # Fetch ONLY live price (fast operation, ~0.2s)
+                            fast_stock = yf.Ticker(ticker)
+                            # fast_info is much faster than .info
+                            latest_price = fast_stock.fast_info.last_price 
                         
-                        if latest_price:
-                            # Update Price in Overview
-                            if 'overview' in payload:
-                                payload['overview']['price'] = latest_price
-                            
-                            # Update Top-level Price (if exists)
-                            payload['currentPrice'] = latest_price
-                            
-                            # --- CHART PATCHING ---
-                            # Patch Intraday Chart (for 1D view)
-                            if 'intraday_history' in payload and isinstance(payload['intraday_history'], list):
-                                current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                                payload['intraday_history'].append({
-                                    "date": current_time_str,
-                                    "close": latest_price
-                                })
-                            
-                            # Patch Daily Chart (for 5Y view, prevents flatline at end)
-                            if 'history' in payload and isinstance(payload['history'], list):
-                                today_str = datetime.now().strftime("%Y-%m-%d")
-                                # Check if today already exists to avoid dupes
-                                if not payload['history'] or payload['history'][-1]['date'] != today_str:
-                                    payload['history'].append({
-                                        "date": today_str,
+                            if latest_price:
+                                # Update Price in Overview
+                                if 'overview' in payload:
+                                    payload['overview']['price'] = latest_price
+                                
+                                # Update Top-level Price (if exists)
+                                payload['currentPrice'] = latest_price
+                                
+                                # --- CHART PATCHING ---
+                                # Patch Intraday Chart (for 1D view)
+                                if 'intraday_history' in payload and isinstance(payload['intraday_history'], list):
+                                    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                                    payload['intraday_history'].append({
+                                        "date": current_time_str,
                                         "close": latest_price
                                     })
-                                else:
-                                    # Update today's close if it exists
-                                    payload['history'][-1]['close'] = latest_price
-                            # ----------------------
+                                
+                                # Patch Daily Chart (for 5Y view, prevents flatline at end)
+                                if 'history' in payload and isinstance(payload['history'], list):
+                                    today_str = datetime.now().strftime("%Y-%m-%d")
+                                    # Check if today already exists to avoid dupes
+                                    if not payload['history'] or payload['history'][-1]['date'] != today_str:
+                                        payload['history'].append({
+                                            "date": today_str,
+                                            "close": latest_price
+                                        })
+                                    else:
+                                        # Update today's close if it exists
+                                        payload['history'][-1]['close'] = latest_price
+                                # ----------------------
 
-                            print(f"DEBUG: Updated cached {ticker} with live price: {latest_price}")
-                    except Exception as p_e:
-                        print(f"WARNING: Failed to update live price for cached {ticker}: {p_e}")
+                                print(f"DEBUG: Updated cached {ticker} with live price: {latest_price}")
+                        except Exception as p_e:
+                            print(f"WARNING: Failed to update live price for cached {ticker}: {p_e}")
                     # ----------------------------------------
                     
                     # Mark source for frontend debugging
@@ -1796,21 +1859,13 @@ def get_stock_data(ticker: str, force_refresh: bool = False):
         
         # Log summary of the response for the user
         print(f"--- [API] Returning data for {ticker} ---")
-        print(f"Payload Size: {len(str(final_response))} characters")
+        final_data = sanitize_data(final_response)
         
-        # --- CACHE SAVE ---
-        try:
-            if db:
-                db.collection('stock_cache').document(ticker).set({
-                    'timestamp': datetime.now(timezone.utc),
-                    'payload': final_response
-                })
-                print(f"DEBUG: Saved fresh data for {ticker} to cache.")
-        except Exception as e:
-            print(f"WARNING: Failed to save cache for {ticker}: {e}")
+        # --- BACKGROUND CACHE SAVE ---
+        background_executor.submit(background_cache_save, ticker, final_data)
         # ------------------
 
-        return final_response
+        return final_data
 
     except HTTPException:
         raise
@@ -1818,29 +1873,162 @@ def get_stock_data(ticker: str, force_refresh: bool = False):
         print(f"Error fetching data for {ticker}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/stock/history/{ticker}")
-async def get_stock_history(ticker: str, period: str = "20y"):
+
+# --- BATCH STOCK PRICES ENDPOINT ---
+class BatchStockPricesRequest(BaseModel):
+    tickers: List[str]
+
+@app.post("/api/stocks/batch-prices")
+def get_batch_stock_prices(payload: BatchStockPricesRequest):
+    tickers = payload.tickers
+    if not tickers:
+        return {}
+    
+    tickers = list(set([t.strip().upper() for t in tickers if t.strip()]))
+    results = {}
+    remaining_tickers = []
+    
+    now = time.time()
+    for t in tickers:
+        if t in price_cache:
+            val, ts = price_cache[t]
+            if now - ts < PRICE_CACHE_EXPIRY:
+                results[t] = val
+                continue
+        remaining_tickers.append(t)
+
+    if not remaining_tickers:
+        return results
+
+    print(f"--- [API] Fast Batch Fetching for {len(remaining_tickers)} tickers ---")
+    s_start = time.time()
+    
+    def fetch_single(symbol):
+        try:
+            # Add a timeout inside the thread if possible, but yfinance doesn't easily support it per call
+            # So we rely on the parent's Wait loop
+            ticker_obj = yf.Ticker(symbol)
+            fast = ticker_obj.fast_info
+            # Accessing properties can trigger the lazy fetch
+            price = fast.last_price
+            prev = fast.regular_market_previous_close
+            
+            if price is None: return None
+            
+            res = {
+                "price": float(price),
+                "change": float(price - prev if prev else 0.0),
+                "changePercent": float(((price - prev)/prev)*100 if prev else 0.0)
+            }
+            price_cache[symbol] = (res, time.time())
+            return symbol, res
+        except:
+            return None
+
+    # Use global pool to limit total concurrent fetches to 30
+    futures = {price_executor.submit(fetch_single, t): t for t in remaining_tickers}
+    
+    # Wait for completion with a total timeout of 8 seconds
+    done, not_done = concurrent.futures.wait(futures.keys(), timeout=8)
+    
+    for f in done:
+        res = f.result()
+        if res:
+            results[res[0]] = res[1]
+    
+    # Cancel pending ones (they might still run in bg, but we won't wait)
+    for f in not_done:
+        print(f"WARNING: Fetch for {futures[f]} timed out.")
+
+    # Fallback for anything that failed (sometimes fast_info is empty)
+    missing = [t for t in remaining_tickers if t not in results]
+    if missing:
+        print(f"DEBUG: {len(missing)} tickers failed fast_info, falling back to yf.download")
+        try:
+            df = yf.download(missing, period="5d", interval="1d", group_by='ticker', progress=False, threads=True)
+            for t in missing:
+                try:
+                    sub_df = df[t] if len(missing) > 1 else df
+                    sub_df = sub_df.dropna(how='all')
+                    if not sub_df.empty:
+                        closes = sub_df['Close']
+                        cp = closes.iloc[-1]
+                        pc = closes.iloc[-2] if len(closes) >= 2 else cp
+                        res = {
+                            "price": float(cp),
+                            "change": float(cp - pc),
+                            "changePercent": float(((cp - pc)/pc)*100 if pc else 0)
+                        }
+                        results[t] = res
+                        price_cache[t] = (res, time.time())
+                except: continue
+        except: pass
+
+    print(f"--- [API] Batch Fetch complete in {time.time() - s_start:.2f}s. Total: {len(results)}")
+    return results
+
+    print(f"--- [API] Batch Fetch complete in {time.time() - s_start:.2f}s. Success: {len(results)}/{len(tickers)}")
+    return results
+
+@app.post("/api/stocks/batch-data")
+def get_batch_stock_data(payload: BatchStockPricesRequest):
+    """
+    Fetches FULL stock data (overview, nutrition, etc.) for multiple tickers in parallel.
+    Utilizes the same caching logic as get_stock_data.
+    """
+    tickers = payload.tickers
+    if not tickers:
+        return {}
+    
+    unique_tickers = list(set(t.strip().upper() for t in tickers if t))
+    results = {}
+    
+    print(f"--- [API] Batch FULL Data Fetch for {len(unique_tickers)} tickers ---")
+    s_start = time.time()
+    
+    def fetch_full(symbol):
+        try:
+            return symbol, get_stock_data(symbol)
+        except:
+            return symbol, None
+
+    # Use a small number of workers for full data to stay under Firebase quota
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(fetch_full, t) for t in unique_tickers]
+        for future in concurrent.futures.as_completed(futures):
+            sym, res = future.result()
+            if res:
+                results[sym] = res
+
+    print(f"--- [API] Batch Full Data complete in {time.time() - s_start:.2f}s. Total: {len(results)}")
+    return sanitize_data(results)
+
+@app.get("/api/history/{ticker}/{period}/{interval}")
+def get_history_endpoint(ticker: str, period: str, interval: str):
     try:
         stock = yf.Ticker(ticker)
-        history = stock.history(period=period)
+        history = stock.history(period=period, interval=interval)
         if history.empty:
             return []
         
         # Format: [{date, close}, ...]
         history_data = [{"date": date.strftime("%Y-%m-%d"), "close": close} for date, close in zip(history.index, history["Close"])]
-        return history_data
+        return sanitize_data(history_data)
     except Exception as e:
         print(f"Error fetching history: {e}")
         return []
 
 @app.get("/api/currency-rate")
-async def get_currency_rate_endpoint(target: str = "SGD"):
+def get_currency_rate_endpoint(target: str = "SGD"):
     """
     Returns the exchange rate from USD to {target}.
     """
     try:
-        rate = get_forex_rate(target.upper(), "USD")
-        return {"rate": rate}
+        if target.upper() == "USD":
+            return sanitize_data({"rate": 1.0, "timestamp": time.time()})
+        
+        rate = get_forex_rate(target.upper(), "USD") # Assuming get_forex_rate still needs source
+        return sanitize_data({"rate": rate, "timestamp": time.time()})
     except Exception as e:
         print(f"Error in currency endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1863,18 +2051,15 @@ class PortfolioTWRRequest(BaseModel):
     comparison_tickers: List[str] = []
 
 @app.post("/api/portfolio/twr")
-async def get_portfolio_twr(payload: PortfolioTWRRequest):
+def get_portfolio_twr(payload: PortfolioTWRRequest):
     items = payload.items
     uid = payload.uid
     
     print(f"--- [API] Calculating Portfolio TWR for {len(items)} items ---")
-    
     # --- Caching Logic ---
     # Generate a hash of the input items to detect ANY changes (edits/adds/deletes)
-    # We stringify the sorted items to ensure consistency
-    import hashlib
     items_str = json.dumps({
-        "items": [item.dict() for item in items],
+        "items": [item.model_dump() for item in items],
         "comparison_tickers": payload.comparison_tickers
     }, sort_keys=True, default=str)
     input_hash = hashlib.md5(items_str.encode()).hexdigest()
@@ -1889,7 +2074,6 @@ async def get_portfolio_twr(payload: PortfolioTWRRequest):
                 cached_date = data.get('last_updated')
                 cached_hash = data.get('input_hash')
                 
-                # Check 1: Is cache from today?
                 is_today = False
                 if cached_date:
                     try:
@@ -1899,16 +2083,15 @@ async def get_portfolio_twr(payload: PortfolioTWRRequest):
                     except:
                         pass
                 
-                # Check 2: Exact Match of Portfolio Inputs
                 if is_today and cached_hash == input_hash:
-                    print("DEBUG: Returning Cached TWR Data from Firestore")
+                    # print("DEBUG: Returning Cached TWR Data from Firestore")
                     return data.get('result')
 
         except Exception as e:
             print(f"Cache Read Error: {e}")
 
     # Calculate
-    result = await calculate_portfolio_twr(items, payload.comparison_tickers)
+    result = calculate_portfolio_twr_sync(items, payload.comparison_tickers)
     
     # Process for JSON safety (NaN -> None)
     result = clean_nan(result)
@@ -1928,7 +2111,7 @@ async def get_portfolio_twr(payload: PortfolioTWRRequest):
             
     return result
 
-async def calculate_portfolio_twr(items: List[PortfolioItem], comparison_tickers: List[str] = []):
+def calculate_portfolio_twr_sync(items: List[PortfolioItem], comparison_tickers: List[str] = []):
     """
     Calculates Time Weighted Returns (TWR) for the portfolio and individual stocks
     using the GIPS standard with Start-of-Day (SOD) flows.
@@ -2250,7 +2433,7 @@ def clean_nan(obj):
     return obj
 
 @app.get("/api/chart/{ticker}/{timeframe}")
-async def get_chart(ticker: str, timeframe: str):
+def get_chart(ticker: str, timeframe: str):
     """
     Fetch chart data with appropriate interval based on timeframe.
     Timeframes: 1D, 5D, 1M, 3M, 6M, YTD, 1Y, 5Y, All
@@ -2329,13 +2512,13 @@ async def get_chart(ticker: str, timeframe: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stock/{ticker}")
-async def read_stock(ticker: str, refresh: bool = False):
+def read_stock(ticker: str, refresh: bool = False):
     print(f"\n--- [API] Received request for {ticker} (Refresh: {refresh}) ---")
     data = get_stock_data(ticker, force_refresh=refresh)
     return clean_nan(data)
 
 @app.get("/api/evaluate_moat/{ticker}")
-async def evaluate_moat(ticker: str):
+def evaluate_moat(ticker: str):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not found in environment variables.")
@@ -2418,7 +2601,7 @@ class PortfolioAnalysisRequest(BaseModel):
     portfolioId: str = 'main'
 
 @app.post("/api/portfolio/analyze")
-async def analyze_portfolio(request: PortfolioAnalysisRequest):
+def analyze_portfolio(request: PortfolioAnalysisRequest):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not found in environment variables.")
@@ -2688,26 +2871,28 @@ async def save_user_settings(uid: str, payload: UserSettings):
     if not db:
         raise HTTPException(status_code=503, detail="Database not available")
     
-    try:
-        # Merge with existing settings or overwrite? Usually merge is safer for partial updates
-        # But for simplicity, we can just set/merge.
-        doc_ref = db.collection('users').document(uid).collection('settings').document('preferences')
-        print(f"DEBUG: Writing to users/{uid}/settings/preferences: {payload.settings}")
-        doc_ref.set(payload.settings, merge=True)
-        print("DEBUG: Write successful")
-        return {"status": "success", "settings": payload.settings}
-    except Exception as e:
-        print(f"Error saving settings for {uid}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    def perform_save(u, p):
+        try:
+            doc_ref = db.collection('users').document(u).collection('settings').document('preferences')
+            doc_ref.set(p, merge=True)
+            # print(f"DEBUG: Background settings save complete for {u}")
+        except Exception as e:
+            print(f"WARNING: Background settings save failed for {u}: {e}")
+
+    # Background the save and return immediately to avoid frontend timeouts
+    background_executor.submit(perform_save, uid, payload.settings)
+    return {"status": "success", "message": "Save backgrounded"}
 
 @app.get("/api/settings/{uid}")
 async def get_user_settings_endpoint(uid: str):
     if not db:
         raise HTTPException(status_code=503, detail="Database not available")
     
+    s_start = time.time()
     try:
         doc_ref = db.collection('users').document(uid).collection('settings').document('preferences')
         doc = doc_ref.get()
+        print(f"--- [API] Fetched settings for {uid} in {time.time() - s_start:.2f}s ---")
         if doc.exists:
             return doc.to_dict()
         return {}

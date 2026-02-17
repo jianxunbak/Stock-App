@@ -85,29 +85,45 @@ const ExpandableCard = ({
     }, [menuItems, onRefresh, onHide]);
 
     const lastToggleTimeComp = React.useRef(0);
+    const lastEventTypeComp = React.useRef(null);
 
-    const handleToggle = (e) => {
+    const handleToggle = React.useCallback((e) => {
+        if (!e) return;
+
         const now = Date.now();
-        // Internal component cooldown to prevent Safari ghost clicks/double-firing
-        if (now - lastToggleTimeComp.current < 450) return;
+        const eventType = e.type;
 
-        // Find if we clicked an interactive element
-        const menuBtn = e.target.closest('.expandable-card-menu-btn') || e.target.closest('.dropdown-wrapper');
-        const toggleBtn = e.target.closest('.expandable-card-btn');
-        const otherInteractive = e.target.closest('button') || e.target.closest('a') || e.target.closest('input');
-
-        // 1. If we clicked a menu or dropdown, stop propagation and return
-        if (menuBtn) {
-            if (e && e.stopPropagation) e.stopPropagation();
+        // 1. Ignore "ghost" clicks that follow touch events
+        if (eventType === 'click' && lastEventTypeComp.current === 'touchstart' && (now - lastToggleTimeComp.current < 1000)) {
             return;
         }
 
-        // 2. If we clicked a button/link that IS NOT our toggle button, ignore
-        if (otherInteractive && !toggleBtn) {
+        // 2. Strict 1-second cooldown to prevent double-toggling
+        if (now - lastToggleTimeComp.current < 1000) return;
+
+        // Find if we clicked an interactive element
+        const target = e.target;
+        const interactiveSelector = 'button, a, input, select, textarea, [role="button"], .dropdown-wrapper, .expandable-card-menu-btn, .expandable-card-btn, svg, path';
+        const interactiveEl = target.closest(interactiveSelector);
+
+        // Check specifically for our toggle button or its children
+        const toggleBtn = target.closest('.expandable-card-btn');
+
+        // 3. If we clicked an interactive element that IS NOT our toggle button, return
+        if (interactiveEl && !toggleBtn) {
             return;
+        }
+
+        // 4. Force stop everything
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+        if (e.nativeEvent && e.nativeEvent.stopImmediatePropagation) {
+            e.nativeEvent.stopImmediatePropagation();
         }
 
         lastToggleTimeComp.current = now;
+        lastEventTypeComp.current = eventType;
+
         const newState = !isExpanded;
 
         // Only update internal state if uncontrolled
@@ -116,7 +132,7 @@ const ExpandableCard = ({
         }
 
         if (onToggle) onToggle(newState);
-    };
+    }, [isExpanded, isControlled, onToggle]);
 
     // Check if headerContent is a React Element to clone it with props if needed
     const finalHeaderContent = React.isValidElement(headerContent)
@@ -161,6 +177,7 @@ const ExpandableCard = ({
             <motion.div
                 className="expandable-card-header"
                 onClick={handleToggle}
+                onTouchStart={handleToggle}
                 initial={false}
                 animate={{
                     minHeight: isExpanded ? 0 : collapsedHeight,
@@ -210,10 +227,8 @@ const ExpandableCard = ({
                                     <Button
                                         variant="icon"
                                         className="expandable-card-btn"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleToggle(e);
-                                        }}
+                                        onClick={handleToggle}
+                                        onTouchStart={handleToggle}
                                     >
                                         <ChevronDown size={20} />
                                     </Button>
@@ -261,6 +276,7 @@ const ExpandableCard = ({
                         <div
                             className="expandable-card-title-container"
                             onClick={handleToggle}
+                            onTouchStart={handleToggle}
                             style={{ cursor: 'pointer' }}
                         >
                             {title && <h3 className="expandable-card-expanded-title">{title}</h3>}
@@ -280,10 +296,8 @@ const ExpandableCard = ({
                             <Button
                                 variant="icon"
                                 className="expandable-card-btn"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggle(e);
-                                }}
+                                onClick={handleToggle}
+                                onTouchStart={handleToggle}
                             >
                                 <ChevronUp size={20} />
                             </Button>

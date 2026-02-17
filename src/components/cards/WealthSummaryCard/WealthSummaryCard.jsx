@@ -3,7 +3,6 @@ import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
 import DropdownButton from '../../ui/DropdownButton/DropdownButton';
 import { Calendar, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
 import styles from './WealthSummaryCard.module.css';
-import { useUserSettings } from '../../../hooks/useUserSettings';
 import BaseChart from '../../ui/BaseChart/BaseChart';
 import { formatLastUpdated } from '../../../utils/dateUtils';
 
@@ -11,9 +10,20 @@ const WealthSummaryCard = ({
     isOpen = true,
     onToggle = null,
     onHide = null,
-    className = ""
+    className = "",
+    baseCurrency = 'USD',
+    baseCurrencySymbol = '$',
+    displayCurrency = 'USD',
+    displayCurrencySymbol = '$',
+    baseToDisplayRate = 1,
+    usdToDisplayRate = 1,
+    sgdToDisplayRate = 1,
+    settings = null,
+    onUpdateSettings = null,
+    loading = false
 }) => {
-    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
+    // const { settings, updateSettings, loading: settingsLoading } = useUserSettings(); // Removed
+    const settingsLoading = loading; // Alias for compatibility with existing code below if any
 
     // Projection relative year (0 = current, 1 = in 1 year, etc.)
     const [projectedYear, setProjectedYear] = useState(0);
@@ -88,10 +98,22 @@ const WealthSummaryCard = ({
         return new Date(Math.max(...dates)).toISOString();
     }, [settings]);
 
-    const formatCurrency = (val) => {
+    const formatCurrency = (val, isFromUsd = false, isFromSgd = false) => {
+        let rate = baseToDisplayRate;
+        if (isFromUsd) rate = usdToDisplayRate;
+        else if (isFromSgd) rate = sgdToDisplayRate;
+
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'USD',
+            currency: displayCurrency,
+            maximumFractionDigits: 0
+        }).format(val * rate);
+    };
+
+    const formatBaseCurrency = (val) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: baseCurrency,
             maximumFractionDigits: 0
         }).format(val);
     };
@@ -115,6 +137,9 @@ const WealthSummaryCard = ({
     }, [settings?.dateOfBirth]);
 
     const targetAge = currentAge !== null ? currentAge + projectedYear : null;
+
+    const usdToBase = baseToDisplayRate !== 0 ? usdToDisplayRate / baseToDisplayRate : 1;
+    const sgdToBase = baseToDisplayRate !== 0 ? sgdToDisplayRate / baseToDisplayRate : 1;
 
     // 1. Savings & CPF Projection
     const savingsAndCpf = useMemo(() => {
@@ -174,7 +199,12 @@ const WealthSummaryCard = ({
         for (let y = 0; y <= projectedYear; y++) {
             if (y > 0) {
                 // Cash Savings Growth (Interest first, then new savings)
-                savingsBalance = (savingsBalance * (1 + bankInterestRate)) + (monthlySavings * 12);
+                // Apply annual expense growth
+                const expenseGrowthRate = Number(scenario.annualExpenseGrowth || 0) / 100;
+                const grownExpenses = totalExpenses * Math.pow(1 + expenseGrowthRate, y);
+                const yearMonthlySavings = monthlyPay - cpfContributionEmployee - grownExpenses;
+
+                savingsBalance = (savingsBalance * (1 + bankInterestRate)) + (yearMonthlySavings * 12);
 
                 // CPF Growth (Employer + Employee = 37% for age <= 55)
                 const ageAtYear = (currentAge || 30) + y - 1;
@@ -207,15 +237,33 @@ const WealthSummaryCard = ({
 
             const initialDeposit = Number(scenario.initialDeposit || 0);
             const contributionAmount = Number(scenario.contributionAmount || 0);
+            // Standard APR Compounding Logic (Nominal Rate)
+            // Matches StocksCard.jsx and standard financial calculators
             const annualRate = Number(scenario.estimatedRate || 0) / 100;
-            const periodsPerYear = scenario.contributionFrequency === 'monthly' ? 12 :
+            const freq = scenario.contributionFrequency === 'monthly' ? 12 :
                 scenario.contributionFrequency === 'quarterly' ? 4 : 1;
-            const ratePerPeriod = annualRate / periodsPerYear;
-            const totalPeriods = projectedYear * periodsPerYear;
+
+            const ratePerPeriod = annualRate / freq;
 
             let val = initialDeposit;
-            for (let p = 1; p <= totalPeriods; p++) {
-                val = (val + contributionAmount) * (1 + ratePerPeriod);
+
+            // Safeguard: Limit projection to 100 years
+            const maxLoop = Math.min(Math.max(0, projectedYear), 100);
+
+            // We calculate period-by-period for accuracy with the StocksCard approach
+            // But since WealthSummaryCard loops by YEAR, we can optimize or nest loops.
+            // To be purely consistent with StocksCard (which loops by year then by period), we do this:
+
+            for (let y = 1; y <= maxLoop; y++) {
+                // Compound for 'freq' periods in this year
+                for (let period = 1; period <= freq; period++) {
+                    // Add contribution at start or end? 
+                    // StocksCard adds contribution THEN compounds: 
+                    // totalValue = (totalValue + contributionAmount) * (1 + ratePerPeriod);
+                    // This implies contributions happen at the START of each period (or end of previous).
+                    // Let's match StocksCard logic EXACTLY.
+                    val = (val + contributionAmount) * (1 + ratePerPeriod);
+                }
             }
             total += val;
         });
@@ -246,7 +294,7 @@ const WealthSummaryCard = ({
         }, 0);
     }, [settings?.otherInvestments, projectedYear]);
 
-    const netWorth = stocksValue + savingsAndCpf.savings + savingsAndCpf.cpf + otherInvestmentsValue;
+    const netWorth = (stocksValue * usdToBase) + savingsAndCpf.savings + (savingsAndCpf.cpf * sgdToBase) + otherInvestmentsValue;
 
     // 4. Annual Net Worth Growth Projection (for Chart)
     const netWorthGrowthData = useMemo(() => {
@@ -294,8 +342,9 @@ const WealthSummaryCard = ({
         const owCeiling = 8000;
         const annualCeiling = 102000;
         const cpfContributionEmployee = Math.min(monthlyPay, owCeiling) * 0.2;
-        const monthlySavings = monthlyPay - cpfContributionEmployee - totalExpenses;
+        // const monthlySavings = monthlyPay - cpfContributionEmployee - totalExpenses; // Moved to loop
         const bankInterestRate = Number(savingsScenario?.bankInterestRate || 0) / 100;
+        const expenseGrowthRate = Number(savingsScenario?.annualExpenseGrowth || 0) / 100;
 
         // Current state tracking
         let runningSavings = Number(savingsScenario?.initialSavings || 0);
@@ -329,7 +378,7 @@ const WealthSummaryCard = ({
             return sum;
         }, 0);
 
-        for (let y = 0; y <= maxProjection; y++) {
+        for (let y = 0; y <= Math.min(maxProjection, 100); y++) {
             const ageAtYear = (currentAge || 30) + y;
             const yearLabel = (currentAge !== null) ? `${ageAtYear}` : `${startYear + y}`;
 
@@ -340,11 +389,23 @@ const WealthSummaryCard = ({
                 year: startYear + y,
                 age: ageAtYear,
                 date: yearLabel,
-                netWorth: Math.round(totalStocksThisYear + runningSavings + runningCpf + totalOtherInvThisYear)
+                stocks: Math.round(totalStocksThisYear * usdToBase),
+                cpf: Math.round(runningCpf * sgdToBase),
+                savings: Math.round(runningSavings),
+                other: Math.round(totalOtherInvThisYear),
+                netWorth: Math.round(
+                    (totalStocksThisYear * usdToBase) +
+                    runningSavings +
+                    (runningCpf * sgdToBase) +
+                    totalOtherInvThisYear
+                )
             });
 
             // Calculate NEXT year values
-            runningSavings = (runningSavings * (1 + bankInterestRate)) + (monthlySavings * 12);
+            const grownExpenses = totalExpenses * Math.pow(1 + expenseGrowthRate, y + 1); // Next year's expenses
+            const nextYearMonthlySavings = monthlyPay - cpfContributionEmployee - grownExpenses;
+
+            runningSavings = (runningSavings * (1 + bankInterestRate)) + (nextYearMonthlySavings * 12);
 
             let contributionRate = 0.37;
             if (ageAtYear > 55) contributionRate = 0.34;
@@ -358,8 +419,10 @@ const WealthSummaryCard = ({
             runningCpf = (runningCpf * 1.033) + annualTotalContr;
 
             runningStocks.forEach(s => {
+                // Standard APR Compounding for Chart (Nested Loop for precision)
                 const ratePerPeriod = s.rate / s.freq;
-                for (let p = 1; p <= s.freq; p++) {
+
+                for (let period = 1; period <= s.freq; period++) {
                     s.value = (s.value + s.contribution) * (1 + ratePerPeriod);
                 }
             });
@@ -368,7 +431,11 @@ const WealthSummaryCard = ({
     }, [settings, savingsScenarioId, stocksScenarioIds, currentAge, projectedYear, settings?.stocks, settings?.otherInvestments, settings?.cpf]);
 
     const netWorthSeries = [
-        { id: 'netWorth', name: 'Net Worth', dataKey: 'netWorth', color: 'var(--neu-success)' }
+        { id: 'netWorth', name: 'Net Worth', dataKey: 'netWorth', color: 'var(--neu-success)' },
+        { id: 'stocks', name: 'Stocks', dataKey: 'stocks', color: '#3b82f6', strokeDasharray: '4 4' },
+        { id: 'savings', name: 'Savings', dataKey: 'savings', color: '#10b981', strokeDasharray: '4 4' },
+        { id: 'cpf', name: 'CPF Estimate', dataKey: 'cpf', color: '#f59e0b', strokeDasharray: '4 4' },
+        { id: 'other', name: 'Other Inv.', dataKey: 'other', color: '#8b5cf6', strokeDasharray: '4 4' }
     ];
 
     const header = (
@@ -397,7 +464,9 @@ const WealthSummaryCard = ({
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={header}
-            loading={settingsLoading}
+            // Only show full loading state if we have NO settings at all. 
+            // Otherwise, let the user see the cached/stale data while we update in background.
+            loading={!settings && loading}
             className={className}
 
         >
@@ -410,7 +479,6 @@ const WealthSummaryCard = ({
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
                             <input
                                 type="number"
-                                className={styles.input}
                                 style={{
                                     width: '60px',
                                     padding: '0.25rem 0.5rem',
@@ -423,6 +491,7 @@ const WealthSummaryCard = ({
                                     boxShadow: 'inset 2px 2px 5px var(--neu-shadow-dark), inset -2px -2px 5px var(--neu-shadow-light)',
                                     outline: 'none'
                                 }}
+                                className={styles.input}
                                 value={projectedYear}
                                 onChange={(e) => {
                                     const val = e.target.value === '' ? '' : Number(e.target.value);
@@ -443,9 +512,11 @@ const WealthSummaryCard = ({
                             showXAxis={true}
                             showYAxis={true}
                             yAxisFormatter={(val) => {
-                                if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-                                if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
-                                return `$${val}`;
+                                // Charts usually use base values, we convert to display
+                                const convertedVal = val * baseToDisplayRate;
+                                if (convertedVal >= 1000000) return `${displayCurrencySymbol}${(convertedVal / 1000000).toFixed(1)}M`;
+                                if (convertedVal >= 1000) return `${displayCurrencySymbol}${(convertedVal / 1000).toFixed(0)}k`;
+                                return `${displayCurrencySymbol}${convertedVal.toFixed(0)}`;
                             }}
                             tooltipValueFormatter={(val) => formatCurrency(val)}
                             tooltipLabelFormatter={(label, payload) => {
@@ -465,7 +536,7 @@ const WealthSummaryCard = ({
                     <div className={styles.planSelectors}>
                         {/* Savings Plan Selector */}
                         <div className={styles.selectorItem}>
-                            <div className={styles.selectorLabel}>Savings:</div>
+                            <div className={styles.selectorLabel}>{settings?.savings?.name || 'Savings'}:</div>
                             <DropdownButton
                                 label={settings?.savings?.scenarios?.find(s => s.id === savingsScenarioId)?.name || 'Select Plan'}
                                 items={settings?.savings?.scenarios?.map(s => ({
@@ -481,7 +552,7 @@ const WealthSummaryCard = ({
                         {/* Stocks Plan Selectors (Per Chart) */}
                         {settings?.stocks?.charts?.map(chart => (
                             <div key={chart.id} className={styles.selectorItem}>
-                                <div className={styles.selectorLabel}>Stocks:</div>
+                                <div className={styles.selectorLabel}>{chart.name || 'Stocks'}:</div>
                                 <DropdownButton
                                     label={chart.scenarios?.find(s => s.id === stocksScenarioIds[chart.id])?.name || 'Select Plan'}
                                     items={chart.scenarios?.map(s => ({
@@ -503,7 +574,7 @@ const WealthSummaryCard = ({
                     <div className={styles.metricsContainer}>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Stocks</span>
-                            <span className={styles.metricValue}>{formatCurrency(stocksValue)}</span>
+                            <span className={styles.metricValue}>{formatCurrency(stocksValue, true)}</span>
                         </div>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Cash Savings</span>
@@ -511,7 +582,7 @@ const WealthSummaryCard = ({
                         </div>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>CPF Estimate</span>
-                            <span className={styles.metricValue}>{formatCurrency(savingsAndCpf.cpf)}</span>
+                            <span className={styles.metricValue}>{formatCurrency(savingsAndCpf.cpf, false, true)}</span>
                         </div>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Other Investments</span>

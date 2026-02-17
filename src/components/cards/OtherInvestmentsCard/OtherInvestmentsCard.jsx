@@ -7,7 +7,6 @@ import DropdownButton from '../../ui/DropdownButton/DropdownButton';
 import CustomDatePicker from '../../ui/CustomDatePicker/CustomDatePicker';
 import BaseChart from '../../ui/BaseChart/BaseChart';
 import styles from './OtherInvestmentsCard.module.css';
-import { useUserSettings } from '../../../hooks/useUserSettings';
 import { formatLastUpdated } from '../../../utils/dateUtils';
 
 const getAge = (dob) => {
@@ -119,9 +118,18 @@ const OtherInvestmentsCard = ({
     isOpen = true,
     onToggle = null,
     onHide = null,
-    className = ""
+    className = "",
+    baseCurrency = 'USD',
+    baseCurrencySymbol = '$',
+    displayCurrency = 'USD',
+    displayCurrencySymbol = '$',
+    baseToDisplayRate = 1,
+    usdToDisplayRate = 1,
+    settings = null,
+    onUpdateSettings = null,
+    loading = false
 }) => {
-    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
+    // const { settings, updateSettings, loading: settingsLoading } = useUserSettings(); // Removed
     const [structuredData, setStructuredData] = useState({ items: [], groups: [] });
     const [projectionYears, setProjectionYears] = useState(10);
     const [showEditor, setShowEditor] = useState(false);
@@ -139,15 +147,16 @@ const OtherInvestmentsCard = ({
     }, [settings, isInitialized]);
 
     useEffect(() => {
-        if (settingsLoading) return;
+        if (loading || !onUpdateSettings) return;
         const timer = setTimeout(() => {
             const currentData = {
                 ...structuredData,
                 projectionYears
             };
             const { updatedAt, ...prevInvWithoutTime } = settings?.otherInvestments || {};
-            if (JSON.stringify(prevInvWithoutTime) !== JSON.stringify(currentData)) {
-                updateSettings({
+            // Only save if initialized and changed
+            if (JSON.stringify(prevInvWithoutTime) !== JSON.stringify(currentData) && isInitialized) {
+                onUpdateSettings({
                     otherInvestments: {
                         ...currentData,
                         updatedAt: new Date().toISOString()
@@ -156,12 +165,20 @@ const OtherInvestmentsCard = ({
             }
         }, 1000);
         return () => clearTimeout(timer);
-    }, [structuredData, projectionYears, settingsLoading, updateSettings, settings?.otherInvestments]);
+    }, [structuredData, projectionYears, loading, onUpdateSettings, settings?.otherInvestments, isInitialized]);
 
     const formatCurrency = (val) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'USD',
+            currency: displayCurrency,
+            maximumFractionDigits: 0
+        }).format(val * baseToDisplayRate);
+    };
+
+    const formatBaseCurrency = (val) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: baseCurrency,
             maximumFractionDigits: 0
         }).format(val);
     };
@@ -215,6 +232,7 @@ const OtherInvestmentsCard = ({
                 age: currentAge !== null ? currentAge + y : null
             };
             let totalVal = 0;
+            let totalInvested = 0;
 
             allItems.forEach(item => {
                 const initialVal = Number(item.value || 0);
@@ -224,25 +242,38 @@ const OtherInvestmentsCard = ({
                     item.frequency === 'Quarterly' ? 4 :
                         item.frequency === 'Yearly' ? 1 : 0;
 
-                let val = initialVal;
-                if (y > 0) {
-                    // Simple annual projection: (PrevVal * (1+growth)) + (Payments * freq)
-                    // For more accuracy we could do period-by-period growth
-                    for (let i = 0; i < y; i++) {
-                        val = (val * (1 + growthRate)) + (payment * freq);
-                    }
+                const annualContribution = payment * freq;
+
+                // Total Invested Calculation (Principal + Contributions)
+                // Note: StocksCard logic: initial + (annual * year)
+                // This assumes contributions start immediately and happen for 'y' years essentially.
+                const itemInvested = initialVal + (annualContribution * y);
+                totalInvested += itemInvested;
+
+
+                // Value Calculation using FV Formula
+                // FV = P(1+r)^t + PMT * ((1+r)^t - 1)/r
+                let itemValue = 0;
+                if (growthRate === 0) {
+                    itemValue = initialVal + (annualContribution * y);
+                } else {
+                    const p_term = initialVal * Math.pow(1 + growthRate, y);
+                    const pmt_term = annualContribution * (Math.pow(1 + growthRate, y) - 1) / growthRate;
+                    itemValue = p_term + pmt_term;
                 }
-                totalVal += val;
+                totalVal += itemValue;
             });
 
             point.value = Math.round(totalVal);
+            point.invested = Math.round(totalInvested);
             data.push(point);
         }
         return data;
-    }, [structuredData, projectionYears]);
+    }, [structuredData, projectionYears, settings?.dateOfBirth]);
 
     const chartSeries = [
-        { id: 'value', name: 'Projected Value', dataKey: 'value', color: 'var(--neu-success)' }
+        { id: 'value', name: 'Projected Value', dataKey: 'value', color: 'var(--neu-success)' },
+        { id: 'invested', name: 'Total Invested', dataKey: 'invested', color: 'var(--text-secondary)', strokeDasharray: '5 5' }
     ];
 
     const handleAddItem = (groupId = null) => {
@@ -392,7 +423,7 @@ const OtherInvestmentsCard = ({
                         />
                     </div>
                     <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Payment Amount</label>
+                        <label className={styles.fieldLabel}>Payment Amount ({baseCurrencySymbol})</label>
                         <div className={styles.valueWrapper}>
                             <input
                                 type="number"
@@ -403,7 +434,7 @@ const OtherInvestmentsCard = ({
                             />
                             {item.frequency !== 'Monthly' && item.frequency !== 'One-time' && (
                                 <span className={styles.monthlyExtrapolation}>
-                                    ≈ ${Math.round(getItemMonthly(item)).toLocaleString()}/mo
+                                    ≈ {baseCurrencySymbol}{Math.round(getItemMonthly(item)).toLocaleString()}/mo
                                 </span>
                             )}
                         </div>
@@ -432,7 +463,7 @@ const OtherInvestmentsCard = ({
 
                 <div className={styles.detailedSubRow}>
                     <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Initial Principal</label>
+                        <label className={styles.fieldLabel}>Initial Principal ({baseCurrencySymbol})</label>
                         <input
                             type="number"
                             step="0.01"
@@ -442,7 +473,7 @@ const OtherInvestmentsCard = ({
                         />
                     </div>
                     <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Current Value</label>
+                        <label className={styles.fieldLabel}>Current Value ({baseCurrencySymbol})</label>
                         <input
                             type="number"
                             step="0.01"
@@ -493,7 +524,7 @@ const OtherInvestmentsCard = ({
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={header}
-            loading={settingsLoading}
+            loading={loading}
             className={className}
             menuItems={menuItems}
 
@@ -502,7 +533,7 @@ const OtherInvestmentsCard = ({
                 <div className={styles.section}>
                     <div className={styles.sectionHeader}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <h4 className={styles.sectionTitle}>Projected Growth</h4>
+                            <h4 className={styles.sectionTitle}>Projected Growth ({displayCurrency})</h4>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
@@ -524,9 +555,10 @@ const OtherInvestmentsCard = ({
                             showXAxis={true}
                             showYAxis={true}
                             yAxisFormatter={(val) => {
-                                if (val >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-                                if (val >= 1000) return `$${(val / 1000).toFixed(0)}k`;
-                                return `$${val}`;
+                                const convertedVal = val * baseToDisplayRate;
+                                if (convertedVal >= 1000000) return `${displayCurrencySymbol}${(convertedVal / 1000000).toFixed(1)}M`;
+                                if (convertedVal >= 1000) return `${displayCurrencySymbol}${(convertedVal / 1000).toFixed(0)}k`;
+                                return `${displayCurrencySymbol}${convertedVal.toFixed(0)}`;
                             }}
                             tooltipValueFormatter={(val) => formatCurrency(val)}
                             tooltipLabelFormatter={(label, payload) => {

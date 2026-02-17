@@ -17,7 +17,7 @@ import ThemeToggle from '../../ui/Navigation/ThemeToggle';
 import TopNav from '../../ui/Navigation/TopNav';
 import WatchlistModal from '../../ui/Modals/WatchlistModal';
 import UserProfileModal from '../../ui/Modals/UserProfileModal';
-import { fetchStockData } from '../../../services/api';
+import { fetchStockPricesBatch } from '../../../services/api';
 import LoadingScreen from '../../ui/LoadingScreen/LoadingScreen';
 import StyledCard from '../../ui/StyledCard';
 import { Wallet, TrendingUp, Sparkles, Clock } from 'lucide-react';
@@ -96,24 +96,28 @@ const HeroPage = () => {
 
         if (missingTickers.length > 0) {
             setPricesLoading(true);
-            let completedCount = 0;
-            missingTickers.forEach((ticker, index) => {
-                // Staggered fetch to avoid hitting rate limits too fast on hero page
-                setTimeout(() => {
-                    fetchStockData(ticker).then(data => {
-                        setLiveData(prev => ({
-                            ...prev,
-                            [ticker]: { price: data.overview?.price || 0 }
-                        }));
-                    }).catch(() => { })
-                        .finally(() => {
-                            completedCount++;
-                            if (completedCount === missingTickers.length) {
-                                setPricesLoading(false);
-                            }
-                        });
-                }, index * 200);
-            });
+
+
+            // BATCH FETCHING IMPLEMENTATION
+            fetchStockPricesBatch(missingTickers)
+                .then(results => {
+                    const newLiveData = {};
+                    Object.entries(results).forEach(([ticker, data]) => {
+                        newLiveData[ticker] = {
+                            price: data.price,
+                            change: data.change,
+                            changePercent: data.changePercent
+                        };
+                    });
+
+                    setLiveData(prev => ({ ...prev, ...newLiveData }));
+                })
+                .catch(err => {
+                    console.error("Failed to batch fetch stocks", err);
+                })
+                .finally(() => {
+                    setPricesLoading(false);
+                });
         } else if (allTickers.length > 0) {
             // All already in liveData
             setPricesLoading(false);
@@ -295,22 +299,7 @@ const HeroPage = () => {
     }, [settings, projectedYear, estimatedNetWorth, currentAge]);
 
     // Silently pre-fetch first portfolio data more aggressively for quick transition
-    useEffect(() => {
-        const firstPortfolioItems = portfolioList?.[0]?.portfolio || [];
-        if (currentUser && firstPortfolioItems.length > 0) {
-            const uniqueTickers = [...new Set(firstPortfolioItems.map(p => p.ticker))];
-
-            const timer = setTimeout(() => {
-                uniqueTickers.forEach((ticker, index) => {
-                    setTimeout(() => {
-                        fetchStockData(ticker).catch(() => { });
-                    }, index * 300);
-                });
-            }, 3000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [currentUser, portfolioList]);
+    // ---------------------------------------
     // ---------------------------------------
 
     return (

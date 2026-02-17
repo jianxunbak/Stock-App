@@ -11,10 +11,14 @@ const SavingsEditorWindow = ({
     scenarios,
     settings,
     stocksCharts = [],
+    baseCurrency = 'USD',
+    baseCurrencySymbol = '$',
     onAddScenario,
     onRemoveScenario,
     onUpdateScenario,
-    onUpdateExpenses
+    onUpdateExpenses,
+    cardName,
+    onUpdateCardName
 }) => {
     const [newExpenseName, setNewExpenseName] = useState('');
 
@@ -290,6 +294,17 @@ const SavingsEditorWindow = ({
             }
         >
             <div className={styles.container}>
+                <div className={styles.section} style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--glass-border)' }}>
+                    <label className={styles.label}>Section Name (Appears in Net Worth)</label>
+                    <input
+                        type="text"
+                        className={styles.input}
+                        value={cardName}
+                        onChange={(e) => onUpdateCardName(e.target.value)}
+                        placeholder="e.g. Savings"
+                    />
+                </div>
+
                 <div className={styles.scenarioList}>
                     {scenarios.map((scenario) => {
                         const expenses = normalizeExpenses(scenario.expenses);
@@ -325,7 +340,7 @@ const SavingsEditorWindow = ({
                                     <div className={styles.inputGrid}>
                                         <div className={styles.inputGroup}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                                <label className={styles.label}>Monthly Pay ($)</label>
+                                                <label className={styles.label}>Monthly Pay ({baseCurrencySymbol})</label>
                                                 {settings?.cpf?.monthlySalary && (
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         {!scenario.isManualPay ? (
@@ -340,7 +355,7 @@ const SavingsEditorWindow = ({
                                                     </div>
                                                 )}
                                             </div>
-                                            <div style={{ position: 'relative' }}>
+                                            <div className={styles.valueWrapper}>
                                                 {!scenario.isManualPay && settings?.cpf?.monthlySalary ? (
                                                     <div className={styles.flatValue}>
                                                         ${Number(settings.cpf.monthlySalary).toLocaleString()}
@@ -396,17 +411,49 @@ const SavingsEditorWindow = ({
                                                         )}
                                                     </div>
                                                 )}
+                                                <span className={styles.monthlyExtrapolation}>
+                                                    ≈ ${Math.round(Number(scenario.monthlyPay || 0) * 12).toLocaleString()}/year
+                                                </span>
                                             </div>
                                         </div>
                                         <div className={styles.inputGroup}>
-                                            <label className={styles.label}>Initial Savings ($)</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                className={styles.input}
-                                                value={scenario.initialSavings}
-                                                onChange={(e) => onUpdateScenario(scenario.id, 'initialSavings', e.target.value)}
-                                            />
+                                            <label className={styles.label}>Initial Savings ({baseCurrencySymbol})</label>
+                                            <div className={styles.valueWrapper}>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    className={styles.input}
+                                                    value={scenario.initialSavings}
+                                                    onChange={(e) => onUpdateScenario(scenario.id, 'initialSavings', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label className={styles.label}>Bank Interest Rate (%)</label>
+                                            <div className={styles.valueWrapper}>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    className={styles.input}
+                                                    value={scenario.bankInterestRate === undefined ? '' : scenario.bankInterestRate}
+                                                    onChange={(e) => onUpdateScenario(scenario.id, 'bankInterestRate', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className={styles.inputGroup}>
+                                            <label className={styles.label}>Annual Expense Increase (%)</label>
+                                            <div className={styles.valueWrapper}>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    className={styles.input}
+                                                    value={scenario.annualExpenseGrowth === undefined ? '' : scenario.annualExpenseGrowth}
+                                                    onChange={(e) => onUpdateScenario(scenario.id, 'annualExpenseGrowth', e.target.value)}
+                                                />
+                                                <span className={styles.monthlyExtrapolation}>
+                                                    ≈ +${Math.round((totalExpenses * (Number(scenario.annualExpenseGrowth || 0) / 100)) * 12).toLocaleString()}/year
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </section>
@@ -610,15 +657,15 @@ const SavingsEditorWindow = ({
                                 <div className={styles.summary}>
                                     <div className={styles.summaryRow}>
                                         <span>Total Monthly Expenses:</span>
-                                        <span className={styles.expenseTotal}>${Math.round(totalExpenses).toLocaleString()}</span>
+                                        <span className={styles.expenseTotal}>{baseCurrencySymbol}{Math.round(totalExpenses).toLocaleString()}</span>
                                     </div>
                                     <div className={styles.summaryRow}>
                                         <span>CPF Contribution:</span>
-                                        <span>${Math.round(cpf).toLocaleString()}</span>
+                                        <span>{baseCurrencySymbol}{Math.round(cpf).toLocaleString()}</span>
                                     </div>
                                     <div className={styles.summaryRow}>
                                         <span>Estimated Monthly Savings:</span>
-                                        <span className={styles.savingsTotal}>${Math.round(monthlySavings).toLocaleString()}</span>
+                                        <span className={styles.savingsTotal}>{baseCurrencySymbol}{Math.round(monthlySavings).toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
