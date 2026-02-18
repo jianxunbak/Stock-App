@@ -20,7 +20,7 @@ const buttonVariants = {
 const textVariants = {
     initial: { scaleX: 1, scaleY: 1, y: 0, opacity: 1, letterSpacing: "0em" },
     hover: { scale: 1.02, y: -1 },
-    pressed: { scaleX: 1.15, scaleY: 0.98, y: 2, opacity: 0.95 }
+    pressed: { scaleX: 1.04, scaleY: 0.99, y: 1, opacity: 0.95 }
 };
 
 // --- 6. Expansion Item Variants ---

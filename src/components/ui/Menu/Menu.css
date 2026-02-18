@@ -18,6 +18,9 @@
     position: absolute;
     z-index: 1000;
     min-width: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 /* Placements */

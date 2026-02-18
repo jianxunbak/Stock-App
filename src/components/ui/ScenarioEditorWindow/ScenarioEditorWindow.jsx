@@ -24,7 +24,9 @@ const ScenarioEditorWindow = ({
     onUpdateScenario,
     onToggleScenarioVisibility,
     baseCurrency = 'USD',
-    baseCurrencySymbol = '$'
+    baseCurrencySymbol = '$',
+    currentPortfolioValue = 0,
+    portfolioOptions = []
 }) => {
     const getFrequencyLabel = (value) => {
         return FREQUENCY_OPTIONS.find(opt => opt.value === value)?.label || value;
@@ -132,7 +134,28 @@ const ScenarioEditorWindow = ({
 
                                     <div className={styles.calculatorForm}>
                                         <div className={styles.inputGroup}>
-                                            <label className={styles.inputLabel}>Initial Deposit ({baseCurrencySymbol})</label>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <label className={styles.inputLabel} style={{ marginBottom: 0 }}>Initial Deposit ({baseCurrencySymbol})</label>
+                                                {currentPortfolioValue > 0 && (
+                                                    <DropdownButton
+                                                        label="Autofill"
+                                                        icon={<ChevronDown size={10} />}
+                                                        items={[
+                                                            {
+                                                                label: `All Portfolios (${baseCurrencySymbol}${Math.round(currentPortfolioValue).toLocaleString()})`,
+                                                                onClick: () => onUpdateScenario(chart.id, scenario.id, 'initialDeposit', Math.round(currentPortfolioValue))
+                                                            },
+                                                            ...(portfolioOptions || []).map(p => ({
+                                                                label: `${p.name} (${baseCurrencySymbol}${Math.round(p.value).toLocaleString()})`,
+                                                                onClick: () => onUpdateScenario(chart.id, scenario.id, 'initialDeposit', Math.round(p.value))
+                                                            }))
+                                                        ]}
+                                                        variant="text"
+                                                        style={{ fontSize: '0.75rem', padding: '0 4px', height: 'auto' }}
+                                                        buttonStyle={{ color: 'var(--neu-accent)', fontSize: '0.75rem', padding: 0, gap: '2px', height: 'auto', border: 'none', background: 'transparent', boxShadow: 'none' }}
+                                                    />
+                                                )}
+                                            </div>
                                             <input
                                                 type="number"
                                                 className={styles.numberInput}
@@ -168,6 +191,7 @@ const ScenarioEditorWindow = ({
                                                 closeOnSelect={true}
                                                 variant="outline"
                                                 className={styles.frequencyDropdown}
+                                                noAnimation={true}
                                                 buttonStyle={{
                                                     width: '100%',
                                                     justifyContent: 'flex-start',

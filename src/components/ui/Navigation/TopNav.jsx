@@ -113,6 +113,8 @@ export const TopNavActions = ({
             <div className={styles.mobileActions}>
                 <Menu
                     placement="bottom-right"
+                    distortionFactor={0.6}
+                    contentDistortionScale={1.5}
                     trigger={
                         <Button variant="icon" className={styles.menuButton}>
                             <MoreVertical size={24} />

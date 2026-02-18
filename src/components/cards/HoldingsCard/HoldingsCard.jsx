@@ -228,10 +228,12 @@ const HoldingsCard = ({
                                     onChange={(val) => setEditValues({ ...editValues, category: val })}
                                     options={['Core', 'Growth', 'Compounder', 'Defensive', 'Speculative']}
                                     triggerClassName={styles.editableSelectTrigger}
-                                    isMobile={isMobile}
+                                    isMobile={false}
                                     useModalOnDesktop={true}
                                     style={{ color: 'var(--text-primary)', WebkitTextFillColor: 'var(--text-primary)' }}
                                     containerStyle={{ minWidth: 0 }}
+                                    distortionFactor={0.5}
+                                    contentDistortionScale={0.5}
                                 />
                             ) : <span className={styles.categoryBadge}>{displayItem.category}</span>}
                         </td>
@@ -255,10 +257,12 @@ const HoldingsCard = ({
                                     value={editValues.purchaseDate}
                                     onChange={(val) => setEditValues({ ...editValues, purchaseDate: val })}
                                     triggerClassName={styles.editableDateTrigger}
-                                    isMobile={isMobile}
+                                    isMobile={false}
                                     useModalOnDesktop={true}
                                     style={{ color: 'var(--text-primary)', WebkitTextFillColor: 'var(--text-primary)', background: 'transparent', borderRadius: '1.5rem' }}
                                     containerStyle={{ minWidth: 0 }}
+                                    distortionFactor={0.5}
+                                    contentDistortionScale={0.5}
                                 />
                             ) : (() => {
                                 if (displayItem.items && displayItem.items.length > 0) {

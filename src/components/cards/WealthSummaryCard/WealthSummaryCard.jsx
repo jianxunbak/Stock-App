@@ -5,6 +5,9 @@ import { Calendar, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
 import styles from './WealthSummaryCard.module.css';
 import BaseChart from '../../ui/BaseChart/BaseChart';
 import { formatLastUpdated } from '../../../utils/dateUtils';
+import { calculateCPFProjection } from '../../../utils/cpfUtils';
+import { calculateStockProjection } from '../../../utils/stockUtils';
+import { calculateOtherInvestmentProjection } from '../../../utils/otherInvestmentUtils';
 
 const WealthSummaryCard = ({
     isOpen = true,
@@ -20,7 +23,9 @@ const WealthSummaryCard = ({
     sgdToDisplayRate = 1,
     settings = null,
     onUpdateSettings = null,
-    loading = false
+    loading = false,
+    currentPortfolioValueUSD = null,
+    onRefresh = null
 }) => {
     // const { settings, updateSettings, loading: settingsLoading } = useUserSettings(); // Removed
     const settingsLoading = loading; // Alias for compatibility with existing code below if any
@@ -72,7 +77,15 @@ const WealthSummaryCard = ({
 
     const handleProjectedYearChange = (year) => {
         setProjectedYear(year);
-        // Note: We no longer sync this back to the database as per user request
+        // Sync back to database
+        if (onUpdateSettings) {
+            onUpdateSettings({
+                wealth: {
+                    ...settings?.wealth,
+                    projectedYear: year
+                }
+            });
+        }
     };
 
     const handleSavingsScenarioChange = (id) => {
@@ -175,126 +188,134 @@ const WealthSummaryCard = ({
         const totalExpenses = calculateTotalExpenses(scenario.expenses);
 
         // CPF Data from CPF Card settings
-        const cpfSalary = Number(settings?.cpf?.monthlySalary || monthlyPay);
+        const cpfSalary = Number(settings?.cpf?.monthlySalary || 0); // Removed || monthlyPay fallback
         const annualBonus = Number(settings?.cpf?.annualBonus || 0);
         const owCeiling = 8000;
-        const annualCeiling = 102000;
 
-        // Calculate Monthly Cash Savings (Subtract only Employee portion 20%)
-        const cpfContributionEmployee = Math.min(monthlyPay, owCeiling) * 0.2;
+        // Calculate Monthly Cash Savings
+        // We only deduct CPF if it is LINKED (in which case it is in totalExpenses).
+        // If unlinked, we assume user wants to simulate 0 CPF deduction.
+        const cpfContributionEmployee = 0;
         const monthlySavings = monthlyPay - cpfContributionEmployee - totalExpenses;
 
         let savingsBalance = Number(scenario.initialSavings || 0);
         const bankInterestRate = Number(scenario.bankInterestRate || 0) / 100;
 
         // CPF Starting Point
-        const initialCpf = Number(settings?.cpf?.balances?.oa || 0) +
-            Number(settings?.cpf?.balances?.sa || 0) +
-            Number(settings?.cpf?.balances?.ma || 0) +
-            Number(settings?.cpf?.balances?.ra || 0);
 
-        let cpfBalance = initialCpf;
 
-        // Sync with CPF Card simulation baseline
+        // ... Savings Calculation Loop ...
+        // We still need to loop for Savings calculation as it depends on expense growth/interest
         for (let y = 0; y <= projectedYear; y++) {
             if (y > 0) {
                 // Cash Savings Growth (Interest first, then new savings)
-                // Apply annual expense growth
                 const expenseGrowthRate = Number(scenario.annualExpenseGrowth || 0) / 100;
                 const grownExpenses = totalExpenses * Math.pow(1 + expenseGrowthRate, y);
                 const yearMonthlySavings = monthlyPay - cpfContributionEmployee - grownExpenses;
 
                 savingsBalance = (savingsBalance * (1 + bankInterestRate)) + (yearMonthlySavings * 12);
-
-                // CPF Growth (Employer + Employee = 37% for age <= 55)
-                const ageAtYear = (currentAge || 30) + y - 1;
-                let contributionRate = 0.37;
-                if (ageAtYear > 55) contributionRate = 0.34;
-                if (ageAtYear > 60) contributionRate = 0.25;
-                if (ageAtYear > 65) contributionRate = 0.165;
-                if (ageAtYear > 70) contributionRate = 0.125;
-
-                const annualOW = Math.min(cpfSalary, owCeiling) * 12;
-                const annualAW = Math.min(annualBonus, Math.max(0, annualCeiling - annualOW));
-                const annualTotalContr = (annualOW + annualAW) * contributionRate;
-
-                cpfBalance = (cpfBalance * 1.033) + annualTotalContr;
             }
         }
+
+        // CPF Calculation using shared utility
+        // This ensures "Net Worth card only retrieves information from the CPF card" logic
+        const cpfProjection = calculateCPFProjection({
+            currentAge: currentAge || 30,
+            dateOfBirth: settings?.dateOfBirth,
+            monthlySalary: Number(settings?.cpf?.monthlySalary || monthlyPay),
+            annualBonus: Number(settings?.cpf?.annualBonus || 0),
+            salaryGrowth: Number(settings?.cpf?.salaryGrowth || 0),
+            projectionYears: projectedYear,
+            balances: settings?.cpf?.balances || {}
+        });
+
+        // Get the value at the target year
+        const targetCpfData = cpfProjection.projection[projectedYear] || cpfProjection.projection[cpfProjection.projection.length - 1];
+        const cpfBalance = targetCpfData ? targetCpfData.total : 0;
 
         return { savings: Math.round(savingsBalance), cpf: Math.round(cpfBalance) };
     }, [settings?.savings, settings?.cpf, settings?.dateOfBirth, savingsScenarioId, projectedYear, currentAge]);
 
     // 2. Stocks Projection
     const stocksValue = useMemo(() => {
-        let total = 0;
+        // DEBUG LOGS
+        // console.log("DEBUG: WealthSummaryCard stocksValue calc. Year:", projectedYear, "CurrentVal:", currentPortfolioValueUSD);
+
+        // If we are at year 0 (Current) and we have real portfolio data, use it!
+        // This solves the issue where "Asset Breakdown" showed the Scenario Initial Deposit (Projected) instead of Real Current Value
+        if (projectedYear === 0 && currentPortfolioValueUSD !== null && currentPortfolioValueUSD !== undefined) {
+            console.log("DEBUG: USING REAL PORTFOLIO VALUE:", currentPortfolioValueUSD);
+            return currentPortfolioValueUSD * usdToBase;
+        } else if (projectedYear === 0) {
+            console.log("DEBUG: Skipping Override. Year 0 but CurrentVal is", currentPortfolioValueUSD);
+        }
+
         if (!settings?.stocks?.charts) return 0;
 
-        settings.stocks.charts.forEach(chart => {
-            const scenarioId = stocksScenarioIds[chart.id];
-            const scenario = chart.scenarios?.find(s => s.id === scenarioId) || chart.scenarios?.[0];
-            if (!scenario) return;
+        // ... (rest of projection logic) ...
+        const activeStockCharts = settings.stocks.charts.map(chart => {
+            const selectedScenarioId = stocksScenarioIds[chart.id];
+            const scenarios = chart.scenarios || [];
+            const targetScenario = selectedScenarioId
+                ? scenarios.find(s => s.id === selectedScenarioId)
+                : (scenarios.find(s => s.visible) || scenarios[0]);
 
-            const initialDeposit = Number(scenario.initialDeposit || 0);
-            const contributionAmount = Number(scenario.contributionAmount || 0);
-            // Standard APR Compounding Logic (Nominal Rate)
-            // Matches StocksCard.jsx and standard financial calculators
-            const annualRate = Number(scenario.estimatedRate || 0) / 100;
-            const freq = scenario.contributionFrequency === 'monthly' ? 12 :
-                scenario.contributionFrequency === 'quarterly' ? 4 : 1;
-
-            const ratePerPeriod = annualRate / freq;
-
-            let val = initialDeposit;
-
-            // Safeguard: Limit projection to 100 years
-            const maxLoop = Math.min(Math.max(0, projectedYear), 100);
-
-            // We calculate period-by-period for accuracy with the StocksCard approach
-            // But since WealthSummaryCard loops by YEAR, we can optimize or nest loops.
-            // To be purely consistent with StocksCard (which loops by year then by period), we do this:
-
-            for (let y = 1; y <= maxLoop; y++) {
-                // Compound for 'freq' periods in this year
-                for (let period = 1; period <= freq; period++) {
-                    // Add contribution at start or end? 
-                    // StocksCard adds contribution THEN compounds: 
-                    // totalValue = (totalValue + contributionAmount) * (1 + ratePerPeriod);
-                    // This implies contributions happen at the START of each period (or end of previous).
-                    // Let's match StocksCard logic EXACTLY.
-                    val = (val + contributionAmount) * (1 + ratePerPeriod);
-                }
-            }
-            total += val;
+            return {
+                ...chart,
+                visible: true,
+                scenarios: scenarios.map(s => ({
+                    ...s,
+                    visible: targetScenario ? s.id === targetScenario.id : false
+                }))
+            };
         });
-        return total;
-    }, [settings?.stocks, stocksScenarioIds, projectedYear]);
+
+        const projection = calculateStockProjection({
+            charts: activeStockCharts,
+            projectionYears: Math.min(Math.max(0, projectedYear), 100),
+            currentAge: currentAge || 30,
+            startYear: new Date().getFullYear()
+        });
+
+        const targetData = projection[projectedYear] || projection[projection.length - 1];
+        return targetData ? targetData.totalValue : 0;
+    }, [settings?.stocks, stocksScenarioIds, projectedYear, currentAge, currentPortfolioValueUSD, usdToBase]);
 
     // 3. Other Investments
     const otherInvestmentsValue = useMemo(() => {
         const otherData = settings?.otherInvestments || { items: [], groups: [] };
-        const allItems = [
-            ...(otherData.items || []),
-            ...(otherData.groups || []).flatMap(g => g.items || [])
-        ];
 
-        return allItems.reduce((sum, item) => {
-            const currentVal = Number(item.value || 0);
-            const payment = Number(item.paymentAmount || 0);
-            const frequency = item.frequency || 'One-time';
+        // If current year, return exact sum of current values to avoid any projection artifacts
+        if (projectedYear === 0) {
+            const allItems = [
+                ...(otherData.items || []),
+                ...(otherData.groups || []).flatMap(g => g.items || [])
+            ];
+            return allItems.reduce((acc, item) => acc + Number(item.value || 0), 0);
+        }
 
-            if (frequency === 'One-time' || projectedYear === 0) return sum + currentVal;
+        const projection = calculateOtherInvestmentProjection({
+            data: otherData,
+            projectionYears: Math.min(Math.max(0, projectedYear), 100),
+            currentAge: currentAge || 30,
+            startYear: new Date().getFullYear()
+        });
 
-            let annualContribution = 0;
-            if (frequency === 'Monthly') annualContribution = payment * 12;
-            else if (frequency === 'Quarterly') annualContribution = payment * 4;
-            else if (frequency === 'Yearly') annualContribution = payment;
+        // Get value at target year
+        const targetData = projection[projectedYear] || projection[projection.length - 1];
+        return targetData ? targetData.value : 0;
+    }, [settings?.otherInvestments, projectedYear, currentAge]);
 
-            return sum + currentVal + (annualContribution * projectedYear);
-        }, 0);
-    }, [settings?.otherInvestments, projectedYear]);
+    console.log("DEBUG: WealthSummaryCard Render", {
+        projectedYear,
+        stocksValue,
+        savings: savingsAndCpf.savings,
+        cpf: savingsAndCpf.cpf,
+        other: otherInvestmentsValue,
+        settingsProjYear: settings?.wealth?.projectedYear
+    });
 
-    const netWorth = (stocksValue * usdToBase) + savingsAndCpf.savings + (savingsAndCpf.cpf * sgdToBase) + otherInvestmentsValue;
+    const netWorth = stocksValue + savingsAndCpf.savings + (savingsAndCpf.cpf * sgdToBase) + otherInvestmentsValue;
 
     // 4. Annual Net Worth Growth Projection (for Chart)
     const netWorthGrowthData = useMemo(() => {
@@ -337,95 +358,116 @@ const WealthSummaryCard = ({
         };
 
         const totalExpenses = calculateTotalExpenses(savingsScenario?.expenses);
-        const cpfSalary = Number(settings?.cpf?.monthlySalary || monthlyPay);
-        const annualBonus = Number(settings?.cpf?.annualBonus || 0);
-        const owCeiling = 8000;
-        const annualCeiling = 102000;
-        const cpfContributionEmployee = Math.min(monthlyPay, owCeiling) * 0.2;
-        // const monthlySavings = monthlyPay - cpfContributionEmployee - totalExpenses; // Moved to loop
+
+        // --- Restored Savings Variables ---
+        const cpfSalary = Number(settings?.cpf?.monthlySalary || 0); // Removed || monthlyPay fallback
+        // Calculate net monthly savings for projection
+        // If CPF is linked, it's in totalExpenses. If not, it's 0.
+        const cpfContributionEmployee = 0;
         const bankInterestRate = Number(savingsScenario?.bankInterestRate || 0) / 100;
         const expenseGrowthRate = Number(savingsScenario?.annualExpenseGrowth || 0) / 100;
-
-        // Current state tracking
         let runningSavings = Number(savingsScenario?.initialSavings || 0);
-        let runningCpf = Number(settings?.cpf?.balances?.oa || 0) +
-            Number(settings?.cpf?.balances?.sa || 0) +
-            Number(settings?.cpf?.balances?.ma || 0) +
-            Number(settings?.cpf?.balances?.ra || 0);
+        // ----------------------------------
 
-        // Stocks initial state
-        const runningStocks = stocksInit.map(chart => {
-            const scenarioId = stocksScenarioIds[chart.id];
-            const scenario = chart.scenarios?.find(s => s.id === scenarioId) || chart.scenarios?.[0];
+        // Generate CPF Projection Array first
+        const cpfProjectionObj = calculateCPFProjection({
+            currentAge: currentAge || 30,
+            dateOfBirth: settings?.dateOfBirth,
+            monthlySalary: cpfSalary,
+            annualBonus: Number(settings?.cpf?.annualBonus || 0),
+            salaryGrowth: Number(settings?.cpf?.salaryGrowth || 0),
+            projectionYears: Math.min(maxProjection, 100),
+            balances: settings?.cpf?.balances || {}
+        });
+        const cpfProjection = cpfProjectionObj.projection;
+
+        // Generate Stock Projection
+        // Filter charts to only include the specific scenario selected in the UI for each chart
+        const activeStockCharts = stocksInit.map(chart => {
+            const selectedScenarioId = stocksScenarioIds[chart.id];
+            const scenarios = chart.scenarios || [];
+
+            // Determine which scenario to use:
+            // 1. Explicitly selected in WealthSummaryCard dropdown
+            // 2. Or the first 'visible' scenario in the Stocks settings
+            // 3. Or the first scenario exists
+            const targetScenario = selectedScenarioId
+                ? scenarios.find(s => s.id === selectedScenarioId)
+                : (scenarios.find(s => s.visible) || scenarios[0]);
+
             return {
-                id: chart.id,
-                value: Number(scenario?.initialDeposit || 0),
-                contribution: Number(scenario?.contributionAmount || 0),
-                rate: Number(scenario?.estimatedRate || 0) / 100,
-                freq: scenario?.contributionFrequency === 'monthly' ? 12 :
-                    scenario?.contributionFrequency === 'quarterly' ? 4 : 1
+                ...chart,
+                visible: true, // Force chart visible for calculation
+                scenarios: scenarios.map(s => ({
+                    ...s,
+                    // Visible only if it matches our target scenario
+                    visible: targetScenario ? s.id === targetScenario.id : false
+                }))
             };
         });
 
+        // Calculate stocks (Returns array of { totalValue, totalInvested, ... })
+        const stockProjection = calculateStockProjection({
+            charts: activeStockCharts,
+            projectionYears: Math.min(maxProjection, 100),
+            currentAge: currentAge || 30,
+            startYear
+        });
+
         // Other investments initial state
-        const otherInvBase = allOtherItems.reduce((sum, item) => sum + Number(item.value || 0), 0);
-        const otherInvAnnualContrib = allOtherItems.reduce((sum, item) => {
-            const p = Number(item.paymentAmount || 0);
-            const f = item.frequency || 'One-time';
-            if (f === 'Monthly') return sum + (p * 12);
-            if (f === 'Quarterly') return sum + (p * 4);
-            if (f === 'Yearly') return sum + p;
-            return sum;
-        }, 0);
+        // Other investments projection
+        const otherInvProjection = calculateOtherInvestmentProjection({
+            data: settings?.otherInvestments || { items: [], groups: [] },
+            projectionYears: Math.min(maxProjection, 100),
+            currentAge: currentAge || 30,
+            startYear
+        });
 
         for (let y = 0; y <= Math.min(maxProjection, 100); y++) {
             const ageAtYear = (currentAge || 30) + y;
             const yearLabel = (currentAge !== null) ? `${ageAtYear}` : `${startYear + y}`;
 
-            const totalStocksThisYear = runningStocks.reduce((sum, s) => sum + s.value, 0);
-            const totalOtherInvThisYear = otherInvBase + (otherInvAnnualContrib * y);
+            // Stocks
+            // Safety check: use last value if y exceeds projection
+            const stockData = stockProjection[y] || stockProjection[stockProjection.length - 1];
+            // Stocks are already in Base Currency. DO NOT convert with usdToBase.
+
+            // Override for Year 0 if we have real portfolio data (same as Breakdown Logic)
+            let totalStocksThisYear = stockData ? stockData.totalValue : 0;
+            if (y === 0 && currentPortfolioValueUSD !== null && currentPortfolioValueUSD !== undefined) {
+                // Use USD->Base rate (which is usdToDisplay / baseToDisplay, or simply usdToBase variable)
+                totalStocksThisYear = currentPortfolioValueUSD * usdToBase;
+            }
+
+            const otherInvData = otherInvProjection[y] || otherInvProjection[otherInvProjection.length - 1];
+            const totalOtherInvThisYear = otherInvData ? otherInvData.value : 0;
+
+            // Fetch CPF from projection array
+            // Safety check: if y exceeds projection length, use last value
+            const cpfData = cpfProjection[y] || cpfProjection[cpfProjection.length - 1];
+            const currentCpfVal = cpfData ? cpfData.total : 0;
 
             data.push({
                 year: startYear + y,
                 age: ageAtYear,
                 date: yearLabel,
-                stocks: Math.round(totalStocksThisYear * usdToBase),
-                cpf: Math.round(runningCpf * sgdToBase),
-                savings: Math.round(runningSavings),
+                stocks: Math.round(totalStocksThisYear), // Value is in Base Currency
+                cpf: Math.round(currentCpfVal * sgdToBase), // CPF is SGD, convert to Base
+                savings: Math.round(runningSavings), // Savings is in Base (?) - Check this
                 other: Math.round(totalOtherInvThisYear),
                 netWorth: Math.round(
-                    (totalStocksThisYear * usdToBase) +
+                    totalStocksThisYear +
                     runningSavings +
-                    (runningCpf * sgdToBase) +
+                    (currentCpfVal * sgdToBase) +
                     totalOtherInvThisYear
                 )
             });
 
-            // Calculate NEXT year values
+            // Calculate NEXT year values for Savings
             const grownExpenses = totalExpenses * Math.pow(1 + expenseGrowthRate, y + 1); // Next year's expenses
             const nextYearMonthlySavings = monthlyPay - cpfContributionEmployee - grownExpenses;
 
             runningSavings = (runningSavings * (1 + bankInterestRate)) + (nextYearMonthlySavings * 12);
-
-            let contributionRate = 0.37;
-            if (ageAtYear > 55) contributionRate = 0.34;
-            if (ageAtYear > 60) contributionRate = 0.25;
-            if (ageAtYear > 65) contributionRate = 0.165;
-            if (ageAtYear > 70) contributionRate = 0.125;
-
-            const annualOW = Math.min(cpfSalary, owCeiling) * 12;
-            const annualAW = Math.min(annualBonus, Math.max(0, annualCeiling - annualOW));
-            const annualTotalContr = (annualOW + annualAW) * contributionRate;
-            runningCpf = (runningCpf * 1.033) + annualTotalContr;
-
-            runningStocks.forEach(s => {
-                // Standard APR Compounding for Chart (Nested Loop for precision)
-                const ratePerPeriod = s.rate / s.freq;
-
-                for (let period = 1; period <= s.freq; period++) {
-                    s.value = (s.value + s.contribution) * (1 + ratePerPeriod);
-                }
-            });
         }
         return data;
     }, [settings, savingsScenarioId, stocksScenarioIds, currentAge, projectedYear, settings?.stocks, settings?.otherInvestments, settings?.cpf]);
@@ -461,12 +503,13 @@ const WealthSummaryCard = ({
             expanded={isOpen}
             onToggle={onToggle}
             onHide={onHide}
+            onRefresh={onRefresh}
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={header}
             // Only show full loading state if we have NO settings at all. 
             // Otherwise, let the user see the cached/stale data while we update in background.
-            loading={!settings && loading}
+            loading={loading}
             className={className}
 
         >
@@ -574,7 +617,7 @@ const WealthSummaryCard = ({
                     <div className={styles.metricsContainer}>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Stocks</span>
-                            <span className={styles.metricValue}>{formatCurrency(stocksValue, true)}</span>
+                            <span className={styles.metricValue}>{formatCurrency(stocksValue)}</span>
                         </div>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Cash Savings</span>

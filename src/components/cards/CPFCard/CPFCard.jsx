@@ -22,6 +22,7 @@ import {
 } from 'recharts';
 import styles from './CPFCard.module.css';
 import { formatLastUpdated } from '../../../utils/dateUtils';
+import { calculateCPFProjection } from '../../../utils/cpfUtils';
 
 const CPFCard = ({
     isOpen = true,
@@ -38,7 +39,8 @@ const CPFCard = ({
     sgdToDisplayRate = 1,
     settings = null,
     onUpdateSettings = null,
-    loading = false
+    loading = false,
+    onRefresh = null
 }) => {
 
     // Default states
@@ -110,311 +112,17 @@ const CPFCard = ({
             setAge(calculatedAge > 0 ? calculatedAge : 30);
         }
     }, [dateOfBirth]);
-
-    // --- CPF 2026+ Base Logic Helpers (Step 3: Dynamic Allocation) ---
-    const YEAR_CONFIGS = {
-        2026: { owCeiling: 8000, annualLimit: 102000 },
-    };
-
-    const getYearlyConfig = (year) => {
-        return YEAR_CONFIGS[2026];
-    };
-
-    // Helper to get exact OA/SA/MA rates based on age
-    const getSpecificRates = (age) => {
-        // <= 35 (Standard 2026: 23, 6, 8 => Total 37%) 
-        if (age <= 35) return { oa: 0.2300, sa: 0.0600, ma: 0.0800, total: 0.3700 };
-
-        // 35-45 (User Rule: 21.01, 6.99, 9.0 => Total 37%)
-        if (age <= 45) return { oa: 0.2101, sa: 0.0699, ma: 0.0900, total: 0.3700 };
-
-        // 45-50 (User Rule: 19.01, 7.99, 10.0 => Total 37%)
-        if (age <= 50) return { oa: 0.1901, sa: 0.0799, ma: 0.1000, total: 0.3700 };
-
-        // 50-55 (User Rule: 15.01, 11.49, 10.5 => Total 37%)
-        if (age <= 55) return { oa: 0.1501, sa: 0.1149, ma: 0.1050, total: 0.3700 };
-
-        // > 55 (Standard tapering - approximate based on 2026)
-        if (age <= 60) return { oa: 0.1150, sa: 0.1100, ma: 0.1000, total: 0.3250 };
-        if (age <= 65) return { oa: 0.0450, sa: 0.0950, ma: 0.1100, total: 0.2500 };
-        if (age <= 70) return { oa: 0.0200, sa: 0.0600, ma: 0.0850, total: 0.1650 };
-        return { oa: 0.0100, sa: 0.0100, ma: 0.1050, total: 0.1250 };
-    };
-
     // Step 3: Compound Interest Foundation Logic + Ceilings + Dynamic Rates
     const calculationResult = useMemo(() => {
-        const startYear = 2026;
-        let currentAge = age;
-        const birthMonthIndex = dateOfBirth ? new Date(dateOfBirth).getMonth() : 0;
-
-        let at55Snapshot = { withdrawable: 0, ra: 0, target: 0, ageReached: false };
-
-        let bal = {
-            oa: Number(balances.oa || 0),
-            sa: Number(balances.sa || 0),
-            ma: Number(balances.ma || 0),
-            ra: Number(balances.ra || 0)
-        };
-
-        const currentTotal = bal.oa + bal.sa + bal.ma + bal.ra;
-
-        let projection = [];
-        let yearlyInterest = { total: 0, breakdown: { oa: 0, sa: 0, ma: 0, ra: 0 } };
-
-        projection.push({
-            year: startYear,
-            age: currentAge,
-            oa: bal.oa,
-            sa_ra: bal.sa + bal.ra,
-            ma: bal.ma,
-            total: currentTotal
+        return calculateCPFProjection({
+            currentAge: age,
+            dateOfBirth,
+            monthlySalary,
+            annualBonus,
+            salaryGrowth,
+            projectionYears,
+            balances
         });
-
-        const maxYears = Math.min(projectionYears, 100 - age);
-
-        for (let y = 0; y < maxYears; y++) {
-            const year = startYear + y + 1;
-            const config = getYearlyConfig(year);
-            const annualWageCeiling = config.annualLimit || 102000;
-
-            let pendingInterest = { oa: 0, sa: 0, ma: 0, ra: 0 };
-
-            // Step 2: Annual Ceiling Counter (resets every year)
-            let totalWagesYearToDate = 0;
-
-            for (let m = 0; m < 12; m++) {
-                const isPostBday = m > birthMonthIndex;
-                const lookupAge = isPostBday ? currentAge + 1 : currentAge;
-
-                // Step 3: Get specific rates for this age
-                const rates = getSpecificRates(lookupAge);
-
-                // Apply Salary Growth Logic
-                // We use the base monthlySalary and annualBonus, compounded by salaryGrowth for the current year (y)
-                const growthFactor = Math.pow(1 + (Number(salaryGrowth) / 100), y);
-                const currentMonthlySalary = Number(monthlySalary || 0) * growthFactor;
-                const currentAnnualBonus = Number(annualBonus || 0) * growthFactor;
-
-                const sNum = currentMonthlySalary;
-
-                // Rule 1: Monthly Wage Ceiling (OW)
-                const ow = Math.min(sNum, config.owCeiling);
-
-                const isBonus = m === 11;
-                const bNum = currentAnnualBonus;
-                const aw = isBonus ? bNum : 0;
-
-                const potentialSubject = ow + aw;
-
-                // Rule 2: Annual Ceiling Logic
-                const remainingQuota = Math.max(0, annualWageCeiling - totalWagesYearToDate);
-                const actualSubject = Math.min(potentialSubject, remainingQuota);
-
-                // Update counter
-                totalWagesYearToDate += actualSubject;
-
-                // Step 3: Direct Percentage Calculation
-                const contribOA = actualSubject * rates.oa;
-                const contribSA = actualSubject * rates.sa;
-                const contribMA = actualSubject * rates.ma;
-
-                bal.oa += contribOA;
-                bal.sa += contribSA;
-                bal.ma += contribMA;
-
-                // --- Step 5: MediSave Overflow Check (Monthly) ---
-                // BHS Limit: $79,000 in 2026, +3% yearly
-                // FRS Limit: ~$213,000 in 2026 (Half of ERS), +3% yearly
-                const currentBHS = 79000 * Math.pow(1.03, year - 2026);
-                const currentFRS = 213000 * Math.pow(1.03, year - 2026);
-
-                const handleOverflow = () => {
-                    if (bal.ma > currentBHS) {
-                        const excessMA = bal.ma - currentBHS;
-                        bal.ma = currentBHS;
-
-                        // Overflow to SA (or RA if age >= 55)
-                        if (currentAge < 55) {
-                            // Check FRS limit for SA
-                            if (bal.sa + excessMA > currentFRS) {
-                                // Fill SA to FRS
-                                const spaceInSA = Math.max(0, currentFRS - bal.sa);
-                                bal.sa += spaceInSA;
-                                const remainingExcess = excessMA - spaceInSA;
-                                // Remainder to OA
-                                bal.oa += remainingExcess;
-                            } else {
-                                bal.sa += excessMA;
-                            }
-                        } else {
-                            // For Age >= 55, overflow to RA (up to ERS) then OA
-                            const currentERS = 426000 * Math.pow(1.03, year - 2026);
-                            if (bal.ra + excessMA > currentERS) {
-                                const spaceInRA = Math.max(0, currentERS - bal.ra);
-                                bal.ra += spaceInRA;
-                                const remainingExcess = excessMA - spaceInRA;
-                                bal.oa += remainingExcess;
-                            } else {
-                                bal.ra += excessMA;
-                            }
-                        }
-                    }
-                };
-
-                handleOverflow(); // Apply immediate BHS overflow check
-
-                pendingInterest.oa += bal.oa * (0.025 / 12);
-                pendingInterest.sa += bal.sa * (0.04 / 12);
-                pendingInterest.ma += bal.ma * (0.04 / 12);
-                pendingInterest.ra += bal.ra * (0.04 / 12);
-
-                // --- Step 4: Extra 1% Interest Hierarchy ---
-                // Cap: $60k combined. OA portion capped at $20k.
-                let extraBase = 60000;
-                let extraInterest = 0;
-
-                // 1. MA (First priority)
-                const maQualify = Math.min(bal.ma, extraBase);
-                extraBase -= maQualify;
-                extraInterest += maQualify * (0.01 / 12);
-
-                // 2. SA / RA (Second priority) -> uses remaining cap
-                const saRaBal = (currentAge < 55) ? bal.sa : bal.ra;
-                const saQualify = Math.min(saRaBal, extraBase);
-                extraBase -= saQualify;
-                extraInterest += saQualify * (0.01 / 12);
-
-                // 3. OA (Third priority) -> capped at remaining base AND $20k
-                const oaCap = 20000;
-                const oaQualify = Math.min(bal.oa, extraBase, oaCap);
-                // extraBase -= oaQualify; // Not needed anymore for calculation
-                extraInterest += oaQualify * (0.01 / 12);
-
-                // Credit Extra Interest to SA (or RA if age >= 55) (User Rule: Credit to SA)
-                if (currentAge < 55) {
-                    pendingInterest.sa += extraInterest;
-                } else {
-                    pendingInterest.ra += extraInterest;
-                }
-
-                // --- Step 6: Age 55 Retirement Transition (Birthday Month) ---
-                if (lookupAge === 55 && m === birthMonthIndex) {
-                    // 1. Calculate Retirement Sums (Base 2026, +3.5% growth)
-                    const yearsFrom2026 = year - 2026;
-                    const projectedBRS = 110200 * Math.pow(1.035, yearsFrom2026);
-                    const projectedFRS = 220400 * Math.pow(1.035, yearsFrom2026);
-                    const projectedERS = 440800 * Math.pow(1.035, yearsFrom2026);
-
-                    // 2. Cascading RA Fill Logic
-                    // 2a. Transfer 1: SA -> RA (up to FRS)
-                    const spaceInRA = Math.max(0, projectedFRS - bal.ra);
-                    const fromSA = Math.min(bal.sa, spaceInRA);
-                    bal.ra += fromSA;
-                    bal.sa -= fromSA;
-
-                    // 2b. Transfer 2: OA -> RA (if RA < FRS)
-                    const remainingSpaceInRA = Math.max(0, projectedFRS - bal.ra);
-                    const fromOA = Math.min(bal.oa, remainingSpaceInRA);
-                    bal.ra += fromOA;
-                    bal.oa -= fromOA;
-
-                    // 3. SA Closure & Sweep (Remaining SA to OA)
-                    if (bal.sa > 0) {
-                        bal.oa += bal.sa;
-                        bal.sa = 0;
-                    }
-
-                    // Capture snapshot at 55
-                    at55Snapshot = {
-                        withdrawable: bal.oa,
-                        ra: bal.ra,
-                        target: projectedFRS,
-                        ageReached: true
-                    };
-                }
-
-                // --- Step 6b: Future SA Contributions Redirect (Age >= 55) ---
-                // "All future working contributions... redirected to RA... or OA".
-                const isAfter55 = (currentAge > 55) || (currentAge === 55 && m > birthMonthIndex);
-                if (isAfter55 && bal.sa > 0) {
-                    const amount = bal.sa;
-                    bal.sa = 0;
-
-                    const currentERS = 440800 * Math.pow(1.035, year - 2026);
-                    const spaceInRA = Math.max(0, currentERS - bal.ra);
-                    const toRA = Math.min(amount, spaceInRA);
-                    bal.ra += toRA;
-
-                    const toOA = amount - toRA;
-                    bal.oa += toOA;
-                }
-            }
-
-            bal.oa += pendingInterest.oa;
-            bal.sa += pendingInterest.sa;
-            bal.ma += pendingInterest.ma;
-            bal.ra += pendingInterest.ra;
-
-            // Re-apply overflow check after year-end interest
-            const currentBHS_YE = 79000 * Math.pow(1.03, year - 2026);
-            const currentFRS_YE = 213000 * Math.pow(1.03, year - 2026);
-
-            if (bal.ma > currentBHS_YE) {
-                const excessMA = bal.ma - currentBHS_YE;
-                bal.ma = currentBHS_YE;
-
-                if (currentAge < 55) {
-                    if (bal.sa + excessMA > currentFRS_YE) {
-                        const spaceInSA = Math.max(0, currentFRS_YE - bal.sa);
-                        bal.sa += spaceInSA;
-                        const remaining = excessMA - spaceInSA;
-                        bal.oa += remaining;
-                    } else {
-                        bal.sa += excessMA;
-                    }
-                } else {
-                    const currentERS_YE = 426000 * Math.pow(1.03, year - 2026);
-                    if (bal.ra + excessMA > currentERS_YE) {
-                        const spaceInRA = Math.max(0, currentERS_YE - bal.ra);
-                        bal.ra += spaceInRA;
-                        const remaining = excessMA - spaceInRA;
-                        bal.oa += remaining;
-                    } else {
-                        bal.ra += excessMA;
-                    }
-                }
-            }
-
-            currentAge++;
-
-            projection.push({
-                year: year,
-                age: currentAge,
-                oa: bal.oa,
-                sa_ra: bal.sa + bal.ra,
-                ma: bal.ma,
-                total: bal.oa + bal.sa + bal.ma + bal.ra
-            });
-
-            if (y === 0) {
-                yearlyInterest = {
-                    total: pendingInterest.oa + pendingInterest.sa + pendingInterest.ma + pendingInterest.ra,
-                    breakdown: { ...pendingInterest }
-                };
-            }
-        }
-
-        return {
-            projection,
-            yearlyInterest,
-            finalBalances: {
-                oa: bal.oa,
-                sa: bal.sa,
-                ma: bal.ma,
-                ra: bal.ra
-            },
-            at55: at55Snapshot
-        };
     }, [age, monthlySalary, annualBonus, salaryGrowth, projectionYears, balances, dateOfBirth]);
 
     // Display values with currency conversion (SGD -> Display)
@@ -547,6 +255,7 @@ const CPFCard = ({
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
+                onRefresh={onRefresh}
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}

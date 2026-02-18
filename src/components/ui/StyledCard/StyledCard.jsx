@@ -27,6 +27,8 @@ const StyledCard = React.memo(({
     loading = false,
     isOpen, // Ignore
     onClose, // Ignore - we use it via props.onClose inside but don't want it on DOM
+    contentDistortionScale = 1,
+    shadowScale = 1,
     ...props
 }) => {
     // Visual Setup
@@ -56,8 +58,8 @@ const StyledCard = React.memo(({
             return (
                 <>
                     <Menu
-                        orientation="horizontal"
-                        variant={variant}
+                        orientation="vertical"
+                        variant="default"
                         placement="bottom-right"
                     >
                         {children}
@@ -125,6 +127,8 @@ const StyledCard = React.memo(({
             variant={variant}
             noScale={noScale}
             distortionFactor={distortionFactor}
+            contentDistortionScale={contentDistortionScale}
+            shadowScale={shadowScale}
             style={{
                 ...style,
                 width: style.width || "100%",

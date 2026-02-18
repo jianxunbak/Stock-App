@@ -2,11 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Info, Activity, TrendingUp, DollarSign, Book, BarChart2, ShieldCheck } from 'lucide-react';
 import { useStockData } from '../../../hooks/useStockData';
 import styles from './ValuationCard.module.css';
-import CardToggleButton from '../CardToggleButton/CardToggleButton';
 import MetricCard from '../../ui/MetricCard/MetricCard';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
-import DropdownButton from '../../ui/DropdownButton/DropdownButton';
-import Button from '../../ui/Button/Button';
 
 const ValuationCard = ({
     currency = 'USD',
@@ -23,7 +20,6 @@ const ValuationCard = ({
     const { stockData, loading: stockLoading, loadStockData } = useStockData();
     const isLoading = parentLoading || stockLoading;
     const [selectedMethodName, setSelectedMethodName] = useState(null);
-
 
     // Sync selected method when stockData changes
     useEffect(() => {
@@ -57,26 +53,12 @@ const ValuationCard = ({
         };
     }, [valuation, selectedMethodName, overview?.price]);
 
-    // Diagnostic log to investigate why allMethods might be missing
+    // Diagnostic log
     useEffect(() => {
         if (valuation && !valuation.allMethods) {
             console.warn("Valuation data received without allMethods. Current valuation:", valuation);
         }
     }, [valuation]);
-
-    if (!stockData) {
-        return (
-            <ExpandableCard
-                title="Intrinsic Value"
-                expanded={isOpen}
-                onToggle={onToggle}
-                onHide={onHide}
-                loading={isLoading}
-                className={className}
-            />
-        );
-    }
-    if (!valuation && !isETF) return null;
 
     // Updated color logic based on percentage difference
     const diff = currentValuation?.differencePercent || 0;
@@ -94,17 +76,17 @@ const ValuationCard = ({
                 <>
                     <div className="summary-name" style={{ color: 'var(--neu-text-primary)' }}>Intrinsic Value</div>
                     <div className="summary-price" style={{ color: statusColor }}>
-                        {currencySymbol}{(currentValuation.intrinsicValue * currentRate)?.toFixed(2)}
+                        {currencySymbol}{(currentValuation?.intrinsicValue * currentRate)?.toFixed(2)}
                     </div>
                     <div className="summary-change" style={{ color: statusColor }}>
-                        {currentValuation.status}
+                        {currentValuation?.status}
                     </div>
                 </>
             )}
         </div>
     );
 
-    const activeMethod = selectedMethodName || valuation.recommendedMethod || valuation.method;
+    const activeMethod = selectedMethodName || valuation?.recommendedMethod || valuation?.method;
 
     const getMethodIcon = (methodName, size = 14) => {
         if (!methodName) return <Activity size={size} />;
@@ -121,7 +103,6 @@ const ValuationCard = ({
     if (!isETF) {
         const methods = valuation?.allMethods || [];
         if (methods.length > 0) {
-            // Define requested order
             const methodPriority = [
                 "Discounted Free Cash Flow",
                 "Discounted Operating Cash Flow",
@@ -131,7 +112,6 @@ const ValuationCard = ({
                 "Graham Number"
             ];
 
-            // Sort methods based on priority
             const sortedMethods = [...methods].sort((a, b) => {
                 const indexA = methodPriority.findIndex(p => a.method.includes(p));
                 const indexB = methodPriority.findIndex(p => b.method.includes(p));
@@ -147,12 +127,6 @@ const ValuationCard = ({
                     indicatorNode: m.method === valuation.recommendedMethod ? <span className={styles.preferredBadge}>Pref</span> : null
                 });
             });
-        } else {
-            valMenuItems.push({
-                label: 'Load Methods',
-                icon: <Activity size={14} />,
-                onClick: () => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)
-            });
         }
     }
 
@@ -165,146 +139,130 @@ const ValuationCard = ({
             collapsedWidth={220}
             collapsedHeight={220}
             loading={isLoading}
-            headerContent={header}
+            headerContent={stockData ? header : null}
             className={className}
             menuItems={valMenuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
         >
-            <div>
-                {isETF ? (
-                    <div className={styles.etfMessage}>
-                        This is an ETF and Intrinsic Value is not applicable.
-                    </div>
-                ) : (
-                    <>
-                        <div className={styles.section}>
-                            <div className={styles.valueRow}>
-                                <MetricCard
-                                    title="Current Price"
-                                    value={`${currencySymbol}${(overview?.price * currentRate)?.toFixed(2)}`}
-                                    variant="transparent"
-                                    isOpen={true}
-                                    status="neutral"
-                                />
-                                <MetricCard
-                                    title="Intrinsic Value"
-                                    value={`${currencySymbol}${currentValuation.intrinsicValue ? (currentValuation.intrinsicValue * currentRate).toFixed(2) : 'N/A'}`}
-                                    variant="transparent"
-                                    isOpen={true}
-                                    status={statusType}
-                                />
-                                <MetricCard
-                                    title="Difference"
-                                    value={`${currentValuation.differencePercent ? (currentValuation.differencePercent > 0 ? '+' : '') + (currentValuation.differencePercent * 100).toFixed(2) : '0.00'}%`}
-                                    variant="transparent"
-                                    isOpen={true}
-                                    status={statusType}
-                                />
-                                <MetricCard
-                                    title="Valuation Status"
-                                    value={currentValuation.status}
-                                    variant="transparent"
-                                    isOpen={true}
-                                    status={statusType}
-                                />
-                            </div>
-                            {(() => {
-                                const diff = currentValuation.differencePercent;
-                                let warningMsg = null;
-                                if (diff >= 1.0) {
-                                    warningMsg = "Price is significant higher than valuation. Extreme risk.";
-                                } else if (diff >= 0.5) {
-                                    warningMsg = "Price is significantly higher than valuation. Use caution.";
-                                }
-
-                                return warningMsg ? (
-                                    <div className={styles.warningNote}>
-                                        {warningMsg}
-                                    </div>
-                                ) : null;
-                            })()}
+            {stockData && (
+                <div>
+                    {isETF ? (
+                        <div className={styles.etfMessage}>
+                            This is an ETF and Intrinsic Value is not applicable.
                         </div>
-
-                        <div className={styles.metricsContainer}>
-                            <div className={styles.section} style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                    {getMethodIcon(activeMethod, 16)}
-                                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--neu-text-primary)' }}>
-                                        {activeMethod}
-                                    </span>
-                                    {activeMethod === valuation.recommendedMethod && (
-                                        <span className={styles.preferredBadge}>Recommended</span>
-                                    )}
-                                </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--neu-text-secondary)', lineHeight: 1.4 }}>
-                                    {currentValuation.explanation || "No description available."}
+                    ) : (
+                        <>
+                            <div className={styles.section}>
+                                <div className={styles.valueRow}>
+                                    <MetricCard
+                                        title="Current Price"
+                                        value={`${currencySymbol}${(overview?.price * currentRate)?.toFixed(2)}`}
+                                        variant="transparent"
+                                        isOpen={true}
+                                        status="neutral"
+                                    />
+                                    <MetricCard
+                                        title="Intrinsic Value"
+                                        value={`${currencySymbol}${currentValuation?.intrinsicValue ? (currentValuation.intrinsicValue * currentRate).toFixed(2) : 'N/A'}`}
+                                        variant="transparent"
+                                        isOpen={true}
+                                        status={statusType}
+                                    />
+                                    <MetricCard
+                                        title="Difference"
+                                        value={`${currentValuation?.differencePercent ? (currentValuation.differencePercent > 0 ? '+' : '') + (currentValuation.differencePercent * 100).toFixed(2) : '0.00'}%`}
+                                        variant="transparent"
+                                        isOpen={true}
+                                        status={statusType}
+                                    />
+                                    <MetricCard
+                                        title="Valuation Status"
+                                        value={currentValuation?.status}
+                                        variant="transparent"
+                                        isOpen={true}
+                                        status={statusType}
+                                    />
                                 </div>
                             </div>
 
-                            <div className={styles.section}>
-                                <h4 className={styles.label}>Calculated Assumptions</h4>
-                                <div className={styles.assumptionsContainer}>
-                                    {currentValuation.assumptions && Object.entries(currentValuation.assumptions)
-                                        .map(([key, value]) => {
-                                            const trimmedKey = key.trim();
-                                            const monetaryKeywords = ["Income", "Cash Flow", "Debt", "Cash", "Sales", "Book Value"];
-                                            const isMonetary = monetaryKeywords.some(keyword => trimmedKey.includes(keyword));
+                            <div className={styles.metricsContainer}>
+                                <div className={styles.section} style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                        {getMethodIcon(activeMethod, 16)}
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--neu-text-primary)' }}>
+                                            {activeMethod}
+                                        </span>
+                                        {activeMethod === valuation?.recommendedMethod && (
+                                            <span className={styles.preferredBadge}>Recommended</span>
+                                        )}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--neu-text-secondary)', lineHeight: 1.4 }}>
+                                        {currentValuation?.explanation || "No description available."}
+                                    </div>
+                                </div>
 
-                                            let displayValue = value;
+                                <div className={styles.section}>
+                                    <h4 className={styles.label}>Calculated Assumptions</h4>
+                                    <div className={styles.assumptionsContainer}>
+                                        {currentValuation?.assumptions && Object.entries(currentValuation.assumptions)
+                                            .map(([key, value]) => {
+                                                const trimmedKey = key.trim();
+                                                const monetaryKeywords = ["Income", "Cash Flow", "Debt", "Cash", "Sales", "Book Value"];
+                                                const isMonetary = monetaryKeywords.some(keyword => trimmedKey.includes(keyword));
 
-                                            if (isMonetary && currentRate !== 1) {
-                                                // Simple attempt to parse and convert monetary strings from backend
-                                                try {
-                                                    const stringHasValue = typeof value === 'string' && value.includes('$');
-                                                    if (stringHasValue) {
-                                                        const isBillions = value.toUpperCase().includes('B');
-                                                        const cleanStr = value.replace(/[$,B]/g, '').trim();
-                                                        const parsed = parseFloat(cleanStr);
+                                                let displayValue = value;
 
-                                                        if (!isNaN(parsed)) {
-                                                            const converted = parsed * currentRate;
-                                                            if (isBillions) {
-                                                                displayValue = `${currencySymbol}${converted.toFixed(2)}B`;
-                                                            } else {
-                                                                displayValue = `${currencySymbol}${converted.toFixed(2)}`;
+                                                if (isMonetary && currentRate !== 1) {
+                                                    try {
+                                                        const stringHasValue = typeof value === 'string' && value.includes('$');
+                                                        if (stringHasValue) {
+                                                            const isBillions = value.toUpperCase().includes('B');
+                                                            const cleanStr = value.replace(/[$,B]/g, '').trim();
+                                                            const parsed = parseFloat(cleanStr);
+
+                                                            if (!isNaN(parsed)) {
+                                                                const converted = parsed * currentRate;
+                                                                if (isBillions) {
+                                                                    displayValue = `${currencySymbol}${converted.toFixed(2)}B`;
+                                                                } else {
+                                                                    displayValue = `${currencySymbol}${converted.toFixed(2)}`;
+                                                                }
                                                             }
                                                         }
+                                                    } catch (e) {
+                                                        console.warn("Could not convert assumption currency:", e);
                                                     }
-                                                } catch (e) {
-                                                    console.warn("Could not convert assumption currency:", e);
+                                                } else if (isMonetary) {
+                                                    displayValue = String(value).replace('$', currencySymbol);
                                                 }
-                                            } else if (isMonetary) {
-                                                // Just replace $ with currencySymbol if rate is 1 but symbol is different
-                                                displayValue = String(value).replace('$', currencySymbol);
-                                            }
 
-                                            return (
-                                                <div key={key} className={styles.assumptionRow}>
-                                                    <span className={styles.assumptionKey}>{key}</span>
-                                                    <span className={styles.assumptionValue}>{displayValue}</span>
-                                                </div>
-                                            );
-                                        })}
-                                </div>
-                            </div>
-
-                            {activeMethod !== valuation.recommendedMethod && valuation.preferredMethodExplanation && (
-                                <div className={styles.preferredFootnote}>
-                                    <div className={styles.footnoteHeader}>
-                                        <Info size={14} />
-                                        Recommended Method: {valuation.recommendedMethod}
+                                                return (
+                                                    <div key={key} className={styles.assumptionRow}>
+                                                        <span className={styles.assumptionKey}>{key}</span>
+                                                        <span className={styles.assumptionValue}>{displayValue}</span>
+                                                    </div>
+                                                );
+                                            })}
                                     </div>
-                                    <p style={{ margin: 0 }}>
-                                        {valuation.preferredMethodExplanation}
-                                    </p>
                                 </div>
-                            )}
 
-                        </div>
-                    </>
-                )}
-            </div>
-        </ExpandableCard >
+                                {activeMethod !== valuation?.recommendedMethod && valuation?.preferredMethodExplanation && (
+                                    <div className={styles.preferredFootnote}>
+                                        <div className={styles.footnoteHeader}>
+                                            <Info size={14} />
+                                            Recommended Method: {valuation.recommendedMethod}
+                                        </div>
+                                        <p style={{ margin: 0 }}>
+                                            {valuation.preferredMethodExplanation}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+        </ExpandableCard>
     );
 };
 

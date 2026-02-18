@@ -20,6 +20,8 @@ const Menu = ({
     surfaceColor,
     maxRadius = 12,
     contentStyle = {},
+    distortionFactor = 1,
+    contentDistortionScale = 1,
     ...props
 }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -148,7 +150,7 @@ const Menu = ({
                                 transition: {
                                     duration: 0.4,
                                     opacity: { times: [0, 0.8, 1], duration: 0.4 },
-                                    default: { duration: 0.4, ease: "easeInOut" }
+                                    default: { duration: 0.8, ease: "easeInOut" }
                                 }
                             }
                         } : {
@@ -165,7 +167,7 @@ const Menu = ({
                                 filter: 'blur(0px)',
                                 transition: {
                                     type: "spring",
-                                    stiffness: 400,
+                                    stiffness: 300,
                                     damping: 30,
                                     staggerChildren: 0.08,
                                     delayChildren: 0.05
@@ -174,23 +176,32 @@ const Menu = ({
                             exit: {
                                 opacity: 0,
                                 scale: 0.95,
-                                transition: { duration: 0.4, ease: "easeInOut" }
+                                transition: { duration: 0.8, ease: "easeInOut" }
                             }
                         }}
                         initial="hidden"
                         animate="visible"
                         exit="exit"
+                        style={{
+                            background: 'transparent',
+                            boxShadow: 'none',
+                            border: 'none',
+                            borderRadius: 0
+                        }}
                     >
                         <CardAnimator
                             type={orientation === 'horizontal' ? 'fabricHorizontal' : 'fabricCard'}
                             active={isOpen}
-                            variant={variant}
-                            className={`menu-content-container ${variant} ${contentClassName}`}
+                            variant={variant === 'transparent' ? 'default' : variant}
+                            className={`menu-content-container ${variant === 'transparent' ? 'default' : variant} ${contentClassName}`}
                             surfaceColor={surfaceColor}
                             maxRadius={maxRadius}
+                            distortionFactor={distortionFactor}
+                            contentDistortionScale={contentDistortionScale}
+                            disableShadow={false}
+                            disableHighlight={false}
                             style={{
                                 width: 'auto',
-                                minWidth: 'unset',
                                 height: 'auto',
                                 padding: '0.5rem',
                                 ...contentStyle
@@ -203,11 +214,10 @@ const Menu = ({
                                     <motion.div
                                         key={index}
                                         variants={{
-                                            hidden: { opacity: 0, y: 15, scale: 0.8 },
+                                            hidden: { opacity: 0, y: 15 },
                                             visible: {
                                                 opacity: 1,
                                                 y: 0,
-                                                scale: 1,
                                                 transition: {
                                                     type: "spring",
                                                     stiffness: 300,

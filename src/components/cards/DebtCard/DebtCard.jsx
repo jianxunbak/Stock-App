@@ -20,22 +20,8 @@ const DebtCard = ({
     const { stockData, loading: stockLoading, loadStockData } = useStockData();
     const isLoading = parentLoading || stockLoading;
 
-    if (!stockData) {
-        return (
-            <ExpandableCard
-                title="Conservative Debt"
-                expanded={isOpen}
-                onToggle={onToggle}
-                onHide={onHide}
-                loading={isLoading}
-                className={className}
-            />
-        );
-    }
-
-
-    const { debt } = stockData;
-    if (!debt) return null;
+    const { debt } = stockData || {};
+    const isETF = stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF';
 
     const d2eColor = debt?.debtToEbitda != null && debt.debtToEbitda < 3 ? 'var(--neu-success)' : 'var(--neu-warning)';
     const dsrColor = debt?.debtServicingRatio != null && debt.debtServicingRatio < 30 ? 'var(--neu-success)' : 'var(--neu-warning)';
@@ -47,15 +33,15 @@ const DebtCard = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: '0.25rem', columnGap: '1rem', width: '100%', fontSize: '0.8rem', alignItems: 'center' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Debt/EBITDA</span>
                 <span style={{ color: d2eColor, fontWeight: 600, textAlign: 'right' }}>
-                    {debt.debtToEbitda != null ? `${debt.debtToEbitda.toFixed(1)}x` : 'N/A'}
+                    {debt?.debtToEbitda != null ? `${debt.debtToEbitda.toFixed(1)}x` : 'N/A'}
                 </span>
                 <span style={{ color: 'var(--text-secondary)' }}>Debt Svc</span>
                 <span style={{ color: dsrColor, fontWeight: 600, textAlign: 'right' }}>
-                    {debt.debtServicingRatio != null ? `${debt.debtServicingRatio.toFixed(1)}%` : 'N/A'}
+                    {debt?.debtServicingRatio != null ? `${debt.debtServicingRatio.toFixed(1)}%` : 'N/A'}
                 </span>
                 <span style={{ color: 'var(--text-secondary)' }}>Curr Ratio</span>
                 <span style={{ color: crColor, fontWeight: 600, textAlign: 'right' }}>
-                    {debt.currentRatio != null ? debt.currentRatio.toFixed(2) : 'N/A'}
+                    {debt?.currentRatio != null ? debt.currentRatio.toFixed(2) : 'N/A'}
                 </span>
             </div>
         </div>
@@ -72,70 +58,72 @@ const DebtCard = ({
             collapsedWidth={220}
             collapsedHeight={220}
             loading={isLoading}
-            headerContent={header}
+            headerContent={stockData && debt ? header : null}
 
             className={className}
             menuItems={menuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
         >
-            <div>
-                {/* Internal title removed as it's now handled by ExpandableCard */}
+            {stockData && debt && (
+                <div>
+                    {/* Internal title removed as it's now handled by ExpandableCard */}
 
 
-                {(stockData.overview.quoteType !== 'ETF' && stockData.overview.industry !== 'ETF') ? (
-                    <div className={styles.metricsContainer}>
-                        <MetricCard
-                            title="Debt / EBITDA Ratio"
-                            value={debt.debtToEbitda}
-                            target="< 3x"
-                            variant="transparent"
-                            isOpen={true}
-                            suffix="x"
-                            multiplier={1}
-                            status={debt.debtToEbitda != null && debt.debtToEbitda < 3 ? 'positive' : 'negative'}
-                        />
-
-                        <MetricCard
-                            title="Debt Servicing Ratio"
-                            value={debt.debtServicingRatio}
-                            target="< 30%"
-                            variant="transparent"
-                            isOpen={true}
-                            suffix="%"
-                            multiplier={1}
-                            status={debt.debtServicingRatio != null && debt.debtServicingRatio < 30 ? 'positive' : 'warning'}
-                        />
-
-                        <MetricCard
-                            title="Current Ratio"
-                            value={debt.currentRatio}
-                            target="> 1.5"
-                            variant="transparent"
-                            isOpen={true}
-                            suffix=""
-                            multiplier={1}
-                            status={debt.currentRatio > 1.5 ? 'positive' : 'negative'}
-                        />
-
-                        {debt.isREIT && (
+                    {!isETF ? (
+                        <div className={styles.metricsContainer}>
                             <MetricCard
-                                title="Gearing Ratio (MRQ)"
-                                value={debt.gearingRatio}
-                                target="< 45%"
+                                title="Debt / EBITDA Ratio"
+                                value={debt.debtToEbitda}
+                                target="< 3x"
+                                variant="transparent"
+                                isOpen={true}
+                                suffix="x"
+                                multiplier={1}
+                                status={debt.debtToEbitda != null && debt.debtToEbitda < 3 ? 'positive' : 'negative'}
+                            />
+
+                            <MetricCard
+                                title="Debt Servicing Ratio"
+                                value={debt.debtServicingRatio}
+                                target="< 30%"
                                 variant="transparent"
                                 isOpen={true}
                                 suffix="%"
                                 multiplier={1}
-                                status={debt.gearingRatio != null && debt.gearingRatio < 45 ? 'positive' : 'negative'}
+                                status={debt.debtServicingRatio != null && debt.debtServicingRatio < 30 ? 'positive' : 'warning'}
                             />
-                        )}
-                    </div>
-                ) : (
-                    <div className={styles.etfMessage}>
-                        This is an ETF and Conservative Debt is not applicable.
-                    </div>
-                )}
-            </div>
+
+                            <MetricCard
+                                title="Current Ratio"
+                                value={debt.currentRatio}
+                                target="> 1.5"
+                                variant="transparent"
+                                isOpen={true}
+                                suffix=""
+                                multiplier={1}
+                                status={debt.currentRatio > 1.5 ? 'positive' : 'negative'}
+                            />
+
+                            {debt.isREIT && (
+                                <MetricCard
+                                    title="Gearing Ratio (MRQ)"
+                                    value={debt.gearingRatio}
+                                    target="< 45%"
+                                    variant="transparent"
+                                    isOpen={true}
+                                    suffix="%"
+                                    multiplier={1}
+                                    status={debt.gearingRatio != null && debt.gearingRatio < 45 ? 'positive' : 'negative'}
+                                />
+                            )}
+                        </div>
+                    ) : (
+                        <div className={styles.etfMessage}>
+                            This is an ETF and Conservative Debt is not applicable.
+                        </div>
+                    )}
+                </div>
+            )}
         </ExpandableCard>
     );
 };

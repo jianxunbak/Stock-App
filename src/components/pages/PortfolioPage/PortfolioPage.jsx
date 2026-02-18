@@ -173,6 +173,18 @@ const PortfolioPage = () => {
     const [liveData, setLiveData] = useState({});
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
+
+    // Keep local currency state in sync with global settings
+    useEffect(() => {
+        if (settings?.baseCurrency && settings.baseCurrency !== currency) {
+            setCurrency(settings.baseCurrency);
+        }
+    }, [settings?.baseCurrency, currency]);
+
+    const handleCurrencyChange = (newCurrency) => {
+        setCurrency(newCurrency);
+        updateSettings({ baseCurrency: newCurrency });
+    };
     const [hiddenColumns, setHiddenColumns] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showWatchlist, setShowWatchlist] = useState(false);
@@ -210,7 +222,7 @@ const PortfolioPage = () => {
     const [newTicker, setNewTicker] = useState('');
     const [newShares, setNewShares] = useState('');
     const [newCost, setNewCost] = useState('');
-    const [newDate, setNewDate] = useState('');
+    const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
     const [newCategory, setNewCategory] = useState('Core');
     const [addError, setAddError] = useState('');
 
@@ -918,7 +930,7 @@ const PortfolioPage = () => {
                     setShowErrorModal(true);
                 }
             }}
-            currency={currency} setCurrency={setCurrency}
+            currency={currency} setCurrency={handleCurrencyChange}
             setShowWatchlist={setShowWatchlist}
             setShowProfileModal={setShowProfileModal}
             handleLogout={logout}
@@ -1136,7 +1148,7 @@ const PortfolioPage = () => {
                                     type="number"
                                     value={newShares}
                                     onChange={e => setNewShares(e.target.value)}
-                                    placeholder="0.00"
+                                    placeholder="e.g. 10"
                                 />
                             </div>
                             {!isTestPortfolio && (
@@ -1147,12 +1159,12 @@ const PortfolioPage = () => {
                                             type="number"
                                             value={newCost}
                                             onChange={e => setNewCost(e.target.value)}
-                                            placeholder="0.00"
+                                            placeholder="Amount invested"
                                         />
                                     </div>
                                     <div className={styles.formGroup}>
-                                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Date</label>
-                                        <CustomDatePicker value={newDate} onChange={setNewDate} isMobile={isMobile} useModalOnDesktop={true} />
+                                        <label style={{ fontSize: '0.85rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>Cost Basis Date</label>
+                                        <CustomDatePicker value={newDate} onChange={setNewDate} isMobile={false} useModalOnDesktop={true} distortionFactor={0.5} contentDistortionScale={0.5} />
                                     </div>
                                 </>
                             )}
@@ -1163,6 +1175,9 @@ const PortfolioPage = () => {
                                     onChange={setNewCategory}
                                     options={['Core', 'Growth', 'Compounder', 'Defensive', 'Speculative']}
                                     useModalOnDesktop={true}
+                                    isMobile={false}
+                                    distortionFactor={0.5}
+                                    contentDistortionScale={0.5}
                                 />
                             </div>
                             {addError && <p className={styles.error}>{addError}</p>}
@@ -1494,6 +1509,10 @@ const PortfolioPage = () => {
                                 onChange={handleSourceChange}
                                 options={portfolioList.filter(p => p.id !== currentPortfolioId).map(p => ({ label: p.name, value: p.id }))}
                                 placeholder="Select Portfolio"
+                                isMobile={false}
+                                useModalOnDesktop={true}
+                                distortionFactor={0.5}
+                                contentDistortionScale={0.5}
                             />
                         </div>
 

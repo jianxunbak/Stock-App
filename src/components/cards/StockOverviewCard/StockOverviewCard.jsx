@@ -69,19 +69,6 @@ const StockOverviewCard = ({
         isFavorite
     };
 
-    if (!hasData) {
-        return (
-            <ExpandableCard
-                title="Stock Summary"
-                expanded={isOpen}
-                onToggle={onToggle}
-                onHide={onHide}
-                loading={loading || !hasData}
-                className={className}
-            />
-        );
-    }
-
     return (
         <ExpandableCard
             title="Stock Summary"
@@ -95,97 +82,101 @@ const StockOverviewCard = ({
             onRefresh={onRefresh}
             loading={loading || !hasData}
             headerContent={
+                hasData && (
+                    <div
+                        className="stock-summary-container stacked"
+                        style={{ height: '100%', width: '100%' }}
+                    >
+                        {overview && (
+                            <StockHeader
+                                {...commonHeaderProps}
+                                view="summary"
+                            />
+                        )}
+                        {
+                            score && (
+                                <StockHealthCard
+                                    view="summary"
+                                    score={score.max > 0 ? Math.round((score.total / score.max) * 100) : 0}
+                                    type="Fundamentals"
+                                />
+                            )
+                        }
+                        {
+                            overview && (
+                                <PriceChartCard
+                                    view="summary"
+                                    ticker={overview.symbol}
+                                    data={history?.slice(-20).map(d => ({ date: d.date, price: d.close }))}
+                                    change={overview?.change || '+0.00'}
+                                    currencySymbol={currencySymbol}
+                                    currentRate={currentRate}
+                                />
+                            )
+                        }
+                    </div >
+                )
+            }
+        >
+            {hasData && (
                 <div
-                    className="stock-summary-container stacked"
-                    style={{ height: '100%', width: '100%' }}
+                    className="stock-overview-body"
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr',
+                        gap: '2rem',
+                        width: '100%',
+                    }}
                 >
                     {overview && (
                         <StockHeader
                             {...commonHeaderProps}
-                            view="summary"
+                            industry={overview.industry}
+                            sector={overview.sector}
+                            description={overview.description}
+                            variant="transparent"
                         />
                     )}
-                    {
-                        score && (
-                            <StockHealthCard
-                                view="summary"
-                                score={score.max > 0 ? Math.round((score.total / score.max) * 100) : 0}
-                                type="Fundamentals"
-                            />
-                        )
-                    }
-                    {
-                        overview && (
-                            <PriceChartCard
-                                view="summary"
-                                ticker={overview.symbol}
-                                data={history?.slice(-20).map(d => ({ date: d.date, price: d.close }))}
-                                change={overview?.change || '+0.00'}
-                                currencySymbol={currencySymbol}
-                                currentRate={currentRate}
-                            />
-                        )
-                    }
-                </div >
-            }
-        >
-            <div
-                className="stock-overview-body"
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr',
-                    gap: '2rem',
-                    width: '100%',
-                }}
-            >
-                {overview && (
-                    <StockHeader
-                        {...commonHeaderProps}
-                        industry={overview.industry}
-                        sector={overview.sector}
-                        description={overview.description}
-                        variant="transparent"
-                    />
-                )}
 
-                {score && (
-                    <StockHealthCard
-                        score={score.max > 0 ? Math.round((score.total / score.max) * 100) : 0}
-                        type="Fundamentals"
-                        items={score.criteria?.map(c => {
-                            const status = c.status?.toLowerCase();
-                            let finalStatus = 'warn';
-                            if (status === 'pass') finalStatus = 'pass';
-                            else if (status === 'fail') finalStatus = 'fail';
-                            else if (status === 'pending') finalStatus = 'pending';
-                            else if (status === 'evaluating') finalStatus = 'evaluating';
+                    {score && (
+                        <StockHealthCard
+                            score={score.max > 0 ? Math.round((score.total / score.max) * 100) : 0}
+                            type="Fundamentals"
+                            items={score.criteria?.map(c => {
+                                const status = c.status?.toLowerCase();
+                                let finalStatus = 'warn';
+                                if (status === 'pass') finalStatus = 'pass';
+                                else if (status === 'fail') finalStatus = 'fail';
+                                else if (status === 'pending') finalStatus = 'pending';
+                                else if (status === 'evaluating') finalStatus = 'evaluating';
 
-                            return {
-                                label: c.name,
-                                status: finalStatus,
-                                value: c.value
-                            };
-                        }) || []}
-                        variant="transparent"
-                        isOpen={true}
-                    />
-                )}
+                                return {
+                                    label: c.name,
+                                    status: finalStatus,
+                                    value: c.value
+                                };
+                            }) || []}
+                            variant="transparent"
+                            isOpen={true}
+                        />
+                    )}
 
-                {overview && (
-                    <PriceChartCard
-                        ticker={overview.symbol}
-                        data={history} // Full history for expanded chart
-                        currencySymbol={currencySymbol}
-                        currentRate={currentRate}
-                        change={overview?.change}
-                        variant="transparent"
-                        isOpen={true}
-                        comparisonTickers={comparisonTickers}
-                        onAddSeries={onAddComparison}
-                        onRemoveSeries={onRemoveComparison}
-                    />
-                )}
-            </div>
+                    {overview && (
+                        <PriceChartCard
+                            ticker={overview.symbol}
+                            data={history} // Full history for expanded chart
+                            currencySymbol={currencySymbol}
+                            currentRate={currentRate}
+                            change={overview?.change}
+                            variant="transparent"
+                            isOpen={true}
+                            comparisonTickers={comparisonTickers}
+                            onAddSeries={onAddComparison}
+                            onRemoveSeries={onRemoveComparison}
+                        />
+                    )}
+                </div>
+            )}
         </ExpandableCard >
     );
 };

@@ -20,56 +20,16 @@ const GrowthCard = ({
     const { stockData, loading: stockLoading, loadStockData } = useStockData();
     const isLoading = parentLoading || stockLoading;
 
-    if (!stockData) {
-        return (
-            <ExpandableCard
-                title="Growth"
-                expanded={isOpen}
-                onToggle={onToggle}
-                onHide={onHide}
-                loading={isLoading}
-                className={className}
-            />
-        );
-    }
+    const { growth } = stockData || {};
+    const revenueGrowth = growth?.revenueGrowth || 0;
+    const formattedValue = (revenueGrowth * 100).toFixed(1) + '%';
+    const color = revenueGrowth > 0.15 ? 'var(--neu-success)' : (revenueGrowth < 0 ? 'var(--neu-error)' : 'var(--neu-warning)');
 
-
-    const { growth } = stockData;
-    const revenueGrowth = growth?.revenueGrowth;
-
-    // Helper to format value
-    const formattedValue = revenueGrowth !== undefined && revenueGrowth !== null
-        ? (revenueGrowth * 100).toFixed(1) + '%'
-        : 'N/A';
-
-    // Color logic
-    const color = (revenueGrowth > 0) ? 'var(--neu-success)' : 'var(--neu-warning)';
-
-    // Summary View Content
     const summaryContent = (
-        <FinancialSummary>
-            {/* Revenue Growth Summary */}
-            <div className={`summary-info stock-health-summary ${className || ''}`} style={{ alignSelf: 'flex-start', paddingTop: '0.25rem' }}>
-                <div className="summary-name">Growth</div>
-                <div className="summary-price-group">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>
-                            Revenue Growth
-                        </span>
-                        <div className="summary-price" style={{ color: color }}>
-                            {formattedValue}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Financial Trends Summary */}
-            <FinancialPerformanceCard
-                view="summary"
-                isETF={isETF}
-                {...props}
-            />
-        </FinancialSummary>
+        <div className="summary-info">
+            <div className="summary-name">Growth</div>
+            <div className="summary-price" style={{ color: color }}>{formattedValue}</div>
+        </div>
     );
 
     const menuItems = [];
@@ -83,45 +43,47 @@ const GrowthCard = ({
             collapsedWidth={220}
             collapsedHeight={220}
             loading={isLoading}
-            headerContent={summaryContent}
+            headerContent={stockData ? summaryContent : null}
 
             className={className}
             menuItems={menuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
         >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                {/* Main Title removed as it's now handled by ExpandableCard */}
+            {stockData && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    {/* Main Title removed as it's now handled by ExpandableCard */}
 
 
-                {/* Revenue Growth Metric Section */}
-                <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isOpen ? '0.25rem' : '0' }}>
-                        <h3 className={styles.subTitle}>Revenue Growth</h3>
+                    {/* Revenue Growth Metric Section */}
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isOpen ? '0.25rem' : '0' }}>
+                            <h3 className={styles.subTitle}>Revenue Growth</h3>
+                        </div>
+
+                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: color }}>
+                            {formattedValue}
+                        </div>
                     </div>
 
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: color }}>
-                        {formattedValue}
-                    </div>
+                    {/* Financial Trends Chart */}
+                    <FinancialPerformanceCard
+                        view="expanded"
+                        variant="transparent"
+                        isOpen={true}
+                        isETF={isETF}
+                        {...props}
+                    />
+
+                    {/* Margin Trends Chart */}
+                    <MarginTrendsCard
+                        view="expanded"
+                        variant="transparent"
+                        isOpen={true}
+                        isETF={isETF}
+                        {...props}
+                    />
                 </div>
-
-                {/* Financial Trends Chart */}
-                <FinancialPerformanceCard
-                    view="expanded"
-                    variant="transparent"
-                    isOpen={true}
-                    isETF={isETF}
-                    {...props}
-                />
-
-                {/* Margin Trends Chart */}
-                <MarginTrendsCard
-                    view="expanded"
-                    variant="transparent"
-                    isOpen={true}
-                    isETF={isETF}
-                    {...props}
-                />
-            </div>
+            )}
         </ExpandableCard>
     );
 };

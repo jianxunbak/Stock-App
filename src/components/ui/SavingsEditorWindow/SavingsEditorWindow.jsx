@@ -2,7 +2,14 @@ import React, { useState, useMemo, useLayoutEffect } from 'react';
 import Window from '../Window/Window';
 import Button from '../Button/Button';
 import DropdownButton from '../DropdownButton/DropdownButton';
-import { Trash2, Plus, Link, FolderPlus, Layers, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, Link, FolderPlus, Layers, ChevronDown, TrendingUp } from 'lucide-react';
+
+// ... (code truncated in tool usage if I can't modify imports separate from function but I will try single block replacement if possible, otherwise I will do multi-replace)
+
+// Wait, replace_file_content replaces a CONTIGUOUS block. I need to change imports AND add logic in handleAddLinked.
+// These are far apart. I should use multi_replace.
+
+// Let's restart this tool call with multi_replace.
 import styles from './SavingsEditorWindow.module.css';
 
 const SavingsEditorWindow = ({
@@ -59,7 +66,23 @@ const SavingsEditorWindow = ({
             frequency: 'Monthly'
         }));
 
-        return { items, groups: [], linked: [] };
+        // Calculate Default CPF for auto-linking during migration
+        const salary = Number(settings?.cpf?.monthlySalary || 0);
+        const bonus = Number(settings?.cpf?.annualBonus || 0);
+        const monthlyBonus = bonus / 12;
+        // Use 8000 ceiling as per standard CPF rules used elsewhere
+        const cpfValue = (Math.min(salary, 8000) + Math.min(monthlyBonus, 8500 - Math.min(salary, 8000))) * 0.2;
+
+        const cpfItem = {
+            id: `linked-cpf-auto-${Date.now()}`,
+            name: 'CPF Contribution',
+            value: Math.round(cpfValue),
+            frequency: 'Monthly',
+            isLinked: true,
+            source: 'CPF Card'
+        };
+
+        return { items, groups: [], linked: [cpfItem] };
     };
 
     const handleUpdateStructuredExpenses = (scenarioId, updatedExpenses) => {
@@ -232,6 +255,23 @@ const SavingsEditorWindow = ({
                 isLinked: true,
                 source: sourceData.source || 'Other Investments'
             };
+        } else if (type === 'stock-scenario') {
+            const { chartId, chartName, scenario: stockScenario } = sourceData;
+            const amount = Number(stockScenario.contributionAmount || 0);
+            const freq = (stockScenario.contributionFrequency || 'monthly').toLowerCase();
+
+            let monthlyVal = amount;
+            if (freq === 'annually' || freq === 'yearly') monthlyVal = amount / 12;
+            else if (freq === 'quarterly') monthlyVal = amount / 3;
+
+            newItem = {
+                id: `linked-stock-${chartId}-${stockScenario.id}-${Date.now()}`,
+                name: `Stock Investment (${stockScenario.name})`,
+                value: Math.round(monthlyVal),
+                frequency: 'Monthly',
+                isLinked: true,
+                source: `Stocks (${chartName})`
+            };
         }
 
         if (newItem) {
@@ -264,11 +304,14 @@ const SavingsEditorWindow = ({
         linked.forEach(i => total += getItemMonthly(i));
 
         const monthlyPay = Number(scenario.monthlyPay || 0);
-        // Simple CPF calculation for display
-        const salary = Number(settings?.cpf?.monthlySalary || 0);
-        const bonus = Number(settings?.cpf?.annualBonus || 0);
-        const monthlyBonus = bonus / 12;
-        const cpf = (Math.min(salary, 8000) + Math.min(monthlyBonus, 8500 - Math.min(salary, 8000))) * 0.2;
+
+        // Check if CPF is already linked to avoid double counting
+        const isCpfLinked = linked.some(i => i.source === 'CPF Card');
+
+        // Only calculate specific CPF value if it is NOT linked (for display purposes if needed, but here we want to allow removal)
+        // Actually, to fix the user issue: If it is NOT linked, we should NOT deduct it automatically.
+        // The user wants full control. Use the system only if linked.
+        let cpf = 0;
 
         return { totalExpenses: total, cpf, monthlySavings: monthlyPay - cpf - total };
     };
@@ -294,16 +337,6 @@ const SavingsEditorWindow = ({
             }
         >
             <div className={styles.container}>
-                <div className={styles.section} style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--glass-border)' }}>
-                    <label className={styles.label}>Section Name (Appears in Net Worth)</label>
-                    <input
-                        type="text"
-                        className={styles.input}
-                        value={cardName}
-                        onChange={(e) => onUpdateCardName(e.target.value)}
-                        placeholder="e.g. Savings"
-                    />
-                </div>
 
                 <div className={styles.scenarioList}>
                     {scenarios.map((scenario) => {
@@ -593,36 +626,57 @@ const SavingsEditorWindow = ({
                                             size="sm"
                                             icon={<Link size={14} />}
                                             closeOnSelect={true}
+                                            usePortal={true}
+                                            contentStyle={{
+                                                position: 'fixed',
+                                                top: '50%',
+                                                left: '50%',
+                                                transform: 'translate(-50%, -50%)',
+                                                width: '300px',
+                                                maxHeight: '280px',
+                                                // Make sure flex is applied to the menu so the specific item container scrolls, not the whole card if possible, 
+                                                // but for simplicity here we let the card handle it.
+                                            }}
                                             items={[
                                                 {
                                                     label: 'Link CPF Contribution',
                                                     disabled: expenses.linked.some(i => i.source === 'CPF Card'),
                                                     onClick: () => handleAddLinked(scenario.id, 'cpf'),
-                                                    icon: <Link size={14} />
+                                                    icon: <Link size={14} /> // Regular Link icon for system links
                                                 },
                                                 { type: 'divider' },
-                                                { type: 'header', label: 'Other Investments' },
-                                                {
-                                                    label: 'Total Other Investments',
-                                                    disabled: expenses.linked.some(i => i.source === 'Other Investments (Total)'),
-                                                    onClick: () => handleAddLinked(scenario.id, 'total-other'),
-                                                    icon: <Layers size={14} />
-                                                },
+                                                { type: 'header', label: 'Stock Investments' },
+                                                ...stocksCharts.flatMap(chart =>
+                                                    (chart.scenarios || []).map(s => ({
+                                                        label: `${chart.name}: ${s.name}`,
+                                                        // Use chart ID + scenario ID to ensure uniqueness if scenario IDs aren't globally unique
+                                                        disabled: expenses.linked.some(i => i.id.startsWith(`linked-stock-${chart.id}-${s.id}`)),
+                                                        onClick: () => handleAddLinked(scenario.id, 'stock-scenario', { chartId: chart.id, chartName: chart.name, scenario: s }),
+                                                        icon: <TrendingUp size={14} />
+                                                    }))
+                                                ),
+                                                { type: 'divider' },
                                                 { type: 'header', label: 'Investment Groups' },
-                                                ...normalizedOtherInvestments.groups.map(group => ({
-                                                    label: `${group.name} (Group Total)`,
-                                                    disabled: expenses.linked.some(i => i.id.startsWith(`linked-group-${group.id}`)),
-                                                    onClick: () => handleAddLinked(scenario.id, 'group-investment', group),
-                                                    icon: <FolderPlus size={14} />
-                                                })),
+                                                ...normalizedOtherInvestments.groups.flatMap(group => [
+                                                    {
+                                                        label: `${group.name} (Group Total)`,
+                                                        disabled: expenses.linked.some(i => i.id.startsWith(`linked-group-${group.id}`)),
+                                                        onClick: () => handleAddLinked(scenario.id, 'group-investment', group),
+                                                        icon: <FolderPlus size={14} />
+                                                    },
+                                                    ...(group.items || []).map(item => ({
+                                                        label: `⌞ ${item.name}`,
+                                                        disabled: expenses.linked.some(i => i.id.startsWith(`linked-inv-${item.id}`)),
+                                                        onClick: () => handleAddLinked(scenario.id, 'investment', { ...item, source: `Other Investments (${group.name})` }),
+                                                        icon: <Layers size={14} />,
+                                                        style: { paddingLeft: '1.5rem', opacity: 0.8 }
+                                                    }))
+                                                ]),
                                                 { type: 'header', label: 'Specific Assets' },
-                                                ...[
-                                                    ...normalizedOtherInvestments.items,
-                                                    ...normalizedOtherInvestments.groups.flatMap(g => (g.items || []).map(i => ({ ...i, groupName: g.name })))
-                                                ].map(item => ({
-                                                    label: item.groupName ? `${item.name} (${item.groupName})` : item.name,
+                                                ...normalizedOtherInvestments.items.map(item => ({
+                                                    label: item.name,
                                                     disabled: expenses.linked.some(i => i.id.startsWith(`linked-inv-${item.id}`)),
-                                                    onClick: () => handleAddLinked(scenario.id, 'investment', { ...item, source: item.groupName ? `Other Investments (${item.groupName})` : 'Other Investments' }),
+                                                    onClick: () => handleAddLinked(scenario.id, 'investment', { ...item, source: 'Other Investments' }),
                                                     icon: <Layers size={14} />
                                                 }))
                                             ]}
@@ -658,10 +712,6 @@ const SavingsEditorWindow = ({
                                     <div className={styles.summaryRow}>
                                         <span>Total Monthly Expenses:</span>
                                         <span className={styles.expenseTotal}>{baseCurrencySymbol}{Math.round(totalExpenses).toLocaleString()}</span>
-                                    </div>
-                                    <div className={styles.summaryRow}>
-                                        <span>CPF Contribution:</span>
-                                        <span>{baseCurrencySymbol}{Math.round(cpf).toLocaleString()}</span>
                                     </div>
                                     <div className={styles.summaryRow}>
                                         <span>Estimated Monthly Savings:</span>

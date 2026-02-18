@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CardAnimator } from '../Animator';
 import styles from './CustomDatePicker.module.css';
 
-const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsMobile, style, useModalOnDesktop = false }) => {
+const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsMobile, style, useModalOnDesktop = false, distortionFactor = 1, contentDistortionScale = 1 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState(null); // 'month' or 'year' or null
     const containerRef = useRef(null);
@@ -191,6 +191,8 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
             active={isOpen}
             className={styles.datePickerPopup}
             maxRadius={20}
+            distortionFactor={distortionFactor}
+            contentDistortionScale={contentDistortionScale}
             style={{
                 width: '100%',
                 padding: '1.25rem'
@@ -216,7 +218,7 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.9, y: -10 }}
                                 >
-                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }}>
+                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }} distortionFactor={distortionFactor} contentDistortionScale={contentDistortionScale}>
                                         <div className={styles.dropdownList}>
                                             {monthNames.map((name, i) => (
                                                 <button
@@ -251,7 +253,7 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.9, y: -10 }}
                                 >
-                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }}>
+                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }} distortionFactor={distortionFactor} contentDistortionScale={contentDistortionScale}>
                                         <div className={styles.dropdownList} ref={yearListRef}>
                                             {years.map(y => (
                                                 <button

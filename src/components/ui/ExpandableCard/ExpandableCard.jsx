@@ -33,15 +33,7 @@ const ExpandableCard = ({
 }) => {
     // Determine the spinner to use
     const renderLoading = () => (
-        <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100%',
-            width: '100%',
-            minHeight: '100px',
-            padding: '2rem'
-        }}>
+        <div className="expandable-card-loading-container">
             <InlineSpinner size="32px" />
         </div>
     );
@@ -147,7 +139,8 @@ const ExpandableCard = ({
             className={`expandable-card ${!isExpanded ? 'is-collapsed' : ''} ${className}`}
             layout={false}
             initial={false}
-            distortionFactor={0}
+            distortionFactor={1}
+            contentDistortionScale={0.3}
             controls={null} // We handle controls manually in summary and body mode
             persistentControls={null}
             animate={isExpanded ? "expanded" : "collapsed"}
@@ -173,6 +166,12 @@ const ExpandableCard = ({
                 ...style
             }}
         >
+            {loading && (
+                <div className="expandable-card-loading-overlay">
+                    <InlineSpinner size="22px" />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>Refreshing...</span>
+                </div>
+            )}
 
             <motion.div
                 className="expandable-card-header"
@@ -237,16 +236,15 @@ const ExpandableCard = ({
                         </div>
                     </div>
 
-                    {/* Summary Content */}
                     <div className="collapsed-summary-wrapper">
-                        {loading ? renderLoading() : (finalHeaderContent ? (
+                        {finalHeaderContent ? (
                             finalHeaderContent
                         ) : (
                             <div className="default-header">
                                 <h3>{title}</h3>
                                 {subtitle && <p className="subtitle">{subtitle}</p>}
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
 
@@ -305,7 +303,7 @@ const ExpandableCard = ({
                     </div>
                 )}
                 <div className="expandable-card-components-group" style={{ paddingTop: 0 }}>
-                    {loading ? renderLoading() : children}
+                    {children}
                 </div>
             </motion.div>
         </StyledCard>

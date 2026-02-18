@@ -2,84 +2,81 @@ import { motion, useMotionValue, useTransform, animate as runAnimation, usePrese
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 
 // --- 1. The Math: Vertical Fabric Path (The Elastic Shape) ---
+const f = (val) => Math.round(val * 10) / 10;
+
 function useFabricPathVertical(width, height, distortion, maxRadius = 24) {
     return useTransform([width, height, distortion], ([w, h, d]) => {
         if (!w || !h || w <= 0 || h <= 0) return "";
 
-        const r = Math.min(maxRadius, w / 2, h / 2); // Radius adjusted to maxRadius
+        const r = Math.min(maxRadius, w / 2, h / 2);
         const straightEdge = Math.max(0, h - 2 * r);
-        let ratio = Math.min(1, straightEdge / 200);
+        let ratio = Math.min(1, straightEdge / 60);
         const dampener = ratio * ratio;
         const safeD = d * dampener;
 
-        const rightControlX = w + safeD;
-        const leftControlX = 0 - safeD;
-        const yTop = Math.max(r, h * 0.25);
-        const yBottom = Math.min(h - r, h * 0.75);
+        const rightControlX = f(w + safeD);
+        const leftControlX = f(0 - safeD);
+        const yTop = f(Math.max(r, h * 0.25));
+        const yBottom = f(Math.min(h - r, h * 0.75));
+        const rw = f(w);
+        const rh = f(h);
+        const rr = f(r);
 
         return `
-            M ${r},0 L ${w - r},0 A ${r},${r} 0 0 1 ${w},${r} 
-            C ${rightControlX},${yTop} ${rightControlX},${yBottom} ${w},${h - r} 
-            A ${r},${r} 0 0 1 ${w - r},${h} L ${r},${h} A ${r},${r} 0 0 1 ${0},${h - r} 
-            C ${leftControlX},${yBottom} ${leftControlX},${yTop} ${0},${r} 
-            A ${r},${r} 0 0 1 ${r},0 Z
+            M ${rr},0 L ${f(w - r)},0 A ${rr},${rr} 0 0 1 ${rw},${rr} 
+            C ${rightControlX},${yTop} ${rightControlX},${yBottom} ${rw},${f(h - r)} 
+            A ${rr},${rr} 0 0 1 ${f(w - r)},${rh} L ${rr},${rh} A ${rr},${rr} 0 0 1 ${0},${f(h - r)} 
+            C ${leftControlX},${yBottom} ${leftControlX},${yTop} ${0},${rr} 
+            A ${rr},${rr} 0 0 1 ${rr},0 Z
         `;
     });
 }
 
-// --- 1b. The Math: Horizontal Fabric Path (Rotated 90 degrees) ---
 function useFabricPathHorizontal(width, height, distortion, maxRadius = 12) {
     return useTransform([width, height, distortion], ([w, h, d]) => {
         if (!w || !h || w <= 0 || h <= 0) return "";
 
-        // INSET: We inset everything by 1px to ensure the 1px stroke is never clipped by its parent div
         const offset = 1;
         const sw = w - (offset * 2);
         const sh = h - (offset * 2);
         const r = Math.min(maxRadius, sw / 2, sh / 2);
 
-        // DAMPING: Prevent the "Oval" effect when the bar is square or nearly square.
-        // We use a cubed dropoff to ensure distortion is 100% dead by the time we approach button size.
         const extraWidth = Math.max(0, sw - sh);
         const dampener = Math.pow(Math.min(1, extraWidth / 80), 3);
         const safeD = d * dampener;
 
-        // Coordinates: d < 0 is Concave (Pinch), d > 0 is Convex (Bulge)
-        // Opening (Concave) -> topY moves DOWN (positive), bottomY moves UP (negative relative to h)
-        const topY = offset - safeD;
-        const bottomY = h - offset + safeD;
+        const topY = f(offset - safeD);
+        const bottomY = f(h - offset + safeD);
+        const midX = f(w / 2);
+        const xLeft = f(w * 0.25);
+        const xRight = f(w * 0.75);
+        const ro = f(offset);
+        const rw = f(w);
+        const rh = f(h);
+        const rr = f(r);
 
-        const midX = w / 2;
-        const xLeft = w * 0.25;
-        const xRight = w * 0.75;
-
-        // CRITICAL: Side edges (w, 0->h) and (0, 0->h) must stay strictly vertical.
-        // The arcs must move vertically but stay horizontally fixed at 0 or w.
-        // Path math using the inset dimensions
         return `
-            M ${offset + r},${offset} 
-            C ${xLeft},${offset} ${xLeft},${topY} ${midX},${topY} 
-            C ${xRight},${topY} ${xRight},${offset} ${w - offset - r},${offset} 
-            A ${r},${r} 0 0 1 ${w - offset},${offset + r} 
-            L ${w - offset},${h - offset - r} 
-            A ${r},${r} 0 0 1 ${w - offset - r},${h - offset} 
-            C ${xRight},${h - offset} ${xRight},${bottomY} ${midX},${bottomY} 
-            C ${xLeft},${bottomY} ${xLeft},${h - offset} ${offset + r},${h - offset} 
-            A ${r},${r} 0 0 1 ${offset},${h - offset - r} 
-            L ${offset},${offset + r} 
-            A ${r},${r} 0 0 1 ${offset + r},${offset} Z
+            M ${f(offset + r)},${ro} 
+            C ${xLeft},${ro} ${xLeft},${topY} ${midX},${topY} 
+            C ${xRight},${topY} ${xRight},${ro} ${f(w - offset - r)},${ro} 
+            A ${rr},${rr} 0 0 1 ${f(w - offset)},${f(offset + r)} 
+            L ${f(w - offset)},${f(h - offset - r)} 
+            A ${rr},${rr} 0 0 1 ${f(w - offset - r)},${f(h - offset)} 
+            C ${xRight},${f(h - offset)} ${xRight},${bottomY} ${midX},${bottomY} 
+            C ${xLeft},${bottomY} ${xLeft},${f(h - offset)} ${f(offset + r)},${f(h - offset)} 
+            A ${rr},${rr} 0 0 1 ${ro},${f(h - offset - r)} 
+            L ${ro},${f(offset + r)} 
+            A ${rr},${rr} 0 0 1 ${f(offset + r)},${ro} Z
         `;
     });
 }
 
-// --- 2. The Renderer: Fabric Background (Purely physical surface) ---
-const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation = 'vertical', surfaceColor = "var(--neu-bg)", maxRadius = 24 }) => {
+const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation = 'vertical', surfaceColor = "var(--neu-bg)", maxRadius = 24, flat = false, distortionFactor = 1, disableHighlight = false, disableShadow = false, shadowScale = 1 }) => {
     const containerRef = useRef(null);
     const lastActive = useRef(null);
 
     const [size, setSize] = useState({ w: 0, h: 0 });
     const [dimsReady, setDimsReady] = useState(false);
-    const [isAnimating, setIsAnimating] = useState(false);
 
     const width = useMotionValue(0);
     const height = useMotionValue(0);
@@ -111,23 +108,24 @@ const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation
     }, [width, height]);
 
     useEffect(() => {
+        // Only run if active actually changes
         if (active === lastActive.current) return;
-        const duration = 0.6;
-        setIsAnimating(true);
 
-        if (active) {
-            runAnimation(distortion, [0, orientation === 'horizontal' ? -8 : -16, 0], { duration, times: [0, 0.4, 1], ease: "easeInOut" });
-        } else {
-            runAnimation(distortion, [0, orientation === 'horizontal' ? 6 : 16, 0], { duration, times: [0, 0.4, 1], ease: "easeInOut" });
-        }
+        const duration = 1.0;
+        const prev = lastActive.current;
+        lastActive.current = active;
 
-        const timer = setTimeout(() => {
-            setIsAnimating(false);
-            lastActive.current = active;
-        }, duration * 1000);
+        const targetDistortion = 12 * distortionFactor;
+        const targetDistortionHorizontal = 6 * distortionFactor;
 
-        return () => clearTimeout(timer);
-    }, [active, distortion, orientation]);
+        // Ensure we reset to 0 even if interrupted
+        runAnimation(distortion, [distortion.get(), active ? -targetDistortion : targetDistortion, 0], {
+            duration,
+            times: [0, 0.35, 1],
+            ease: "easeInOut"
+        });
+
+    }, [active, distortion, orientation, distortionFactor]);
 
     return (
         <div
@@ -137,25 +135,18 @@ const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation
                 zIndex: 0,
                 opacity: isReady ? 1 : 0,
                 overflow: 'visible',
-                background: 'transparent !important',
-                boxShadow: 'none !important',
-                border: 'none !important',
+                background: 'transparent',
                 borderRadius: `${maxRadius}px`,
-
-                transition: 'none',
-                pointerEvents: 'none',
-                boxSizing: 'border-box'
+                pointerEvents: 'none'
             }}
         >
-
-            {/* 1. Dark Shadow Layer - HTML Div Blur (Safari Fix) */}
-            {!isStrokeOnly && orientation !== 'horizontal' && (
+            {!isStrokeOnly && !flat && !disableShadow && orientation !== 'horizontal' && (
                 <div style={{
                     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                    transform: 'translate3d(6px, 6px, 0)',
-                    filter: 'blur(8px)',
-                    WebkitFilter: 'blur(8px)',
-                    opacity: 0.8,
+                    transform: `translate3d(${6 * shadowScale}px, ${6 * shadowScale}px, 0)`,
+                    filter: `blur(${8 * shadowScale}px)`,
+                    WebkitFilter: `blur(${8 * shadowScale}px)`,
+                    opacity: 0.8 * shadowScale,
                     zIndex: -1
                 }}>
                     <svg style={{ width: '100%', height: '100%', overflow: 'visible' }}>
@@ -164,14 +155,13 @@ const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation
                 </div>
             )}
 
-            {/* 2. Light Highlight Layer - HTML Div Blur (Safari Fix) */}
-            {!isStrokeOnly && orientation !== 'horizontal' && (
+            {!isStrokeOnly && !flat && !disableHighlight && orientation !== 'horizontal' && (
                 <div style={{
                     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                    transform: 'translate3d(-6px, -6px, 0)',
-                    filter: 'blur(8px)',
-                    WebkitFilter: 'blur(8px)',
-                    opacity: 1,
+                    transform: `translate3d(${-6 * shadowScale}px, ${-6 * shadowScale}px, 0)`,
+                    filter: `blur(${8 * shadowScale}px)`,
+                    WebkitFilter: `blur(${8 * shadowScale}px)`,
+                    opacity: shadowScale,
                     zIndex: -1
                 }}>
                     <svg style={{ width: '100%', height: '100%', overflow: 'visible' }}>
@@ -180,13 +170,11 @@ const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation
                 </div>
             )}
 
-            {/* 3. Main Surface */}
             <svg
                 style={{
                     width: '100%', height: '100%', overflow: 'visible', display: 'block',
                     position: 'absolute', top: 0, left: 0,
                     opacity: isReady ? 1 : 0,
-                    transition: 'opacity 0.1s',
                     zIndex: 0
                 }}
             >
@@ -196,17 +184,12 @@ const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation
                     stroke={isStrokeOnly ? "var(--neu-border-subtle)" : "none"}
                     strokeWidth="1"
                     strokeLinejoin="round"
-                    style={{
-                        padding: 0,
-                        vectorEffect: 'non-scaling-stroke'
-                    }}
                 />
             </svg>
         </div>
     );
 });
 
-// --- 3. Main Export: Animation Controller ---
 const CardAnimator = React.memo(({
     type = 'fabricCard',
     active = false,
@@ -218,11 +201,16 @@ const CardAnimator = React.memo(({
     variant = 'default',
     noScale = false,
     distortionFactor = 1,
+    contentDistortionScale = 1,
     surfaceColor,
     maxRadius = 24,
+    flat = false,
+    disableHighlight = false,
+    disableShadow = false,
+    shadowScale = 1,
     ...props
 }) => {
-    const [isAnimating, setIsAnimating] = useState(false);
+    const [isInternalAnimating, setIsInternalAnimating] = useState(false);
 
     if (type === 'expandableContent') {
         return (
@@ -235,12 +223,12 @@ const CardAnimator = React.memo(({
                         transition: { duration: 0.3, ease: "easeInOut" }
                     },
                     expanded: {
-                        opacity: 1, height: "auto", overflow: isAnimating ? "hidden" : "visible", y: 0,
+                        opacity: 1, height: "auto", overflow: isInternalAnimating ? "hidden" : "visible", y: 0,
                         transition: { duration: 0.4, ease: "easeOut", delay: 0.05 }
                     }
                 }}
-                onAnimationStart={() => setIsAnimating(true)}
-                onAnimationComplete={() => setIsAnimating(false)}
+                onAnimationStart={() => setIsInternalAnimating(true)}
+                onAnimationComplete={() => setIsInternalAnimating(false)}
                 className={className}
             >
                 {children}
@@ -253,14 +241,9 @@ const CardAnimator = React.memo(({
         const [isPresent, safeToRemove] = usePresence();
         const contentScaleX = useMotionValue(1);
         const contentScaleY = useMotionValue(1);
-        const prevActive = useRef(null);
         const isHorizontal = type === 'fabricHorizontal';
         const effectiveActive = active && isPresent;
-
-        // Fix doubling: Strip all style-carrying classes from the container using regex
-        const cleanClassName = className
-            .replace(/\b(neu-btn-base|active|pressed-latch|hover-pop)\b/g, '')
-            .trim();
+        const prevActive = useRef(null);
 
         useEffect(() => {
             if (!isPresent && safeToRemove) {
@@ -269,32 +252,38 @@ const CardAnimator = React.memo(({
             }
         }, [isPresent, safeToRemove]);
 
+
         useEffect(() => {
-            if (prevActive.current === effectiveActive || noScale) return;
-            const duration = 0.5;
+            if (prevActive.current === effectiveActive || noScale) {
+                prevActive.current = effectiveActive;
+                return;
+            }
+
+            const duration = 1.0;
             const ease = "easeInOut";
-            const times = [0, 0.4, 1];
+            const times = [0, 0.35, 1];
             const d = distortionFactor;
+            const scaleAmount = 0.08 * d * contentDistortionScale;
 
             if (isHorizontal) {
                 if (effectiveActive) {
-                    runAnimation(contentScaleX, [1, 1 + (0.04 * d), 1], { duration, times, ease });
-                    runAnimation(contentScaleY, [1, 1 - (0.04 * d), 1], { duration, times, ease });
+                    runAnimation(contentScaleX, [contentScaleX.get(), 1 + (scaleAmount * 0.3), 1], { duration, times, ease });
+                    runAnimation(contentScaleY, [contentScaleY.get(), 1 - scaleAmount, 1], { duration, times, ease });
                 } else {
-                    runAnimation(contentScaleX, [1, 1 - (0.03 * d), 1], { duration, times, ease });
-                    runAnimation(contentScaleY, [1, 1 + (0.03 * d), 1], { duration, times, ease });
+                    runAnimation(contentScaleX, [contentScaleX.get(), 1 - (scaleAmount * 0.3), 1], { duration, times, ease });
+                    runAnimation(contentScaleY, [contentScaleY.get(), 1 + scaleAmount, 1], { duration, times, ease });
                 }
             } else {
                 if (effectiveActive) {
-                    runAnimation(contentScaleX, [1, 1 - (0.06 * d), 1], { duration, times, ease });
-                    runAnimation(contentScaleY, [1, 1 + (0.06 * d), 1], { duration, times, ease });
+                    runAnimation(contentScaleX, [contentScaleX.get(), 1 - scaleAmount, 1], { duration, times, ease });
+                    runAnimation(contentScaleY, [contentScaleY.get(), 1 + (scaleAmount * 0.3), 1], { duration, times, ease });
                 } else {
-                    runAnimation(contentScaleX, [1, 1 + (0.05 * d), 1], { duration, times, ease });
-                    runAnimation(contentScaleY, [1, 1 - (0.05 * d), 1], { duration, times, ease });
+                    runAnimation(contentScaleX, [contentScaleX.get(), 1 + scaleAmount, 1], { duration, times, ease });
+                    runAnimation(contentScaleY, [contentScaleY.get(), 1 - (scaleAmount * 0.3), 1], { duration, times, ease });
                 }
             }
             prevActive.current = effectiveActive;
-        }, [effectiveActive, contentScaleX, contentScaleY, isHorizontal, noScale, distortionFactor]);
+        }, [effectiveActive, isHorizontal, noScale, distortionFactor, contentDistortionScale]);
 
         return (
             <BaseComponent
@@ -305,12 +294,11 @@ const CardAnimator = React.memo(({
                     transformOrigin: isHorizontal ? "center left" : "top center",
                     willChange: "transform",
                     ...style,
-                    // OVERRIDES MUST BE LAST
                     background: 'transparent',
                     boxShadow: 'none',
                     border: 'none',
                 }}
-                className={cleanClassName}
+                className={className}
                 {...props}
             >
                 {variant !== 'transparent' && (
@@ -319,6 +307,11 @@ const CardAnimator = React.memo(({
                         orientation={isHorizontal ? 'horizontal' : 'vertical'}
                         surfaceColor={surfaceColor}
                         maxRadius={maxRadius}
+                        flat={flat}
+                        distortionFactor={distortionFactor}
+                        disableHighlight={disableHighlight}
+                        disableShadow={disableShadow}
+                        shadowScale={shadowScale}
                     />
                 )}
                 <motion.div
@@ -338,7 +331,6 @@ const CardAnimator = React.memo(({
                 >
                     {children}
                 </motion.div>
-                {/* Stroke Layer Removed for Borderless Look */}
             </BaseComponent >
         );
     }

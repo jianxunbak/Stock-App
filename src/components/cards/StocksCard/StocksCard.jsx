@@ -5,6 +5,7 @@ import ScenarioEditorWindow from '../../ui/ScenarioEditorWindow/ScenarioEditorWi
 import { Settings } from 'lucide-react';
 import styles from './StocksCard.module.css';
 import { formatLastUpdated } from '../../../utils/dateUtils';
+import { calculateStockProjection } from '../../../utils/stockUtils';
 
 const SCENARIO_COLORS = [
     'var(--neu-success)',      // Green
@@ -28,8 +29,26 @@ const StocksCard = ({
     usdToDisplayRate = 1,
     settings = null,
     onUpdateSettings = null,
-    loading = false
+    loading = false,
+    currentPortfolioValueUSD = 0,
+    portfolioOptions = [],
+    onRefresh = null
 }) => {
+    // Calculate current portfolio value in base currency for scenario initialization
+    const usdToBase = useMemo(() => {
+        return (usdToDisplayRate && baseToDisplayRate) ? usdToDisplayRate / baseToDisplayRate : 1;
+    }, [usdToDisplayRate, baseToDisplayRate]);
+
+    const currentPortfolioValueBase = useMemo(() => {
+        return currentPortfolioValueUSD * usdToBase;
+    }, [currentPortfolioValueUSD, usdToBase]);
+
+    const portfolioOptionsBase = useMemo(() => {
+        return portfolioOptions.map(p => ({
+            name: p.name,
+            value: p.valueUSD * usdToBase
+        }));
+    }, [portfolioOptions, usdToBase]);
     // Charts state - each chart contains its own scenarios
     const [charts, setCharts] = useState([
         {
@@ -213,52 +232,11 @@ const StocksCard = ({
             const visibleScenarios = chart.scenarios.filter(s => s.visible);
             if (visibleScenarios.length === 0) return { chart, chartData: [], series: [] };
 
-            const maxYears = projectionYears;
-            const data = [];
-
-            for (let year = 0; year <= maxYears; year++) {
-                const label = currentAge !== null ? `Age ${currentAge + year}` : `Year ${year}`;
-                const point = {
-                    date: label,
-                    year: new Date().getFullYear() + year,
-                    // If currentAge is null, age property will be undefined, which is fine
-                    age: currentAge !== null ? currentAge + year : undefined
-                };
-                visibleScenarios.forEach(scenario => {
-                    if (year >= 0) {
-                        const estimatedRate = Number(scenario.estimatedRate || 0);
-                        const initialDeposit = Number(scenario.initialDeposit || 0);
-                        const contributionAmount = Number(scenario.contributionAmount || 0);
-
-                        const annualRate = estimatedRate / 100;
-                        const freq = scenario.contributionFrequency === 'monthly' ? 12 :
-                            scenario.contributionFrequency === 'quarterly' ? 4 : 1;
-
-                        const annualContribution = contributionAmount * freq;
-
-                        // Invested: Initial + (Annual * Years)
-                        // Note: year is the loop variable (0, 1, 2...)
-                        let totalInvested = initialDeposit + (annualContribution * year);
-
-                        // Value: FV = P(1+r)^t + PMT * ((1+r)^t - 1)/r (Ordinary Annuity)
-                        let totalValue = 0;
-                        if (annualRate === 0) {
-                            totalValue = totalInvested;
-                        } else {
-                            const p_term = initialDeposit * Math.pow(1 + annualRate, year);
-                            const pmt_term = annualContribution * (Math.pow(1 + annualRate, year) - 1) / annualRate;
-                            totalValue = p_term + pmt_term;
-                        }
-
-                        point[`invested_${scenario.id}`] = Math.round(totalInvested * 100) / 100;
-                        point[`value_${scenario.id}`] = Math.round(totalValue * 100) / 100;
-                    } else {
-                        point[`invested_${scenario.id}`] = null;
-                        point[`value_${scenario.id}`] = null;
-                    }
-                });
-                data.push(point);
-            }
+            const chartData = calculateStockProjection({
+                charts: [chart],
+                projectionYears,
+                currentAge
+            });
 
             const seriesArray = [];
             visibleScenarios.forEach(scenario => {
@@ -277,7 +255,7 @@ const StocksCard = ({
                 });
             });
 
-            return { chart, chartData: data, series: seriesArray, visibleScenarios };
+            return { chart, chartData, series: seriesArray, visibleScenarios };
         });
     }, [charts, currentAge, projectionYears]);
 
@@ -360,6 +338,7 @@ const StocksCard = ({
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
+                onRefresh={onRefresh}
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}
@@ -503,6 +482,8 @@ const StocksCard = ({
                 onRemoveScenario={removeScenario}
                 onUpdateScenario={updateScenario}
                 onToggleScenarioVisibility={toggleScenarioVisibility}
+                currentPortfolioValue={currentPortfolioValueBase}
+                portfolioOptions={portfolioOptionsBase}
             />
         </>
     );

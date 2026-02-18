@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { fetchUserSettings, saveUserSettings, fetchCurrencyRate } from '../../../services/api';
+import { fetchUserSettings, saveUserSettings, fetchCurrencyRate, fetchStockDataBatch } from '../../../services/api';
+import { usePortfolio } from '../../../hooks/usePortfolio';
 import { ArrowLeft } from 'lucide-react';
 import CascadingHeader from '../../ui/CascadingHeader/CascadingHeader';
 import { TopNavLogo, TopNavActions } from '../../ui/Navigation/TopNav';
@@ -27,6 +28,65 @@ const WealthPage = () => {
     const [baseToDisplayRate, setBaseToDisplayRate] = useState(1);
     const [usdToDisplayRate, setUsdToDisplayRate] = useState(1);
     const [sgdToDisplayRate, setSgdToDisplayRate] = useState(1);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const { portfolioList } = usePortfolio();
+
+    const [livePrices, setLivePrices] = useState({});
+
+    // Fetch live prices for all portfolios
+    useEffect(() => {
+        if (!portfolioList || !Array.isArray(portfolioList)) return;
+
+        const mainPortfolios = portfolioList.filter(p => !p.type || p.type === 'main' || p.type === 'test');
+        const allTickers = new Set();
+
+        mainPortfolios.forEach(p => {
+            (p.portfolio || []).forEach(item => {
+                if (item.ticker) allTickers.add(item.ticker.trim().toUpperCase());
+            });
+        });
+
+        const tickers = Array.from(allTickers);
+        const missing = tickers.filter(t => !livePrices[t]);
+
+        if (missing.length > 0) {
+            const fetchPrices = async () => {
+                try {
+                    const batchData = await fetchStockDataBatch(missing);
+                    const newPrices = {};
+                    Object.entries(batchData).forEach(([ticker, data]) => {
+                        newPrices[ticker] = data.overview?.price || 0;
+                    });
+                    setLivePrices(prev => ({ ...prev, ...newPrices }));
+                } catch (err) {
+                    console.error("Error fetching stock prices:", err);
+                }
+            };
+            fetchPrices();
+        }
+    }, [portfolioList, livePrices]);
+
+    let totalPortfolioValue = 0;
+    try {
+        if (portfolioList && Array.isArray(portfolioList)) {
+            const mainPortfolios = portfolioList.filter(p => !p.type || p.type === 'main' || p.type === 'test');
+
+            mainPortfolios.forEach(p => {
+                const items = p.portfolio || [];
+                items.forEach(item => {
+                    const ticker = (item.ticker || '').trim().toUpperCase();
+                    // Use live price if available, otherwise fallback
+                    const price = livePrices[ticker] !== undefined ? livePrices[ticker] : (Number(item.price) || 0);
+                    const shares = Number(item.shares) || 0;
+                    const val = price * shares;
+                    totalPortfolioValue += val;
+                });
+            });
+        }
+    } catch (err) {
+        console.error("Error calculating portfolio value", err);
+    }
 
     const displayCurrencySymbol = useMemo(() => {
         if (displayCurrency === 'SGD') return 'S$';
@@ -56,7 +116,6 @@ const WealthPage = () => {
             };
 
             const displayRate = await getRate(displayCurrency);
-
             // 1. Base to Display Rate
             if (baseCurrency === displayCurrency) {
                 setBaseToDisplayRate(1);
@@ -72,8 +131,12 @@ const WealthPage = () => {
             if (displayCurrency === 'SGD') {
                 setSgdToDisplayRate(1);
             } else {
-                const sgdRate = await getRate('SGD');
-                setSgdToDisplayRate(displayRate / sgdRate);
+                let sgdRate = await getRate('SGD');
+                // Fallback: If API returns 1 for SGD (unlikely 1:1 with USD), verify/force standard rate
+                if (sgdRate === 1) sgdRate = 1.35;
+
+                const calculatedRate = displayRate / sgdRate;
+                setSgdToDisplayRate(calculatedRate);
             }
         };
 
@@ -164,6 +227,19 @@ const WealthPage = () => {
     // Load User Preferences from DB
     const ignoreRemoteSyncUntil = useRef(0);
 
+    // Initial Currency Sync
+    useEffect(() => {
+        if (userSettings?.baseCurrency) {
+            setDisplayCurrency(userSettings.baseCurrency);
+            setBaseCurrency(userSettings.baseCurrency);
+        }
+    }, [userSettings?.baseCurrency]);
+
+    const handleCurrencyChange = (newCurrency) => {
+        setDisplayCurrency(newCurrency);
+        handleUpdateSettings({ baseCurrency: newCurrency });
+    };
+
     const loadSettings = useCallback((e) => {
         if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') {
             return;
@@ -202,8 +278,9 @@ const WealthPage = () => {
 
         if (e?.detail?.settings) {
             processSettings(e.detail.settings);
+            return Promise.resolve();
         } else if (currentUser?.uid) {
-            fetchUserSettings(currentUser.uid).then(settings => {
+            return fetchUserSettings(currentUser.uid).then(settings => {
                 // SYNC SHIELD: Catch in-flight requests that might be stale
                 if (Date.now() < ignoreRemoteSyncUntil.current) return;
                 // If settings are null (new user or empty), set to empty object to stop loading
@@ -212,10 +289,28 @@ const WealthPage = () => {
                 console.error("Failed to fetch settings", err);
                 // On error, also unblock loading
                 processSettings({});
+                return {};
             });
         }
+        return Promise.resolve();
     }, [currentUser?.uid]);
 
+    const handleRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        // 1. Reset live prices to trigger refetch
+        setLivePrices({});
+        // 2. Bypass sync shield
+        ignoreRemoteSyncUntil.current = 0;
+        // 3. Force reload settings
+        try {
+            await loadSettings();
+        } catch (err) {
+            console.error("Refresh failed:", err);
+        } finally {
+            // Add a small delay so the user sees the refresh happen
+            setTimeout(() => setIsRefreshing(false), 600);
+        }
+    }, [loadSettings]);
 
     useEffect(() => {
         loadSettings();
@@ -321,12 +416,12 @@ const WealthPage = () => {
     const actionGroupContent = (
         <TopNavActions
             showSearch={true}
-            alwaysOpenSearch={!isMobile}
+            alwaysOpenSearch={false}
             searchTicker={ticker}
             setSearchTicker={setTicker}
             handleSearch={handleSearch}
             currency={displayCurrency}
-            setCurrency={setDisplayCurrency}
+            setCurrency={handleCurrencyChange}
             setShowWatchlist={setShowWatchlist}
             setShowProfileModal={setShowProfileModal}
             handleLogout={handleLogout}
@@ -375,9 +470,12 @@ const WealthPage = () => {
                                         displayCurrencySymbol={displayCurrencySymbol}
                                         baseToDisplayRate={baseToDisplayRate}
                                         usdToDisplayRate={usdToDisplayRate}
+                                        sgdToDisplayRate={sgdToDisplayRate}
                                         settings={userSettings}
                                         onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings}
+                                        loading={!userSettings || isRefreshing}
+                                        currentPortfolioValueUSD={totalPortfolioValue}
+                                        onRefresh={handleRefresh}
                                     />
                                 </div>
                             );
@@ -399,7 +497,18 @@ const WealthPage = () => {
                                         usdToDisplayRate={usdToDisplayRate}
                                         settings={userSettings}
                                         onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings}
+                                        loading={!userSettings || isRefreshing}
+                                        currentPortfolioValueUSD={totalPortfolioValue}
+                                        portfolioOptions={portfolioList?.map(p => {
+                                            let val = 0;
+                                            (p.portfolio || []).forEach(item => {
+                                                const ticker = (item.ticker || '').trim().toUpperCase();
+                                                const price = livePrices[ticker] !== undefined ? livePrices[ticker] : (Number(item.price) || 0);
+                                                val += price * (Number(item.shares) || 0);
+                                            });
+                                            return { name: p.name, valueUSD: val };
+                                        })}
+                                        onRefresh={handleRefresh}
                                     />
                                 </div>
                             );
@@ -422,7 +531,8 @@ const WealthPage = () => {
                                         sgdToDisplayRate={sgdToDisplayRate}
                                         settings={userSettings}
                                         onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings}
+                                        loading={!userSettings || isRefreshing}
+                                        onRefresh={handleRefresh}
                                     />
                                 </div>
                             );
@@ -443,7 +553,8 @@ const WealthPage = () => {
                                         usdToDisplayRate={usdToDisplayRate}
                                         settings={userSettings}
                                         onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings}
+                                        loading={!userSettings || isRefreshing}
+                                        onRefresh={handleRefresh}
                                     />
                                 </div>
                             );
@@ -464,7 +575,8 @@ const WealthPage = () => {
                                         usdToDisplayRate={usdToDisplayRate}
                                         settings={userSettings}
                                         onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings}
+                                        loading={!userSettings || isRefreshing}
+                                        onRefresh={handleRefresh}
                                     />
                                 </div>
                             );
@@ -481,8 +593,11 @@ const WealthPage = () => {
                         currency={displayCurrency}
                         currencySymbol={displayCurrencySymbol}
                         currentRate={usdToDisplayRate}
+                        onAddToPortfolio={() => { }}
                     />
                 )}
+
+
 
                 {showProfileModal && currentUser && (
                     <UserProfileModal

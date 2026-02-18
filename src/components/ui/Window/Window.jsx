@@ -99,6 +99,7 @@ const Window = ({
                                 overflow: 'visible' // Allow shadows/highlights to show
                             }}
                             distortionFactor={1.2}
+                            contentDistortionScale={0.24}
                             noScale={false}
                             style={{
                                 flex: 1,

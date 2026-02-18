@@ -19,7 +19,9 @@ const CustomSelect = ({
     isOpen: controlledIsOpen,
     onOpenChange,
     multiple = false,
-    isMobile: propIsMobile
+    isMobile: propIsMobile,
+    distortionFactor = 1,
+    contentDistortionScale = 1
 }) => {
     const [internalIsOpen, setInternalIsOpen] = useState(false);
     const containerRef = useRef(null);
@@ -155,7 +157,8 @@ const CustomSelect = ({
             type="fabricCard"
             active={isOpen}
             className={styles.customSelectMenu}
-            maxRadius={12}
+            distortionFactor={distortionFactor}
+            contentDistortionScale={contentDistortionScale}
             style={{
                 width: '100%',
                 padding: '0.25rem'

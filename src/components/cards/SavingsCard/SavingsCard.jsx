@@ -57,7 +57,8 @@ const SavingsCard = ({
     usdToDisplayRate = 1,
     settings = null,
     onUpdateSettings = null,
-    loading = false
+    loading = false,
+    onRefresh = null
 }) => {
     const [scenarios, setScenarios] = useState([
         {
@@ -148,17 +149,13 @@ const SavingsCard = ({
             totalExpenses = Object.values(scenario.expenses || {}).reduce((a, b) => a + Number(b || 0), 0);
         }
 
-        // Get CPF from settings if available, otherwise fallback to 20%
-        const cpfSettings = settings?.cpf;
-        let cpf = monthlyPay * 0.2; // Fallback
-        if (cpfSettings?.monthlySalary) {
-            const salary = Number(cpfSettings.monthlySalary);
-            const bonus = Number(cpfSettings.annualBonus || 0);
-            const monthlyBonus = bonus / 12;
-            // Simple approximation for the editor summary
-            // In a real app we might want to use the actual calculated contribution from CPFCard logic
-            cpf = (Math.min(salary, 8000) + Math.min(monthlyBonus, 8500 - Math.min(salary, 8000))) * 0.2;
-        }
+        // Check if CPF is already linked
+        const isStructuredAndHasLinkedCpf = isStructured &&
+            (scenario.expenses.linked || []).some(i => i.source === 'CPF Card');
+
+        // We only deduct if it IS linked (via the totalExpenses, so 'cpf' variable is 0 here)
+        // If it is NOT linked, we also want 'cpf' to be 0 so we don't force a deduction.
+        const cpf = 0;
 
         const monthlySavings = monthlyPay - cpf - totalExpenses;
         return { totalExpenses, cpf, monthlySavings };
@@ -389,6 +386,27 @@ const SavingsCard = ({
     // Scenario CRUD
     const addScenario = () => {
         const cpfSalary = settings?.cpf?.monthlySalary ? Number(settings.cpf.monthlySalary) : 5000;
+        const bonus = Number(settings?.cpf?.annualBonus || 0);
+        const monthlyBonus = bonus / 12;
+        // Use 8000 ceiling as per standard CPF rules used elsewhere
+        const cpfVal = (Math.min(cpfSalary, 8000) + Math.min(monthlyBonus, 8500 - Math.min(cpfSalary, 8000))) * 0.2;
+
+        const defaultItems = Object.entries(DEFAULT_EXPENSES).map(([name, value], idx) => ({
+            id: `def-${idx}-${Date.now()}`,
+            name: name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^[a-z]/, L => L.toUpperCase()),
+            value: Number(value),
+            frequency: 'Monthly'
+        }));
+
+        const cpfItem = {
+            id: `linked-cpf-${Date.now()}`,
+            name: 'CPF Contribution',
+            value: Math.round(cpfVal),
+            frequency: 'Monthly',
+            isLinked: true,
+            source: 'CPF Card'
+        };
+
         const newScenario = {
             id: nextScenarioId,
             name: `Plan ${String.fromCharCode(65 + scenarios.length)}`,
@@ -399,7 +417,11 @@ const SavingsCard = ({
             years: 10,
             visible: true,
             color: SCENARIO_COLORS[scenarios.length % SCENARIO_COLORS.length],
-            expenses: { ...DEFAULT_EXPENSES }
+            expenses: {
+                items: defaultItems,
+                groups: [],
+                linked: [cpfItem]
+            }
         };
         setScenarios([...scenarios, newScenario]);
         setNextScenarioId(nextScenarioId + 1);
@@ -435,6 +457,7 @@ const SavingsCard = ({
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
+                onRefresh={onRefresh}
                 collapsedWidth={220}
                 collapsedHeight={220}
                 headerContent={header}

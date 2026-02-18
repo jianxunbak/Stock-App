@@ -85,6 +85,18 @@ const AnalysisPage = () => {
     const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
     const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
 
+    // Keep local currency state in sync with global settings
+    useEffect(() => {
+        if (settings?.baseCurrency && settings.baseCurrency !== currency) {
+            setCurrency(settings.baseCurrency);
+        }
+    }, [settings?.baseCurrency, currency]);
+
+    const handleCurrencyChange = (newCurrency) => {
+        setCurrency(newCurrency);
+        updateSettings({ baseCurrency: newCurrency });
+    };
+
     // console.log("AnalysisPage Settings:", { settings, settingsLoading });
 
     // Currency conversion rates (base: USD)
@@ -432,7 +444,7 @@ const AnalysisPage = () => {
             setSearchTicker={setTicker}
             handleSearch={handleSearch}
             currency={currency}
-            setCurrency={setCurrency}
+            setCurrency={handleCurrencyChange}
             setShowWatchlist={setShowWatchlist}
             setShowProfileModal={setShowProfileModal}
             handleLogout={handleLogout}
@@ -481,12 +493,14 @@ const AnalysisPage = () => {
                         const isSpan1 = ['debt', 'valuation', 'support'].includes(cardKey);
                         const colSpanClass = isSpan1 ? styles.colSpan1 : styles.colSpan3;
                         const isOpen = !!openCards[cardKey];
+                        const cardTicker = ticker || urlTicker || 'no-ticker';
                         const wrapperClass = `${colSpanClass} ${!isOpen ? styles.collapsedWrapper : styles.expandedWrapper}`;
 
                         if (cardKey === 'stockSummary' && cardVisibility.stockSummary) {
                             return (
                                 <div key="stockSummary" className={wrapperClass}>
                                     <StockOverviewCard
+                                        key={cardTicker}
                                         stockData={{ ...stockData, score: modifiedScore }}
                                         currencySymbol={currencySymbol}
                                         currentRate={currentRate}
@@ -511,6 +525,7 @@ const AnalysisPage = () => {
                             return (
                                 <div key="financialAnalysis" className={wrapperClass}>
                                     <GrowthCard
+                                        key={cardTicker}
                                         isOpen={isOpen}
                                         onToggle={() => toggleCard('financialAnalysis')}
                                         onHide={() => handleHideRequest('financialAnalysis')}
@@ -525,6 +540,7 @@ const AnalysisPage = () => {
                             return (
                                 <div key="profitability" className={wrapperClass}>
                                     <ProfitabilityCard
+                                        key={cardTicker}
                                         currency={currency}
                                         currencySymbol={currencySymbol}
                                         currentRate={currentRate}
@@ -541,7 +557,7 @@ const AnalysisPage = () => {
                             return (
                                 <div key="moat" className={wrapperClass}>
                                     <MoatCard
-                                        key={stockData?.overview?.symbol || 'moat-card'}
+                                        key={cardTicker}
                                         onMoatStatusChange={setMoatStatusLabel}
                                         onIsEvaluatingChange={setIsMoatEvaluating}
                                         currency={currency}
@@ -560,6 +576,7 @@ const AnalysisPage = () => {
                             return (
                                 <div key="debt" className={wrapperClass}>
                                     <DebtCard
+                                        key={cardTicker}
                                         currency={currency}
                                         currencySymbol={currencySymbol}
                                         currentRate={currentRate}
@@ -576,6 +593,7 @@ const AnalysisPage = () => {
                             return (
                                 <div key="valuation" className={wrapperClass}>
                                     <ValuationCard
+                                        key={cardTicker}
                                         currency={currency}
                                         currencySymbol={currencySymbol}
                                         currentRate={currentRate}
@@ -592,6 +610,7 @@ const AnalysisPage = () => {
                             return (
                                 <div key="support" className={wrapperClass}>
                                     <SupportResistanceCard
+                                        key={cardTicker}
                                         currency={currency}
                                         currencySymbol={currencySymbol}
                                         currentRate={currentRate}
@@ -608,6 +627,7 @@ const AnalysisPage = () => {
                             return (
                                 <div key="financials" className={wrapperClass}>
                                     <FinancialTables
+                                        key={cardTicker}
                                         currencySymbol={currencySymbol}
                                         currentRate={currentRate}
                                         isOpen={isOpen}

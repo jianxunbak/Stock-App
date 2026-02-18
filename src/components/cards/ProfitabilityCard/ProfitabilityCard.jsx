@@ -45,22 +45,8 @@ const ProfitabilityCard = ({
         return () => observer.disconnect();
     }, [isLoading, stockData]);
 
-    if (!stockData) {
-        return (
-            <ExpandableCard
-                title="Profitability"
-                expanded={isOpen}
-                onToggle={onToggle}
-                onHide={onHide}
-                loading={isLoading}
-                className={className}
-            />
-        );
-    }
-
-
-    const { profitability, growth } = stockData;
-    if (!profitability || !growth) return null;
+    const { profitability, growth } = stockData || {};
+    const isETF = stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF';
 
     // Prepare data
     const prepareChartData = () => {
@@ -106,8 +92,8 @@ const ProfitabilityCard = ({
     };
 
     // Calculate Summary Data
-    const roe = profitability.roe * 100;
-    const roic = profitability.roic * 100;
+    const roe = (profitability?.roe || 0) * 100;
+    const roic = (profitability?.roic || 0) * 100;
 
     // Calculate Trends - REVENUE
     let revTrend = { icon: Minus, label: 'Stable', color: 'var(--text-secondary)', text: 'Stable' };
@@ -155,7 +141,7 @@ const ProfitabilityCard = ({
 
     // Calculate Trends - CCC
     let cccTrend = { icon: Minus, label: 'Stable', color: 'var(--text-secondary)' };
-    if (profitability.ccc_history && profitability.ccc_history.length >= 2) {
+    if (profitability?.ccc_history && profitability.ccc_history.length >= 2) {
         const last = profitability.ccc_history[profitability.ccc_history.length - 1].value;
         const prev = profitability.ccc_history[profitability.ccc_history.length - 2].value;
         if (last < prev) cccTrend = { icon: TrendingDown, label: 'Improving', color: 'var(--neu-success)' };
@@ -202,89 +188,91 @@ const ProfitabilityCard = ({
             collapsedWidth={220}
             collapsedHeight={220}
             loading={isLoading}
-            headerContent={header}
+            headerContent={stockData && (profitability && growth) ? header : null}
 
             className={className}
             menuItems={menuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
         >
-            <div ref={cardRef}>
-                {/* Internal title removed as it's now handled by ExpandableCard */}
+            {stockData && profitability && growth && (
+                <div ref={cardRef}>
+                    {/* Internal title removed as it's now handled by ExpandableCard */}
 
 
-                {(stockData.overview.quoteType !== 'ETF' && stockData.overview.industry !== 'ETF') ? (
-                    <div className={styles.allChartsContainer}>
-                        <MetricCard
-                            title="Return on Equity"
-                            value={profitability.roe}
-                            target="> 12% - 15%"
-                            variant="transparent"
-                            isOpen={true}
-                        />
+                    {!isETF ? (
+                        <div className={styles.allChartsContainer}>
+                            <MetricCard
+                                title="Return on Equity"
+                                value={profitability.roe}
+                                target="> 12% - 15%"
+                                variant="transparent"
+                                isOpen={true}
+                            />
 
-                        <MetricCard
-                            title="Return on Invested Capital"
-                            value={profitability.roic}
-                            target="> 12% - 15%"
-                            variant="transparent"
-                            isOpen={true}
-                        />
+                            <MetricCard
+                                title="Return on Invested Capital"
+                                value={profitability.roic}
+                                target="> 12% - 15%"
+                                variant="transparent"
+                                isOpen={true}
+                            />
 
-                        <div className={styles.chartContainer}>
-                            <h4 className={styles.subTitle}>Receivables vs Revenue</h4>
-                            {chartData.length > 0 ? (
-                                <div className={styles.chartWrapper} style={{ height: 'auto', minHeight: 'auto' }}>
-                                    {isInView && (
-                                        <VerticalBarChart
-                                            data={chartData}
-                                            series={[
-                                                { dataKey: 'revenue', name: 'Total Revenue', color: '#3B82F6' },
-                                                { dataKey: 'receivables', name: 'Accounts Receivable', color: '#EF4444' }
-                                            ]}
-                                            currencySymbol={currencySymbol}
-                                            valueFormatter={(val) => `${currencySymbol}${(val / 1e9).toFixed(0)}B`}
-                                            height={240}
-                                        />
-                                    )}
-                                </div>
-                            ) : (
-                                <div className={styles.noData}>No efficiency data available</div>
-                            )}
+                            <div className={styles.chartContainer}>
+                                <h4 className={styles.subTitle}>Receivables vs Revenue</h4>
+                                {chartData.length > 0 ? (
+                                    <div className={styles.chartWrapper} style={{ height: 'auto', minHeight: 'auto' }}>
+                                        {isInView && (
+                                            <VerticalBarChart
+                                                data={chartData}
+                                                series={[
+                                                    { dataKey: 'revenue', name: 'Total Revenue', color: '#3B82F6' },
+                                                    { dataKey: 'receivables', name: 'Accounts Receivable', color: '#EF4444' }
+                                                ]}
+                                                currencySymbol={currencySymbol}
+                                                valueFormatter={(val) => `${currencySymbol}${(val / 1e9).toFixed(0)}B`}
+                                                height={240}
+                                            />
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className={styles.noData}>No efficiency data available</div>
+                                )}
+                            </div>
+
+                            <div className={profitability.ccc_history && profitability.ccc_history.length > 0 ? styles.chartContainer : styles.chartContainerSmall}>
+                                <h4 className={styles.subTitle}>Cash Conversion Cycle</h4>
+                                {profitability.ccc_history && profitability.ccc_history.length > 0 ? (
+                                    <div className={styles.chartWrapper} style={{ height: 'auto', minHeight: 'auto' }}>
+                                        {isInView && (
+                                            <VerticalBarChart
+                                                data={[...profitability.ccc_history].reverse()}
+                                                series={[
+                                                    { dataKey: 'value', name: 'Cash Conversion Cycle', color: '#10B981' }
+                                                ]}
+                                                currencySymbol=""
+                                                valueFormatter={(val) => `${Number(val).toFixed(0)} Days`}
+                                                height={240}
+                                            />
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className={styles.noDataSmall}>
+                                        {profitability.ccc_not_applicable_reason ? (
+                                            <span>Not applicable: {profitability.ccc_not_applicable_reason}</span>
+                                        ) : (
+                                            "No CCC data available"
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-
-                        <div className={profitability.ccc_history && profitability.ccc_history.length > 0 ? styles.chartContainer : styles.chartContainerSmall}>
-                            <h4 className={styles.subTitle}>Cash Conversion Cycle</h4>
-                            {profitability.ccc_history && profitability.ccc_history.length > 0 ? (
-                                <div className={styles.chartWrapper} style={{ height: 'auto', minHeight: 'auto' }}>
-                                    {isInView && (
-                                        <VerticalBarChart
-                                            data={[...profitability.ccc_history].reverse()}
-                                            series={[
-                                                { dataKey: 'value', name: 'Cash Conversion Cycle', color: '#10B981' }
-                                            ]}
-                                            currencySymbol=""
-                                            valueFormatter={(val) => `${Number(val).toFixed(0)} Days`}
-                                            height={240}
-                                        />
-                                    )}
-                                </div>
-                            ) : (
-                                <div className={styles.noDataSmall}>
-                                    {profitability.ccc_not_applicable_reason ? (
-                                        <span>Not applicable: {profitability.ccc_not_applicable_reason}</span>
-                                    ) : (
-                                        "No CCC data available"
-                                    )}
-                                </div>
-                            )}
+                    ) : (
+                        <div className={styles.etfMessage}>
+                            This is an ETF and Profitability & Efficiency is not applicable.
                         </div>
-                    </div>
-                ) : (
-                    <div className={styles.etfMessage}>
-                        This is an ETF and Profitability & Efficiency is not applicable.
-                    </div>
-                )}
-            </div>
+                    )}
+                </div>
+            )}
         </ExpandableCard>
     );
 };

@@ -6,7 +6,7 @@ import './ButtonShared.css';
  * Button - Tuned 'Medium-Fast' Recovery.
  * Syncing the return physics with the search bar for a unified laboratory feel.
  */
-const Button = ({ children, onClick, className = '', ...props }) => {
+const Button = ({ children, onClick, className = '', noAnimation = false, ...props }) => {
     const [isPressed, setIsPressed] = useState(false);
     const pressTimerRef = useRef(null);
 
@@ -21,6 +21,26 @@ const Button = ({ children, onClick, className = '', ...props }) => {
             setIsPressed(false);
         }, 150); // Reduced delay for snappier feel
     };
+
+    if (noAnimation) {
+        return (
+            <button
+                type="button"
+                className={`neu-btn-base ${className} ${props.active || isPressed ? 'active' : ''}`}
+                onClick={onClick}
+                data-variant={props.variant}
+                {...props}
+                style={{
+                    ...props.style,
+                    transition: 'none' // Ensure no CSS transitions either
+                }}
+            >
+                <span className="neu-text-base" style={{ transition: 'none' }}>
+                    {children}
+                </span>
+            </button>
+        );
+    }
 
     return (
         <ButtonAnimator

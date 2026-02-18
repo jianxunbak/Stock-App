@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import Button from '../Button/Button';
 import { CardAnimator } from '../Animator';
@@ -19,90 +20,104 @@ const DropdownButton = ({
     contentStyle = {},
     buttonStyle = {},
     variant = 'outline',
+    usePortal = false,
+    disableBounce = false,
+    noAnimation = false,
     ...props
 }) => {
+    // ... existing hooks ...
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef(null);
     const triggerControls = useAnimation();
     const prevIsOpen = useRef(isOpen);
 
     useEffect(() => {
+        // ...
         const handleClickOutside = (event) => {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
+            // Check if click is inside container (trigger) OR inside menu (portal)
+            const isClickInMenu = menuRef.current && menuRef.current.contains(event.target);
+            const isClickInTrigger = containerRef.current && containerRef.current.contains(event.target);
+
+            if (!isClickInTrigger && !isClickInMenu) {
                 setIsOpen(false);
             }
         };
-
+        // ...
         if (isOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
-
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isOpen]);
 
+    // ... nudge logic ...
     const [nudgeOffset, setNudgeOffset] = useState({ x: 0, y: 0 });
     const [shouldFlip, setShouldFlip] = useState(false);
     const nudgeRef = useRef({ x: 0, y: 0 });
     const menuRef = useRef(null);
 
     useLayoutEffect(() => {
+        // Skip position calculation if using portal with fixed positioning (centered)
+        if (usePortal && contentStyle?.position === 'fixed') return;
+
         if (isOpen && menuRef.current && containerRef.current) {
+            // ... existing position update logic ...
             const updatePosition = () => {
                 if (!menuRef.current || !containerRef.current) return;
 
-                const rect = menuRef.current.getBoundingClientRect();
+                // Use offsetWidth/Height for the MENU specifically because it ignores 
+                // the CSS transforms (scaling) currently happening, giving us a stable size.
+                const menuW = menuRef.current.offsetWidth;
+                const menuH = menuRef.current.offsetHeight;
+
+                // We still use getBoundingClientRect for the trigger and viewport as they are stable.
                 const triggerRect = containerRef.current.getBoundingClientRect();
                 const viewportWidth = window.innerWidth;
                 const viewportHeight = window.innerHeight;
-                const padding = 24;
+                const padding = 48;
 
                 const currentNudge = nudgeRef.current;
 
-                // 1. Vertical Flip Decision (Based on trigger space, more stable)
-                const menuHeight = rect.height;
+                // 1. Vertical Flip Decision
                 const spaceBelow = viewportHeight - triggerRect.bottom;
                 const spaceAbove = triggerRect.top;
 
-                if (spaceBelow < (menuHeight + padding) && spaceAbove > spaceBelow) {
+                if (spaceBelow < (menuH + padding) && spaceAbove > spaceBelow) {
                     setShouldFlip(true);
                 } else {
                     setShouldFlip(false);
                 }
 
                 // 2. Nudge Calculation
-                // Important: Subtract the CURRENT nudge to find where it WOULDA been (the "Base" position)
-                const baseRect = {
-                    left: rect.left - currentNudge.x,
-                    right: rect.right - currentNudge.x,
-                    top: rect.top - currentNudge.y,
-                    bottom: rect.bottom - currentNudge.y
-                };
+                // Calculate where the menu WOULDS be without any nudge
+                const baseLeft = (align === 'right')
+                    ? triggerRect.right - menuW
+                    : triggerRect.left;
+
+                const baseTop = (shouldFlip)
+                    ? triggerRect.top - menuH - 12
+                    : triggerRect.bottom + 6;
 
                 let nx = 0;
-                if (baseRect.right > viewportWidth - padding) {
-                    nx = viewportWidth - padding - baseRect.right;
-                } else if (baseRect.left < padding) {
-                    nx = padding - baseRect.left;
+                if (baseLeft + menuW > viewportWidth - padding) {
+                    nx = viewportWidth - padding - (baseLeft + menuW);
+                } else if (baseLeft < padding) {
+                    nx = padding - baseLeft;
                 }
 
                 let ny = 0;
-                // Vertical nudge is tricky because flipping changes the baseRect.top/bottom.
-                // We calculate ny relative to the current painted position's overflow.
-                if (rect.bottom > viewportHeight - padding) {
-                    ny = (viewportHeight - padding - rect.bottom);
-                } else if (rect.top < padding) {
-                    ny = (padding - rect.top);
+                if (baseTop + menuH > viewportHeight - padding) {
+                    ny = viewportHeight - padding - (baseTop + menuH);
+                } else if (baseTop < padding) {
+                    ny = padding - baseTop;
                 }
 
-                // Add existing nudge to ny to make it absolute to base
-                const totalNy = currentNudge.y + ny;
-
                 // Only update if difference is meaningful to prevent "vibrating"
-                if (Math.abs(nx - currentNudge.x) > 2 || Math.abs(totalNy - currentNudge.y) > 2) {
-                    nudgeRef.current = { x: nx, y: totalNy };
-                    setNudgeOffset({ x: nx, y: totalNy });
+                // Increased threshold to 3px for better stability
+                if (Math.abs(nx - currentNudge.x) > 3 || Math.abs(ny - currentNudge.y) > 3) {
+                    nudgeRef.current = { x: nx, y: ny };
+                    setNudgeOffset({ x: nx, y: ny });
                 }
             };
 
@@ -113,19 +128,17 @@ const DropdownButton = ({
                 setTimeout(updatePosition, 300)
             ];
             return () => timers.forEach(t => clearTimeout(t));
-        } else if (!isOpen) {
-            setNudgeOffset({ x: 0, y: 0 });
-            setShouldFlip(false);
         }
-    }, [isOpen, shouldFlip]);
+    }, [isOpen, shouldFlip, usePortal, contentStyle?.position]); // Updated dependencies
 
+    // ... existing toggle logic ...
     useEffect(() => {
-        if (prevIsOpen.current && !isOpen) {
+        if (!noAnimation && !disableBounce && prevIsOpen.current && !isOpen) {
             // Bounce effect when closing
             triggerControls.start("bounce");
         }
         prevIsOpen.current = isOpen;
-    }, [isOpen, triggerControls]);
+    }, [isOpen, triggerControls, disableBounce, noAnimation]);
 
     const handleToggle = (e) => {
         if (e) e.stopPropagation();
@@ -162,6 +175,7 @@ const DropdownButton = ({
                 variant={variant}
                 onClick={handleToggle}
                 className={isOpen ? 'active' : ''}
+                noAnimation={noAnimation}
                 style={{
                     width: showLabel ? 'auto' : '36px',
                     minWidth: '36px',
@@ -190,14 +204,133 @@ const DropdownButton = ({
         );
     };
 
+    const isFixedCentered = usePortal && contentStyle?.position === 'fixed';
+
+    const getDropdownMenu = () => (
+        <motion.div
+            key="dropdown-menu-container"
+            ref={menuRef}
+            className="dropdown-menu-container"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
+            style={{
+                zIndex: usePortal ? 1000000 : 1000,
+                position: isFixedCentered ? 'fixed' : (usePortal ? 'absolute' : 'absolute'),
+                left: isFixedCentered ? '50%' : (align === 'right' ? 'auto' : 0),
+                right: isFixedCentered ? 'auto' : (align === 'right' ? 0 : 'auto'),
+                top: isFixedCentered ? '50%' : (shouldFlip ? 'auto' : '100%'),
+                bottom: isFixedCentered ? 'auto' : (shouldFlip ? 'calc(100% + 12px)' : 'auto'),
+                maxHeight: '400px', // Default max-height
+                transform: isFixedCentered
+                    ? `translate(-50%, -50%)`
+                    : `translate(${nudgeOffset.x}px, ${nudgeOffset.y}px)`,
+                ...contentStyle,
+                backgroundColor: 'transparent',
+                boxShadow: 'none',
+                border: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+            }}
+        >
+            <motion.div
+                className="dropdown-menu-animator"
+                initial={{
+                    scale: 0.95,
+                    y: isFixedCentered ? 10 : -10,
+                }}
+                animate={{
+                    scale: 1,
+                    y: 0,
+                }}
+                exit={{
+                    scale: 0.95,
+                    transition: { duration: 0.8, ease: "easeInOut" }
+                }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%',
+                    maxHeight: 'inherit'
+                }}
+            >
+                <CardAnimator
+                    type="fabricCard"
+                    active={isOpen}
+                    variant={variant === 'transparent' ? 'transparent' : 'default'}
+                    surfaceColor="var(--neu-bg)"
+                    distortionFactor={props.distortionFactor !== undefined ? props.distortionFactor : 0.5}
+                    contentDistortionScale={props.contentDistortionScale !== undefined ? props.contentDistortionScale : 0.72}
+                    disableHighlight={false}
+                    disableShadow={false}
+                    style={{
+                        padding: '0.25rem',
+                        maxHeight: 'inherit',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                >
+                    <div className="dropdown-items-container">
+                        {items.map((item, index) => {
+                            if (item.type === 'divider') {
+                                return <div key={index} className="dropdown-divider" />;
+                            }
+                            if (item.type === 'header') {
+                                return (
+                                    <div key={index} className="dropdown-header">
+                                        {item.label}
+                                    </div>
+                                );
+                            }
+                            return (
+                                <button
+                                    key={index}
+                                    className={`dropdown-item ${item.isActive ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`}
+                                    onClick={(e) => handleItemClick(e, item)}
+                                >
+                                    <div className="dropdown-item-content">
+                                        {item.icon ? (
+                                            <span style={{ marginRight: '8px', display: 'flex', alignItems: 'center', opacity: 0.7 }}>
+                                                {item.icon}
+                                            </span>
+                                        ) : item.indicatorNode ? (
+                                            item.indicatorNode
+                                        ) : item.indicatorColor ? (
+                                            <div
+                                                className="dropdown-dot"
+                                                style={{ backgroundColor: item.indicatorColor }}
+                                            />
+                                        ) : (
+                                            item.isActive ? (
+                                                <div
+                                                    className="dropdown-dot"
+                                                    style={{ backgroundColor: 'currentColor', opacity: 0.6 }}
+                                                />
+                                            ) : (
+                                                <div style={{ width: 6 }} />
+                                            )
+                                        )}
+                                        <span>{item.label}</span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </CardAnimator>
+            </motion.div>
+        </motion.div>
+    );
+
     return (
         <div className={`dropdown-wrapper ${className}`} ref={containerRef} {...props}>
             <motion.div
-                animate={triggerControls}
+                animate={noAnimation ? {} : triggerControls}
                 variants={{
                     bounce: {
-                        scaleX: [1, 1.1, 0.95, 1.05, 1],
-                        scaleY: [1, 0.95, 1.05, 0.98, 1],
+                        scaleX: [1, 1.04, 0.98, 1.02, 1],
+                        scaleY: [1, 0.98, 1.02, 0.99, 1],
                         transition: { duration: 0.4, ease: "easeInOut" }
                     }
                 }}
@@ -205,85 +338,16 @@ const DropdownButton = ({
                 {renderTrigger()}
             </motion.div>
 
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        ref={menuRef}
-                        className="dropdown-menu"
-                        initial={{ opacity: 0, y: -5, x: 0, scale: 0.95, filter: 'blur(4px)' }}
-                        animate={{
-                            opacity: 1,
-                            y: nudgeOffset.y,
-                            x: nudgeOffset.x,
-                            scale: 1,
-                            filter: 'blur(0px)'
-                        }}
-                        exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                        style={{
-                            [align === 'right' ? 'right' : 'left']: 0,
-                            [align === 'right' ? 'left' : 'right']: 'auto',
-                            top: shouldFlip ? 'auto' : '100%',
-                            bottom: shouldFlip ? 'calc(100% + 12px)' : 'auto',
-                            ...contentStyle
-                        }}
-                    >
-                        <CardAnimator
-                            type="fabricCard"
-                            active={isOpen}
-                            variant={variant === 'transparent' ? 'transparent' : 'default'}
-                            style={{ padding: '0.25rem' }}
-                        >
-                            <div className="dropdown-items-container">
-                                {items.map((item, index) => {
-                                    if (item.type === 'divider') {
-                                        return <div key={index} className="dropdown-divider" />;
-                                    }
-                                    if (item.type === 'header') {
-                                        return (
-                                            <div key={index} className="dropdown-header">
-                                                {item.label}
-                                            </div>
-                                        );
-                                    }
-                                    return (
-                                        <button
-                                            key={index}
-                                            className={`dropdown-item ${item.isActive ? 'active' : ''} ${item.disabled ? 'disabled' : ''}`}
-                                            onClick={(e) => handleItemClick(e, item)}
-                                        >
-                                            <div className="dropdown-item-content">
-                                                {item.icon ? (
-                                                    <span style={{ marginRight: '8px', display: 'flex', alignItems: 'center', opacity: 0.7 }}>
-                                                        {item.icon}
-                                                    </span>
-                                                ) : item.indicatorNode ? (
-                                                    item.indicatorNode
-                                                ) : item.indicatorColor ? (
-                                                    <div
-                                                        className="dropdown-dot"
-                                                        style={{ backgroundColor: item.indicatorColor }}
-                                                    />
-                                                ) : (
-                                                    item.isActive ? (
-                                                        <div
-                                                            className="dropdown-dot"
-                                                            style={{ backgroundColor: 'currentColor', opacity: 0.6 }}
-                                                        />
-                                                    ) : (
-                                                        <div style={{ width: 6 }} />
-                                                    )
-                                                )}
-                                                <span>{item.label}</span>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </CardAnimator>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {usePortal ? createPortal(
+                <AnimatePresence>
+                    {isOpen && getDropdownMenu()}
+                </AnimatePresence>,
+                document.body
+            ) : (
+                <AnimatePresence>
+                    {isOpen && getDropdownMenu()}
+                </AnimatePresence>
+            )}
         </div>
     );
 };

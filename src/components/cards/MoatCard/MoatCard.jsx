@@ -33,6 +33,7 @@ const MoatCard = ({
     const { theme } = useTheme();
 
     const { currentUser } = useAuth();
+    const isETF = stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF';
 
     // Lazy load charts
     const [isInView, setIsInView] = useState(false);
@@ -224,86 +225,25 @@ const MoatCard = ({
         }
     }, [moatStatus, isActuallyEvaluated, onMoatStatusChange]);
 
-    if (!stockData) {
-        return (
-            <ExpandableCard
-                title="Economic Moat"
-                expanded={isOpen}
-                onToggle={onToggle}
-                onHide={onHide}
-                loading={isLoading}
-                className={className}
-            />
-        );
-    }
-
-    const isETF = stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF';
-
     const header = (
         <div className="summary-info">
             <div className="summary-name">Economic Moat</div>
-            {isActuallyEvaluated ? (
-                <>
-                    <div className="summary-price" style={{ color: totalScore < 2 ? 'var(--neu-error)' : (totalScore <= 3 ? 'var(--neu-warning)' : 'var(--neu-success)') }}>
-                        {moatStatus.label}
-                    </div>
-                    <div className="summary-change" style={{ color: 'var(--neu-text-tertiary)' }}>
-                        {totalScore} / 5 Score
-                    </div>
-                </>
+            {isETF ? (
+                <div className="summary-price" style={{ color: 'var(--neu-text-tertiary)' }}>N/A</div>
             ) : (
                 <>
-                    <div className="summary-price" style={{ color: 'var(--neu-text-tertiary)' }}>
-                        {isEvaluating ? 'Evaluating...' : 'Pending'}
+                    <div className={`summary-price ${moatStatus.color}`}>
+                        {isActuallyEvaluated ? totalScore : '?'}/5
                     </div>
-                    <div className="summary-change" style={{ color: 'var(--neu-text-tertiary)' }}>
-                        Action Required
+                    <div className={`summary-change ${moatStatus.color}`}>
+                        {isActuallyEvaluated ? moatStatus.label : 'Not Evaluated'}
                     </div>
                 </>
             )}
         </div>
     );
 
-    const handleClearAnalysis = async () => {
-        if (!stockData?.overview?.symbol) return;
-
-        setScores({ brand: null, barriers: null, scale: null, network: null, switching: null });
-        setAiDescription('');
-        setHasEvaluated(false);
-        setEvaluator(null);
-
-        if (currentUser) {
-            try {
-                await deletePrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol);
-            } catch (err) {
-                console.error("Failed to clear private analysis:", err);
-            }
-        }
-    };
-
-    const handleClearNotes = async () => {
-        if (!stockData?.overview?.symbol) return;
-        setUserNote('');
-        if (currentUser) {
-            try {
-                const newEvaluator = currentUser.displayName || currentUser.email || 'User';
-                await savePrivateMoatAnalysis(currentUser.uid, stockData.overview.symbol, {
-                    scores,
-                    description: aiDescription,
-                    evaluator: newEvaluator,
-                    userNote: ''
-                });
-            } catch (err) {
-                console.error("Failed to clear notes in DB:", err);
-            }
-        }
-    };
-
-    const menuItems = [
-        { label: 'Re-evaluate AI', onClick: handleAiEvaluation, indicatorNode: <Sparkles size={14} /> },
-        { label: 'Clear Notes', onClick: handleClearNotes, indicatorNode: <Edit size={14} /> },
-        { label: 'Clear Analysis', onClick: handleClearAnalysis, indicatorNode: <Trash2 size={14} /> },
-    ];
+    const menuItems = [];
 
     return (
         <ExpandableCard
@@ -315,86 +255,88 @@ const MoatCard = ({
             collapsedWidth={220}
             collapsedHeight={220}
             loading={isLoading}
-            headerContent={header}
+            headerContent={stockData ? header : null}
             className={className}
             menuItems={menuItems}
             onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
         >
-            <div ref={cardRef}>
-                {/* Internal title removed as it's now handled by ExpandableCard */}
+            {stockData && (
+                <div ref={cardRef}>
+                    {/* Internal title removed as it's now handled by ExpandableCard */}
 
 
-                {isETF ? (
-                    <div className={styles.etfMessage}>This is an ETF and Economic Moat is not applicable.</div>
-                ) : (
-                    <div className={styles.topZone}>
-                        <div className={styles.scoreSection}>
-                            <div className={styles.scoreCard}>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%' }}>
-                                    {isEvaluating ? (
-                                        <div className={styles.evaluatingText}>
-                                            <Loader2 className={styles.spin} size={16} />
-                                            <span>AI Analyzing Moat...</span>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {hasEvaluated ? (
-                                                <div className={styles.score}>
-                                                    <div className={`${styles.scoreValue} ${moatStatus.color}`}>{totalScore} <span className={styles.scoreMax}>/ 5</span></div>
-                                                    <p className={`${styles.scoreStatus} ${moatStatus.color}`}>{moatStatus.label}</p>
-                                                    {evaluator && <p className={styles.evaluatorNote}>Evaluated by {evaluator}</p>}
-                                                </div>
-                                            ) : (
-                                                <div className={styles.emptyState}>
-                                                    <p>No analysis yet.</p>
-                                                    <p className={styles.promptText}>Click the AI button to evaluate with AI or rate the categories manually.</p>
-                                                </div>
-                                            )}
+                    {isETF ? (
+                        <div className={styles.etfMessage}>This is an ETF and Economic Moat is not applicable.</div>
+                    ) : (
+                        <div className={styles.topZone}>
+                            <div className={styles.scoreSection}>
+                                <div className={styles.scoreCard}>
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%' }}>
+                                        {isEvaluating ? (
+                                            <div className={styles.evaluatingText}>
+                                                <Loader2 className={styles.spin} size={16} />
+                                                <span>AI Analyzing Moat...</span>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {hasEvaluated ? (
+                                                    <div className={styles.score}>
+                                                        <div className={`${styles.scoreValue} ${moatStatus.color}`}>{totalScore} <span className={styles.scoreMax}>/ 5</span></div>
+                                                        <p className={`${styles.scoreStatus} ${moatStatus.color}`}>{moatStatus.label}</p>
+                                                        {evaluator && <p className={styles.evaluatorNote}>Evaluated by {evaluator}</p>}
+                                                    </div>
+                                                ) : (
+                                                    <div className={styles.emptyState}>
+                                                        <p>No analysis yet.</p>
+                                                        <p className={styles.promptText}>Click the AI button to evaluate with AI or rate the categories manually.</p>
+                                                    </div>
+                                                )}
 
-                                            {aiDescription && <p className={styles.description}>{aiDescription}</p>}
+                                                {aiDescription && <p className={styles.description}>{aiDescription}</p>}
 
-                                            <Button
-                                                variant="icon"
-                                                onClick={handleAiEvaluation}
-                                                style={{ position: 'absolute', top: '10px', right: '10px' }}
-                                                title={aiDescription ? "Re-evaluate with AI" : "Ask AI to Evaluate"}
-                                            >
-                                                <Sparkles size={18} />
-                                            </Button>
-                                        </>
-                                    )}
-                                </div>
-
-                                <textarea
-                                    className={styles.userNoteInput}
-                                    placeholder="Add your personal notes or assumptions here..."
-                                    value={userNote}
-                                    onChange={handleNoteChange}
-                                    onBlur={handleNoteBlur}
-                                    rows={3}
-                                />
-                            </div>
-                        </div>
-
-                        <div className={styles.checklistSection}>
-                            <h4 className={styles.checklistSubtitle}>Rate Moat Strength</h4>
-                            <div className={styles.checklistContainer}>
-                                {categories.map(cat => (
-                                    <div key={cat.id} className={styles.checklistItem}>
-                                        <label className={styles.checklistLabel}>{cat.label}</label>
-                                        <div className={styles.buttonGroup}>
-                                            <Button variant="icon" onClick={() => handleScoreChange(cat.id, 1)} className={scores[cat.id] === 1 ? 'active' : ''} title="High"><ArrowUp size={18} /></Button>
-                                            <Button variant="icon" onClick={() => handleScoreChange(cat.id, 0.5)} className={scores[cat.id] === 0.5 ? 'active' : ''} title="Low"><ArrowDown size={18} /></Button>
-                                            <Button variant="icon" onClick={() => handleScoreChange(cat.id, 0)} className={scores[cat.id] === 0 ? 'active' : ''} title="None"><X size={18} /></Button>
-                                        </div>
+                                                <Button
+                                                    variant="icon"
+                                                    onClick={handleAiEvaluation}
+                                                    style={{ position: 'absolute', top: '10px', right: '10px' }}
+                                                    title={aiDescription ? "Re-evaluate with AI" : "Ask AI to Evaluate"}
+                                                >
+                                                    <Sparkles size={18} />
+                                                </Button>
+                                            </>
+                                        )}
                                     </div>
-                                ))}
+
+                                    <textarea
+                                        className={styles.userNoteInput}
+                                        placeholder="Add your personal notes or assumptions here..."
+                                        value={userNote}
+                                        onChange={handleNoteChange}
+                                        onBlur={handleNoteBlur}
+                                        rows={3}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className={styles.checklistSection}>
+                                <h4 className={styles.checklistSubtitle}>Rate Moat Strength</h4>
+                                <div className={styles.checklistContainer}>
+                                    {categories.map(cat => (
+                                        <div key={cat.id} className={styles.checklistItem}>
+                                            <label className={styles.checklistLabel}>{cat.label}</label>
+                                            <div className={styles.buttonGroup}>
+                                                <Button variant="icon" onClick={() => handleScoreChange(cat.id, 1)} className={scores[cat.id] === 1 ? 'active' : ''} title="High"><ArrowUp size={18} /></Button>
+                                                <Button variant="icon" onClick={() => handleScoreChange(cat.id, 0.5)} className={scores[cat.id] === 0.5 ? 'active' : ''} title="Low"><ArrowDown size={18} /></Button>
+                                                <Button variant="icon" onClick={() => handleScoreChange(cat.id, 0)} className={scores[cat.id] === 0 ? 'active' : ''} title="None"><X size={18} /></Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-            <Modal isOpen={showErrorModal} onClose={() => setShowErrorModal(false)} title={errorTitle} message={error} />
+                    )}
+                </div>
+            )}
+            {stockData && <Modal isOpen={showErrorModal} onClose={() => setShowErrorModal(false)} title={errorTitle} message={error} />}
         </ExpandableCard>
     );
 };

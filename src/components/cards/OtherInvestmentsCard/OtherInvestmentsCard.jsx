@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { calculateOtherInvestmentProjection } from '../../../utils/otherInvestmentUtils';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
 import { Settings, Plus, Trash2, FolderPlus, ChevronDown, TrendingUp } from 'lucide-react';
 import Button from '../../ui/Button';
@@ -47,10 +48,8 @@ const normalizeInvestments = (data) => {
     };
 };
 
-// Iterative TWR calculation (assuming constant return between cash flows)
-const calculateTWR = (principal, payment, frequency, currentValue, startDate) => {
-    if (principal <= 0 && payment <= 0) return 0;
-
+// Simple ROI Calculation: (Current Value - Total Invested) / Total Invested
+const calculateSimpleROI = (principal, payment, frequency, currentValue, startDate) => {
     const start = new Date(startDate);
     const end = new Date();
 
@@ -60,58 +59,22 @@ const calculateTWR = (principal, payment, frequency, currentValue, startDate) =>
     const days = end.getDate() - start.getDate();
     months += days / 30;
 
-    if (months <= 0.1) {
-        // Simple ROI if less than 3 days
-        const totalIn = principal + payment;
-        return totalIn > 0 ? ((currentValue / totalIn) - 1) * 100 : 0;
-    }
+    if (months < 0) months = 0;
 
-    // Determine total payments and effective monthly contribution
-    let effectiveP = 0;
-    let totalP = 0;
+    let totalContribution = 0;
     if (frequency === 'Monthly') {
-        effectiveP = payment;
-        totalP = Math.floor(months) * payment;
+        totalContribution = Math.floor(months) * payment;
     } else if (frequency === 'Quarterly') {
-        effectiveP = payment / 3;
-        totalP = Math.floor(months / 3) * payment;
+        totalContribution = Math.floor(months / 3) * payment;
     } else if (frequency === 'Yearly') {
-        effectiveP = payment / 12;
-        totalP = Math.floor(months / 12) * payment;
+        totalContribution = Math.floor(months / 12) * payment;
     }
 
-    // Solve for r (monthly rate) using Newton-Raphson
-    // V = C0(1+r)^n + P * ((1+r)^n - 1) / r
-    const C0 = principal;
-    const P = effectiveP;
-    const n = months;
-    const V = currentValue;
+    const totalInvested = principal + totalContribution;
 
-    let r = (V - (C0 + totalP)) / (n * C0 + (n * (n - 1) / 2) * P);
-    if (isNaN(r) || !isFinite(r)) r = 0.01;
+    if (totalInvested <= 0) return 0;
 
-    for (let i = 0; i < 20; i++) {
-        const pow = Math.pow(1 + r, n);
-        const powMinus1 = pow - 1;
-
-        let f, df;
-        if (Math.abs(r) < 0.0001) {
-            // Linear approximation for very small r
-            f = C0 * (1 + n * r) + P * n * (1 + (n - 1) * r / 2) - V;
-            df = n * C0 + P * n * (n - 1) / 2;
-        } else {
-            f = C0 * pow + P * powMinus1 / r - V;
-            df = n * C0 * Math.pow(1 + r, n - 1) + P * (n * Math.pow(1 + r, n - 1) * r - powMinus1) / (r * r);
-        }
-
-        if (Math.abs(f) < 0.01) break;
-        if (Math.abs(df) < 0.0000001) break;
-        r = r - f / df;
-    }
-
-    // TWR is (1+r)^n - 1
-    const twrResult = (Math.pow(1 + r, n) - 1) * 100;
-    return isNaN(twrResult) ? 0 : twrResult;
+    return ((currentValue - totalInvested) / totalInvested) * 100;
 };
 
 const OtherInvestmentsCard = ({
@@ -127,7 +90,8 @@ const OtherInvestmentsCard = ({
     usdToDisplayRate = 1,
     settings = null,
     onUpdateSettings = null,
-    loading = false
+    loading = false,
+    onRefresh = null
 }) => {
     // const { settings, updateSettings, loading: settingsLoading } = useUserSettings(); // Removed
     const [structuredData, setStructuredData] = useState({ items: [], groups: [] });
@@ -137,9 +101,9 @@ const OtherInvestmentsCard = ({
     const [isInitialized, setIsInitialized] = useState(false);
 
     useEffect(() => {
-        if (settings?.otherInvestments && !isInitialized) {
+        if (settings && !isInitialized) {
             setStructuredData(normalizeInvestments(settings.otherInvestments));
-            if (settings.otherInvestments.projectionYears) {
+            if (settings.otherInvestments?.projectionYears) {
                 setProjectionYears(settings.otherInvestments.projectionYears);
             }
             setIsInitialized(true);
@@ -199,8 +163,22 @@ const OtherInvestmentsCard = ({
         const processItem = (item) => {
             const v = Number(item.value || 0);
             const p = Number(item.investedAmount || 0);
+            const pay = Number(item.paymentAmount || 0);
+
+            // Calculate total invested for this item including recurring payments
+            const start = new Date(item.startDate);
+            const end = new Date();
+            let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+            months += (end.getDate() - start.getDate()) / 30;
+            if (months < 0) months = 0;
+
+            let contributions = 0;
+            if (item.frequency === 'Monthly') contributions = Math.floor(months) * pay;
+            else if (item.frequency === 'Quarterly') contributions = Math.floor(months / 3) * pay;
+            else if (item.frequency === 'Yearly') contributions = Math.floor(months / 12) * pay;
+
             totalAssetValue += v;
-            totalInvestedValue += p;
+            totalInvestedValue += (p + contributions);
             totalMonthlyFlow += getItemMonthly(item);
         };
 
@@ -216,59 +194,12 @@ const OtherInvestmentsCard = ({
     }, [structuredData]);
 
     const chartData = useMemo(() => {
-        const allItems = [
-            ...structuredData.items,
-            ...structuredData.groups.flatMap(g => g.items || [])
-        ];
-
-        const data = [];
-        const startYear = new Date().getFullYear();
-        const currentAge = getAge(settings?.dateOfBirth);
-
-        for (let y = 0; y <= projectionYears; y++) {
-            const point = {
-                date: currentAge !== null ? `Age ${currentAge + y}` : `Year ${y}`,
-                year: startYear + y,
-                age: currentAge !== null ? currentAge + y : null
-            };
-            let totalVal = 0;
-            let totalInvested = 0;
-
-            allItems.forEach(item => {
-                const initialVal = Number(item.value || 0);
-                const payment = Number(item.paymentAmount || 0);
-                const growthRate = Number(item.projectedGrowth || 0) / 100;
-                const freq = item.frequency === 'Monthly' ? 12 :
-                    item.frequency === 'Quarterly' ? 4 :
-                        item.frequency === 'Yearly' ? 1 : 0;
-
-                const annualContribution = payment * freq;
-
-                // Total Invested Calculation (Principal + Contributions)
-                // Note: StocksCard logic: initial + (annual * year)
-                // This assumes contributions start immediately and happen for 'y' years essentially.
-                const itemInvested = initialVal + (annualContribution * y);
-                totalInvested += itemInvested;
-
-
-                // Value Calculation using FV Formula
-                // FV = P(1+r)^t + PMT * ((1+r)^t - 1)/r
-                let itemValue = 0;
-                if (growthRate === 0) {
-                    itemValue = initialVal + (annualContribution * y);
-                } else {
-                    const p_term = initialVal * Math.pow(1 + growthRate, y);
-                    const pmt_term = annualContribution * (Math.pow(1 + growthRate, y) - 1) / growthRate;
-                    itemValue = p_term + pmt_term;
-                }
-                totalVal += itemValue;
-            });
-
-            point.value = Math.round(totalVal);
-            point.invested = Math.round(totalInvested);
-            data.push(point);
-        }
-        return data;
+        return calculateOtherInvestmentProjection({
+            data: structuredData,
+            projectionYears,
+            currentAge: getAge(settings?.dateOfBirth),
+            startYear: new Date().getFullYear()
+        });
     }, [structuredData, projectionYears, settings?.dateOfBirth]);
 
     const chartSeries = [
@@ -409,38 +340,65 @@ const OtherInvestmentsCard = ({
     );
 
     const renderItemInput = (item, groupId = null) => {
-        const twr = calculateTWR(item.investedAmount, item.paymentAmount, item.frequency, item.value, item.startDate);
         return (
             <div key={item.id} className={styles.detailedItem}>
-                <div className={styles.detailedRow}>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Investment Name</label>
+                {/* ROW 1: Name & Delete */}
+                <div className={styles.nameSection}>
+                    <label className={styles.fieldLabel}>Investment Name</label>
+                    <input
+                        className={styles.input}
+                        value={item.name}
+                        onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value, groupId)}
+                        placeholder="e.g. Real Estate"
+                    />
+                </div>
+                <div className={styles.deleteAction}>
+                    <Button variant="icon" size="sm" onClick={() => handleRemoveItem(item.id, groupId)}>
+                        <Trash2 size={14} />
+                    </Button>
+                </div>
+
+                {/* ROW 2: Principal & Date */}
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Initial Principal ({baseCurrencySymbol})</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        className={styles.input}
+                        value={item.investedAmount}
+                        onChange={(e) => handleUpdateItem(item.id, 'investedAmount', e.target.value, groupId)}
+                    />
+                </div>
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Start Date</label>
+                    <CustomDatePicker
+                        value={item.startDate}
+                        onChange={(date) => handleUpdateItem(item.id, 'startDate', date, groupId)}
+                        triggerClassName={styles.input}
+                    />
+                </div>
+
+                {/* ROW 3: Amount & Freq */}
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Payment Amount ({baseCurrencySymbol})</label>
+                    <div className={styles.valueWrapper}>
                         <input
+                            type="number"
+                            step="0.01"
                             className={styles.input}
-                            value={item.name}
-                            onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value, groupId)}
-                            placeholder="e.g. Real Estate"
+                            value={item.paymentAmount}
+                            onChange={(e) => handleUpdateItem(item.id, 'paymentAmount', e.target.value, groupId)}
                         />
+                        {item.frequency !== 'Monthly' && item.frequency !== 'One-time' && (
+                            <span className={styles.monthlyExtrapolation}>
+                                ≈ {baseCurrencySymbol}{Math.round(getItemMonthly(item)).toLocaleString()}/mo
+                            </span>
+                        )}
                     </div>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Payment Amount ({baseCurrencySymbol})</label>
-                        <div className={styles.valueWrapper}>
-                            <input
-                                type="number"
-                                step="0.01"
-                                className={styles.input}
-                                value={item.paymentAmount}
-                                onChange={(e) => handleUpdateItem(item.id, 'paymentAmount', e.target.value, groupId)}
-                            />
-                            {item.frequency !== 'Monthly' && item.frequency !== 'One-time' && (
-                                <span className={styles.monthlyExtrapolation}>
-                                    ≈ {baseCurrencySymbol}{Math.round(getItemMonthly(item)).toLocaleString()}/mo
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Payment Freq.</label>
+                </div>
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Payment Freq.</label>
+                    <div className={styles.inputFreq}>
                         <DropdownButton
                             label={item.frequency}
                             variant="ghost"
@@ -456,51 +414,29 @@ const OtherInvestmentsCard = ({
                             ]}
                         />
                     </div>
-                    <Button variant="icon" size="sm" onClick={() => handleRemoveItem(item.id, groupId)}>
-                        <Trash2 size={14} />
-                    </Button>
                 </div>
 
-                <div className={styles.detailedSubRow}>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Initial Principal ({baseCurrencySymbol})</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            className={styles.input}
-                            value={item.investedAmount}
-                            onChange={(e) => handleUpdateItem(item.id, 'investedAmount', e.target.value, groupId)}
-                        />
-                    </div>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Current Value ({baseCurrencySymbol})</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            className={styles.input}
-                            value={item.value}
-                            onChange={(e) => handleUpdateItem(item.id, 'value', e.target.value, groupId)}
-                        />
-                    </div>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Start Date</label>
-                        <CustomDatePicker
-                            value={item.startDate}
-                            onChange={(date) => handleUpdateItem(item.id, 'startDate', date, groupId)}
-                            triggerClassName={styles.input}
-                        />
-                    </div>
-                    <div className={styles.fieldGroup}>
-                        <label className={styles.fieldLabel}>Proj. Growth %</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            className={styles.input}
-                            value={item.projectedGrowth}
-                            onChange={(e) => handleUpdateItem(item.id, 'projectedGrowth', e.target.value, groupId)}
-                            placeholder="Annual %"
-                        />
-                    </div>
+                {/* ROW 4: Value & Growth */}
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Current Value ({baseCurrencySymbol})</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        className={styles.input}
+                        value={item.value}
+                        onChange={(e) => handleUpdateItem(item.id, 'value', e.target.value, groupId)}
+                    />
+                </div>
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Growth %</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        className={styles.input}
+                        value={item.projectedGrowth}
+                        onChange={(e) => handleUpdateItem(item.id, 'projectedGrowth', e.target.value, groupId)}
+                        placeholder="Annual %"
+                    />
                 </div>
             </div>
         );
@@ -521,6 +457,7 @@ const OtherInvestmentsCard = ({
             expanded={isOpen}
             onToggle={onToggle}
             onHide={onHide}
+            onRefresh={onRefresh}
             collapsedWidth={220}
             collapsedHeight={220}
             headerContent={header}
@@ -587,7 +524,7 @@ const OtherInvestmentsCard = ({
                                     </div>
                                     <div className={styles.cardGroupItems}>
                                         {group.items.map(item => {
-                                            const twr = calculateTWR(item.investedAmount, item.paymentAmount, item.frequency, item.value, item.startDate);
+                                            const roi = calculateSimpleROI(item.investedAmount, item.paymentAmount, item.frequency, item.value, item.startDate);
                                             return (
                                                 <div key={item.id} className={styles.metricRow}>
                                                     <div className={styles.metricLabelGroup}>
@@ -600,11 +537,11 @@ const OtherInvestmentsCard = ({
                                                         <span className={styles.metricValue}>{formatCurrency(item.value)}</span>
                                                         <span style={{
                                                             fontSize: '0.65rem',
-                                                            color: twr >= 0 ? 'var(--neu-success)' : 'var(--neu-danger)',
+                                                            color: roi >= 0 ? 'var(--neu-success)' : 'var(--neu-danger)',
                                                             fontWeight: 700,
                                                             opacity: 0.9
                                                         }}>
-                                                            {twr >= 0 ? '+' : ''}{twr.toFixed(2)}%
+                                                            {roi >= 0 ? '+' : ''}{roi.toFixed(2)}%
                                                         </span>
                                                     </div>
                                                 </div>
@@ -614,7 +551,7 @@ const OtherInvestmentsCard = ({
                                 </div>
                             ))}
                             {structuredData.items.map(item => {
-                                const twr = calculateTWR(item.investedAmount, item.paymentAmount, item.frequency, item.value, item.startDate);
+                                const roi = calculateSimpleROI(item.investedAmount, item.paymentAmount, item.frequency, item.value, item.startDate);
                                 return (
                                     <div key={item.id} className={styles.metricRow}>
                                         <div className={styles.metricLabelGroup}>
@@ -627,11 +564,11 @@ const OtherInvestmentsCard = ({
                                             <span className={styles.metricValue}>{formatCurrency(item.value)}</span>
                                             <span style={{
                                                 fontSize: '0.65rem',
-                                                color: twr >= 0 ? 'var(--neu-success)' : 'var(--neu-danger)',
+                                                color: roi >= 0 ? 'var(--neu-success)' : 'var(--neu-danger)',
                                                 fontWeight: 700,
                                                 opacity: 0.9
                                             }}>
-                                                {twr >= 0 ? '+' : ''}{twr.toFixed(1)}%
+                                                {roi >= 0 ? '+' : ''}{roi.toFixed(1)}%
                                             </span>
                                         </div>
                                     </div>
