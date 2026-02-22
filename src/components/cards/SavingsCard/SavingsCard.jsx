@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 import BaseChart from '../../ui/BaseChart/BaseChart';
 import DropdownButton from '../../ui/DropdownButton/DropdownButton';
 import SavingsEditorWindow from '../../ui/SavingsEditorWindow/SavingsEditorWindow';
-import { Settings, TrendingUp, PieChart as PieChartIcon, ChevronDown, Layers } from 'lucide-react';
+import { Settings, TrendingUp, PieChart as PieChartIcon, ChevronDown, Layers, Wallet, CheckCircle, ArrowUpRight, MinusCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import styles from './SavingsCard.module.css';
 import { formatLastUpdated } from '../../../utils/dateUtils';
@@ -58,7 +59,9 @@ const SavingsCard = ({
     settings = null,
     onUpdateSettings = null,
     loading = false,
-    onRefresh = null
+    onRefresh = null,
+    sgdToDisplayRate = 1,
+    inflationRate = 0
 }) => {
     const [scenarios, setScenarios] = useState([
         {
@@ -124,12 +127,23 @@ const SavingsCard = ({
     }, [scenarios, nextScenarioId, activeScenarioId, projectionYears, cardName, loading, onUpdateSettings, settings?.savings, isInitialized]);
 
     // Helpers
+    const getDerivedMonthlyPay = (scenario) => {
+        if (!scenario.isManualPay && settings?.cpf?.monthlySalary) {
+            // Normalized to Base Currency: SGD_Value * (SGD->Display / Base->Display)
+            // Weighting: (sgdToDisplayRate / baseToDisplayRate)
+            const sgdToBase = baseToDisplayRate !== 0 ? sgdToDisplayRate / baseToDisplayRate : 1;
+            return Number(settings.cpf.monthlySalary) * sgdToBase;
+        }
+        return Number(scenario.monthlyPay || 0);
+    };
+
     const calculateMetrics = (scenario) => {
         let totalExpenses = 0;
-        const monthlyPay = Number(scenario.monthlyPay || 0);
+        const monthlyPay = getDerivedMonthlyPay(scenario);
 
         const isStructured = scenario.expenses && typeof scenario.expenses === 'object' &&
             ('items' in scenario.expenses || 'groups' in scenario.expenses || 'linked' in scenario.expenses);
+
 
         if (isStructured) {
             const { items = [], groups = [], linked = [] } = scenario.expenses;
@@ -206,9 +220,12 @@ const SavingsCard = ({
 
                     const interestRate = Number(s.bankInterestRate || 0) / 100;
 
-                    // Annual compounding: (Balance * Interest) + Annual Savings
+                    // Annual compounding: (Balance * Interest) + Annual Savings (Nominal)
                     balances[s.id] = (balances[s.id] * (1 + interestRate)) + annualSavings;
-                    point[`savings_${s.id}`] = Math.round(balances[s.id]);
+
+                    // Apply inflation to get Real Value
+                    const discount = 1 / Math.pow(1 + (inflationRate / 100), year);
+                    point[`savings_${s.id}`] = Math.round(balances[s.id] * discount);
                 }
             });
             data.push(point);
@@ -260,12 +277,18 @@ const SavingsCard = ({
             });
         }
 
+        const monthlyPay = getDerivedMonthlyPay(activeScenario);
+
         return [
             ...flattenedExpenses,
             { name: 'CPF', value: activeMetrics.cpf, type: 'cpf' },
             { name: 'Savings', value: Math.max(0, activeMetrics.monthlySavings), type: 'savings' }
-        ].filter(item => item.value > 0);
-    }, [activeScenario, activeMetrics]);
+        ].filter(item => item.value > 0).map(item => ({
+            ...item,
+            percent: monthlyPay > 0 ? (item.value / monthlyPay) * 100 : 0
+        }));
+    }, [activeScenario, activeMetrics, settings?.cpf?.monthlySalary]);
+
 
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('en-US', {
@@ -273,8 +296,9 @@ const SavingsCard = ({
             currency: displayCurrency,
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
-        }).format(value * baseToDisplayRate);
+        }).format(value * baseToDisplayRate).replace('SGD', 'S$');
     };
+
 
     const formatBaseCurrency = (value) => {
         return new Intl.NumberFormat('en-US', {
@@ -282,75 +306,35 @@ const SavingsCard = ({
             currency: baseCurrency,
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
-        }).format(value);
+        }).format(value).replace('SGD', 'S$');
     };
+
 
     const savingsRate = ((activeMetrics.monthlySavings / (Number(activeScenario.monthlyPay) || 1)) * 100).toFixed(2);
 
     const header = (
-        <div className="summary-info" style={{ padding: 0 }}>
-            <div className="summary-name">Savings</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
-                Last updated: {formatLastUpdated(settings?.savings?.updatedAt)}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '0.5rem' }}>
-                <div style={{ position: 'relative', width: '100px', height: '100px', flexShrink: 0 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={donutData}
-                                innerRadius={32}
-                                outerRadius={48}
-                                paddingAngle={3}
-                                dataKey="value"
-                                stroke="none"
-                                isAnimationActive={false}
-                            >
-                                {donutData.map((entry, index) => {
-                                    let color;
-                                    if (entry.type === 'savings') color = 'var(--neu-success)';
-                                    else if (entry.type === 'cpf') color = 'var(--neu-color-favorite)';
-                                    else color = EXPENSE_COLORS[index % EXPENSE_COLORS.length];
-                                    return <Cell key={`cell-header-${index}`} fill={color} />;
-                                })}
-                            </Pie>
-                        </PieChart>
-                    </ResponsiveContainer>
-                    <div style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none'
-                    }}>
-                        <div style={{
-                            fontSize: '1.2rem',
-                            fontWeight: 800,
-                            color: 'var(--text-primary)',
-                            lineHeight: 1
-                        }}>
-                            {savingsRate}%
-                        </div>
-                        <div style={{
-                            fontSize: '0.6rem',
-                            fontWeight: 600,
-                            color: 'var(--text-secondary)',
-                            textTransform: 'uppercase',
-                            marginTop: '2px',
-                            letterSpacing: '0.05em'
-                        }}>
-                            Savings
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={[
+                {
+                    label: 'Monthly Savings',
+                    value: formatCurrency(activeMetrics.monthlySavings),
+                    color: 'var(--neu-success)'
+                },
+                {
+                    label: 'Savings Rate',
+                    value: `${savingsRate}%`,
+                    color: Number(savingsRate) > 20 ? 'var(--neu-success)' : 'var(--neu-warning)'
+                }
+            ]}
+            gridMetrics={donutData.filter(d => d.type !== 'savings').slice(0, 6).map((d, i) => ({
+                label: `${d.name}: ${formatCurrency(d.value)}`,
+                icon: d.type === 'cpf' ? <Layers size={14} /> : <MinusCircle size={14} />,
+                color: d.type === 'cpf' ? 'var(--neu-color-favorite)' : EXPENSE_COLORS[i % EXPENSE_COLORS.length]
+            }))}
+        />
     );
+
+
 
     const CustomTooltip = ({ active, payload }) => {
         if (active && payload && payload.length) {
@@ -438,10 +422,46 @@ const SavingsCard = ({
     };
 
     const updateScenario = (id, field, value) => {
-        setScenarios(scenarios.map(s =>
-            s.id === id ? { ...s, [field]: value } : s
-        ));
+        setScenarios(scenarios.map(s => {
+            if (s.id !== id) return s;
+
+            // Support multi-field updates
+            if (typeof field === 'object' && field !== null) {
+                return { ...s, ...field };
+            }
+
+            // Otherwise single field update
+            const updates = { [field]: value };
+            // If manually editing monthlyPay, set isManualPay to true
+            if (field === 'monthlyPay') {
+                updates.isManualPay = true;
+            }
+            return { ...s, ...updates };
+        }));
     };
+
+    // Auto-update monthlyPay for scenarios linked to CPF Salary
+    useEffect(() => {
+        if (!isInitialized || !settings?.cpf?.monthlySalary) return;
+
+        setScenarios(prevScenarios => {
+            let changed = false;
+            const newScenarios = prevScenarios.map(s => {
+                if (s.isManualPay) return s;
+
+                const sgdToBase = baseToDisplayRate !== 0 ? sgdToDisplayRate / baseToDisplayRate : 1;
+                const newPay = Number(settings.cpf.monthlySalary) * sgdToBase;
+
+                if (Math.round(newPay) !== Math.round(Number(s.monthlyPay))) {
+                    changed = true;
+                    return { ...s, monthlyPay: newPay };
+                }
+                return s;
+            });
+
+            return changed ? newScenarios : prevScenarios;
+        });
+    }, [settings?.cpf?.monthlySalary, baseToDisplayRate, sgdToDisplayRate, isInitialized]);
 
     const updateExpenses = (scenarioId, expenses) => {
         setScenarios(scenarios.map(s =>
@@ -453,13 +473,12 @@ const SavingsCard = ({
         <>
             <ExpandableCard
                 title="Savings and Expenses"
-                subtitle={`Last updated: ${formatLastUpdated(settings?.savings?.updatedAt)}`}
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
                 onRefresh={onRefresh}
                 collapsedWidth={220}
-                collapsedHeight={220}
+                collapsedHeight={198}
                 headerContent={header}
                 // Only block if we have NO data. Otherwise show stale data.
                 loading={!settings && loading}
@@ -494,7 +513,10 @@ const SavingsCard = ({
                         <div className={styles.chartSection}>
                             <div className={styles.sectionHeader}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <h4 className={styles.sectionTitle}>Projected Savings ({baseCurrency})</h4>
+                                    <h4 className={styles.sectionTitle}>
+                                        Projected Savings ({baseCurrency})
+                                        {inflationRate > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--neu-brand)', fontWeight: 500 }}> (Real Value)</span>}
+                                    </h4>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
@@ -588,11 +610,17 @@ const SavingsCard = ({
                                     else if (entry.type === 'cpf') color = 'var(--neu-color-favorite)';
                                     else color = EXPENSE_COLORS[index % EXPENSE_COLORS.length];
                                     return (
-                                        <div key={entry.name} className={styles.legendItem}>
+                                        <div key={`${entry.name}-${index}`} className={styles.legendItem}>
                                             <div className={styles.legendDot} style={{ backgroundColor: color }} />
                                             <span className={styles.legendName}>{entry.name}</span>
-                                            <span className={styles.legendValue}>{((entry.value / activeScenario.monthlyPay) * 100).toFixed(2)}%</span>
+                                            <div className={styles.legendValueGroup}>
+                                                <span className={styles.legendValue}>{formatCurrency(entry.value)}</span>
+                                                <span className={styles.legendPercent}>({entry.percent.toFixed(1)}%)</span>
+                                            </div>
                                         </div>
+
+
+
                                     );
                                 })}
                             </div>
@@ -611,11 +639,16 @@ const SavingsCard = ({
                 stocksCharts={settings?.stocks?.charts || []}
                 baseCurrency={baseCurrency}
                 baseCurrencySymbol={baseCurrencySymbol}
+                displayCurrency={displayCurrency}
+                displayCurrencySymbol={displayCurrencySymbol}
+                baseToDisplayRate={baseToDisplayRate}
+                sgdToDisplayRate={sgdToDisplayRate}
                 onAddScenario={addScenario}
                 onRemoveScenario={removeScenario}
                 onUpdateScenario={updateScenario}
                 onUpdateExpenses={updateExpenses}
             />
+
         </>
     );
 };

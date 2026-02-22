@@ -5,6 +5,7 @@ import MetricCard from '../../ui/MetricCard/MetricCard';
 import { useStockData } from '../../../hooks/useStockData';
 import styles from './DebtCard.module.css';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 
 const DebtCard = ({
     currency = 'USD',
@@ -15,7 +16,8 @@ const DebtCard = ({
     onHide = null,
     className = "",
     variant = 'default',
-    loading: parentLoading = false
+    loading: parentLoading = false,
+    collapsedHeight = 250
 }) => {
     const { stockData, loading: stockLoading, loadStockData } = useStockData();
     const isLoading = parentLoading || stockLoading;
@@ -23,28 +25,18 @@ const DebtCard = ({
     const { debt } = stockData || {};
     const isETF = stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF';
 
-    const d2eColor = debt?.debtToEbitda != null && debt.debtToEbitda < 3 ? 'var(--neu-success)' : 'var(--neu-warning)';
-    const dsrColor = debt?.debtServicingRatio != null && debt.debtServicingRatio < 30 ? 'var(--neu-success)' : 'var(--neu-warning)';
+    const d2eColor = debt?.debtToEbitda != null && debt.debtToEbitda < 3 ? 'var(--neu-success)' : 'var(--neu-error)';
+    const dsrColor = debt?.debtServicingRatio != null && debt.debtServicingRatio < 30 ? 'var(--neu-success)' : '#facc15';
     const crColor = (debt?.currentRatio || 0) > 1.5 ? 'var(--neu-success)' : 'var(--neu-error)';
 
     const header = (
-        <div className="summary-info">
-            <div className="summary-name">Conservative Debt</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: '0.25rem', columnGap: '1rem', width: '100%', fontSize: '0.8rem', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Debt/EBITDA</span>
-                <span style={{ color: d2eColor, fontWeight: 600, textAlign: 'right' }}>
-                    {debt?.debtToEbitda != null ? `${debt.debtToEbitda.toFixed(1)}x` : 'N/A'}
-                </span>
-                <span style={{ color: 'var(--text-secondary)' }}>Debt Svc</span>
-                <span style={{ color: dsrColor, fontWeight: 600, textAlign: 'right' }}>
-                    {debt?.debtServicingRatio != null ? `${debt.debtServicingRatio.toFixed(1)}%` : 'N/A'}
-                </span>
-                <span style={{ color: 'var(--text-secondary)' }}>Curr Ratio</span>
-                <span style={{ color: crColor, fontWeight: 600, textAlign: 'right' }}>
-                    {debt?.currentRatio != null ? debt.currentRatio.toFixed(2) : 'N/A'}
-                </span>
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={[
+                { label: 'Debt/EBITDA', value: debt?.debtToEbitda != null ? debt.debtToEbitda.toFixed(1) : 'N/A', suffix: 'x', color: d2eColor },
+                { label: 'Debt Svc', value: debt?.debtServicingRatio != null ? debt.debtServicingRatio.toFixed(1) : 'N/A', suffix: '%', color: dsrColor },
+                { label: 'Curr Ratio', value: debt?.currentRatio != null ? debt.currentRatio.toFixed(2) : 'N/A', color: crColor }
+            ]}
+        />
     );
 
     const menuItems = [];
@@ -56,7 +48,7 @@ const DebtCard = ({
             onToggle={onToggle}
             onHide={onHide}
             collapsedWidth={220}
-            collapsedHeight={220}
+            collapsedHeight={collapsedHeight}
             loading={isLoading}
             headerContent={stockData && debt ? header : null}
 

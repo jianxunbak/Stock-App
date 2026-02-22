@@ -5,10 +5,14 @@
 
 // --- CPF 2026+ Base Logic Helpers ---
 const YEAR_CONFIGS = {
+    2024: { owCeiling: 6300, annualLimit: 102000 },
+    2025: { owCeiling: 7000, annualLimit: 102000 },
     2026: { owCeiling: 8000, annualLimit: 102000 },
 };
 
 const getYearlyConfig = (year) => {
+    if (year <= 2024) return YEAR_CONFIGS[2024];
+    if (year === 2025) return YEAR_CONFIGS[2025];
     return YEAR_CONFIGS[2026];
 };
 
@@ -54,12 +58,33 @@ export const calculateCPFProjection = ({
     annualBonus = 12000,
     salaryGrowth = 0,
     projectionYears = 30,
-    balances = { oa: 0, sa: 0, ma: 0, ra: 0 }
+    balances = { oa: 0, sa: 0, ma: 0, ra: 0 },
+    cpfisData = { items: [], groups: [] }
 }) => {
-    const startYear = 2026;
+    const today = new Date();
+    const startYear = today.getFullYear();
+    const startMonthIndex = today.getMonth();
     const birthMonthIndex = dateOfBirth ? new Date(dateOfBirth).getMonth() : 0;
 
     let at55Snapshot = { withdrawable: 0, ra: 0, target: 0, ageReached: false };
+
+    // Normalize CPFIS Items
+    const cpisItems = [
+        ...(cpfisData.items || []),
+        ...(cpfisData.groups || []).flatMap(g => g.items || [])
+    ].map(item => ({
+        ...item,
+        currentValue: Number(item.value || 0),
+        investedAmount: Number(item.investedAmount || item.value || 0),
+        growthRate: Number(item.projectedGrowth || 0) / 100,
+        monthlyPayment: (() => {
+            const pay = Number(item.paymentAmount || 0);
+            if (item.frequency === 'Yearly') return pay / 12;
+            if (item.frequency === 'Quarterly') return pay / 3;
+            if (item.frequency === 'Monthly') return pay;
+            return 0;
+        })()
+    }));
 
     // Normalize balances
     let bal = {
@@ -74,6 +99,8 @@ export const calculateCPFProjection = ({
     let projection = [];
     let yearlyInterest = { total: 0, breakdown: { oa: 0, sa: 0, ma: 0, ra: 0 } };
 
+    const initialCpfisTotal = cpisItems.reduce((sum, item) => sum + item.currentValue, 0);
+
     // Initial State (Year 0 / Start)
     projection.push({
         year: startYear,
@@ -81,21 +108,25 @@ export const calculateCPFProjection = ({
         oa: bal.oa,
         sa_ra: bal.sa + bal.ra,
         ma: bal.ma,
-        total: currentTotal
+        cpfis: initialCpfisTotal,
+        total: bal.oa + bal.sa + bal.ma + bal.ra + initialCpfisTotal
     });
 
     const maxYears = Math.min(Number(projectionYears), 100 - currentAge);
 
     // Simulation Loop
     for (let y = 0; y < maxYears; y++) {
-        const year = startYear + y + 1;
+        const year = startYear + y;
         const config = getYearlyConfig(year);
         const annualWageCeiling = config.annualLimit || 102000;
 
         let pendingInterest = { oa: 0, sa: 0, ma: 0, ra: 0 };
         let totalWagesYearToDate = 0;
 
-        for (let m = 0; m < 12; m++) {
+        // For the first year, start from the current month
+        const monthStart = y === 0 ? startMonthIndex : 0;
+
+        for (let m = monthStart; m < 12; m++) {
             const isPostBday = m > birthMonthIndex;
             const lookupAge = isPostBday ? currentAge + 1 : currentAge;
 
@@ -108,6 +139,23 @@ export const calculateCPFProjection = ({
             const currentAnnualBonus = Number(annualBonus || 0) * growthFactor;
 
             const sNum = currentMonthlySalary;
+
+            // --- CPFIS Growth & Contributions ---
+            let monthlyCpfisInvestment = 0;
+            cpisItems.forEach(item => {
+                // Growth
+                const monthlyGrowth = Math.pow(1 + item.growthRate, 1 / 12) - 1;
+                item.currentValue *= (1 + monthlyGrowth);
+
+                // Contribution (only if enough OA)
+                if (item.monthlyPayment > 0) {
+                    const toInvest = Math.min(bal.oa, item.monthlyPayment);
+                    bal.oa -= toInvest;
+                    item.currentValue += toInvest;
+                    item.investedAmount += toInvest;
+                    monthlyCpfisInvestment += toInvest;
+                }
+            });
 
             // Rule 1: Monthly Wage Ceiling (OW)
             const ow = Math.min(sNum, config.owCeiling);
@@ -124,7 +172,56 @@ export const calculateCPFProjection = ({
 
             totalWagesYearToDate += actualSubject;
 
-            // Step 3: Direct Percentage Calculation
+            // --- Step 4: Interest Calculation (Before Monthly Contribution) ---
+            // CPF Rule: Interest is based on the opening balance of the month.
+            // In our logic, bal.oa already had CPFIS investments deducted, so it's the "cash" part.
+            pendingInterest.oa += bal.oa * (0.025 / 12);
+            pendingInterest.sa += bal.sa * (0.04 / 12);
+            pendingInterest.ma += bal.ma * (0.04 / 12);
+            pendingInterest.ra += bal.ra * (0.04 / 12);
+
+            // Step 4b: Extra Interest Hierarchy (Before Contribution)
+            // Rule: First $60k combined (up to $20k from OA) gets +1%.
+            // Age 55+: First $30k combined gets an additional +1% (Total +2% on first $30k).
+            let extra1_60k = 60000;
+            let extra1_30k = (lookupAge >= 55) ? 30000 : 0;
+
+            const calculateExtraOnAccount = (accountName, balance) => {
+                const effectiveBalance = accountName === 'oa' ? Math.min(balance, 20000) : balance;
+
+                // Tier 1: Additional 1% for 55+ on first $30k
+                let tier1Qualify = 0;
+                if (extra1_30k > 0) {
+                    tier1Qualify = Math.min(effectiveBalance, extra1_30k);
+                    extra1_30k -= tier1Qualify;
+                }
+
+                // Tier 2: Standard 1% on first $60k
+                const remainingForTier2 = Math.min(effectiveBalance, extra1_60k);
+                const tier2Qualify = Math.min(remainingForTier2, extra1_60k);
+                extra1_60k -= tier2Qualify;
+
+                return (tier1Qualify * (0.01 / 12)) + (tier2Qualify * (0.01 / 12));
+            };
+
+            // Order of priority: RA > MA > SA > OA
+            if (lookupAge >= 55) {
+                pendingInterest.ra += calculateExtraOnAccount('ra', bal.ra);
+            }
+            pendingInterest.ma += calculateExtraOnAccount('ma', bal.ma);
+            if (lookupAge < 55) {
+                pendingInterest.sa += calculateExtraOnAccount('sa', bal.sa);
+            }
+
+            // Extra interest earned on OA goes to SA (or RA if 55+)
+            const extraFromOA = calculateExtraOnAccount('oa', bal.oa);
+            if (lookupAge < 55) {
+                pendingInterest.sa += extraFromOA;
+            } else {
+                pendingInterest.ra += extraFromOA;
+            }
+
+            // --- Step 5: Add Contributions ---
             const contribOA = actualSubject * rates.oa;
             const contribSA = actualSubject * rates.sa;
             const contribMA = actualSubject * rates.ma;
@@ -133,9 +230,14 @@ export const calculateCPFProjection = ({
             bal.sa += contribSA;
             bal.ma += contribMA;
 
-            // --- Step 5: MediSave Overflow Check (Monthly) ---
-            const currentBHS = 79000 * Math.pow(1.03, year - 2026);
-            const currentFRS = 213000 * Math.pow(1.03, year - 2026);
+            // --- Step 6: MediSave Overflow Check (Monthly) ---
+            // Current BHS (2024 is $71.5k, extrapolating to startYear with 3% growth)
+            const baseBHS = 71500 * Math.pow(1.03, startYear - 2024);
+            const currentBHS = baseBHS * Math.pow(1.03, y);
+
+            // Current FRS (2025 is $213k, extrapolating with 3.5% growth)
+            const baseFRS = 213000 * Math.pow(1.035, startYear - 2025);
+            const currentFRS = baseFRS * Math.pow(1.035, y);
 
             const handleOverflow = () => {
                 if (bal.ma > currentBHS) {
@@ -153,9 +255,13 @@ export const calculateCPFProjection = ({
                             bal.sa += excessMA;
                         }
                     } else {
-                        const currentERS = 426000 * Math.pow(1.03, year - 2026);
-                        if (bal.ra + excessMA > currentERS) {
-                            const spaceInRA = Math.max(0, currentERS - bal.ra);
+                        const currentERS = currentFRS * 2; // ERS is usually 2x FRS? No, 3x FRS now, 4x in 2025
+                        const erMultiplier = year >= 2025 ? 4 : 3;
+                        const brs = currentFRS / 2;
+                        const ers = brs * erMultiplier;
+
+                        if (bal.ra + excessMA > ers) {
+                            const spaceInRA = Math.max(0, ers - bal.ra);
                             bal.ra += spaceInRA;
                             const remainingExcess = excessMA - spaceInRA;
                             bal.oa += remainingExcess;
@@ -168,44 +274,9 @@ export const calculateCPFProjection = ({
 
             handleOverflow();
 
-            pendingInterest.oa += bal.oa * (0.025 / 12);
-            pendingInterest.sa += bal.sa * (0.04 / 12);
-            pendingInterest.ma += bal.ma * (0.04 / 12);
-            pendingInterest.ra += bal.ra * (0.04 / 12);
-
-            // --- Step 4: Extra 1% Interest Hierarchy ---
-            let extraBase = 60000;
-            let extraInterest = 0;
-
-            // 1. MA
-            const maQualify = Math.min(bal.ma, extraBase);
-            extraBase -= maQualify;
-            extraInterest += maQualify * (0.01 / 12);
-
-            // 2. SA / RA
-            const saRaBal = (currentAge < 55) ? bal.sa : bal.ra;
-            const saQualify = Math.min(saRaBal, extraBase);
-            extraBase -= saQualify;
-            extraInterest += saQualify * (0.01 / 12);
-
-            // 3. OA
-            const oaCap = 20000;
-            const oaQualify = Math.min(bal.oa, extraBase, oaCap);
-            extraInterest += oaQualify * (0.01 / 12);
-
-            // Credit Extra Interest to SA (or RA if age >= 55)
-            if (currentAge < 55) {
-                pendingInterest.sa += extraInterest;
-            } else {
-                pendingInterest.ra += extraInterest;
-            }
-
             // --- Step 6: Age 55 Retirement Transition ---
             if (lookupAge === 55 && m === birthMonthIndex) {
-                const yearsFrom2026 = year - 2026;
-                // const projectedBRS = 110200 * Math.pow(1.035, yearsFrom2026); // Unused
-                const projectedFRS = 220400 * Math.pow(1.035, yearsFrom2026);
-                // const projectedERS = 440800 * Math.pow(1.035, yearsFrom2026); // Unused
+                const projectedFRS = baseFRS * Math.pow(1.035, (startYear + y) - 2025);
 
                 // Transfer SA -> RA
                 const spaceInRA = Math.max(0, projectedFRS - bal.ra);
@@ -286,13 +357,16 @@ export const calculateCPFProjection = ({
 
         currentAge++;
 
+        const currentCpfisTotal = cpisItems.reduce((sum, item) => sum + item.currentValue, 0);
+
         projection.push({
             year: year,
             age: currentAge,
             oa: bal.oa,
             sa_ra: bal.sa + bal.ra,
             ma: bal.ma,
-            total: bal.oa + bal.sa + bal.ma + bal.ra
+            cpfis: currentCpfisTotal,
+            total: bal.oa + bal.sa + bal.ma + bal.ra + currentCpfisTotal
         });
 
         if (y === 0) {
@@ -310,7 +384,8 @@ export const calculateCPFProjection = ({
             oa: bal.oa,
             sa: bal.sa,
             ma: bal.ma,
-            ra: bal.ra
+            ra: bal.ra,
+            cpfis: cpisItems.reduce((sum, item) => sum + item.currentValue, 0)
         },
         at55: at55Snapshot
     };

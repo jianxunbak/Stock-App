@@ -1,13 +1,30 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 import Window from '../../ui/Window/Window';
 import Button from '../../ui/Button/Button';
+import DropdownButton from '../../ui/DropdownButton/DropdownButton';
+import CustomDatePicker from '../../ui/CustomDatePicker/CustomDatePicker';
+import BaseChart from '../../ui/BaseChart/BaseChart';
 import {
     Info,
     Calculator,
     Lock,
     Settings,
+    Landmark,
+    ShieldCheck,
+    TrendingUp,
+    PieChart as PieChartIcon,
+    Briefcase,
+    Activity,
+    Plus,
+    Trash2,
+    FolderPlus,
+    ChevronDown,
+    DollarSign,
+    TrendingDown
 } from 'lucide-react';
+
 import {
     ResponsiveContainer,
     Tooltip,
@@ -40,7 +57,8 @@ const CPFCard = ({
     settings = null,
     onUpdateSettings = null,
     loading = false,
-    onRefresh = null
+    onRefresh = null,
+    inflationRate = 0
 }) => {
 
     // Default states
@@ -55,6 +73,7 @@ const CPFCard = ({
         ma: 20000,
         ra: 0
     });
+    const [cpfisData, setCpfisData] = useState({ items: [], groups: [] });
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isReferenceOpen, setIsReferenceOpen] = useState(false);
@@ -64,15 +83,18 @@ const CPFCard = ({
 
     // Sync from user settings (only once)
     useEffect(() => {
-        if (settings?.cpf && !isInitialized) {
-            if (settings.cpf.monthlySalary !== undefined) setMonthlySalary(settings.cpf.monthlySalary);
-            if (settings.cpf.annualBonus !== undefined) setAnnualBonus(settings.cpf.annualBonus);
-            if (settings.cpf.salaryGrowth !== undefined) setSalaryGrowth(settings.cpf.salaryGrowth);
-            if (settings.cpf.projectionYears !== undefined) setProjectionYears(settings.cpf.projectionYears);
-            if (settings.cpf.balances) setBalances(settings.cpf.balances);
+        if (!isInitialized && !loading && settings) {
+            if (settings.cpf) {
+                if (settings.cpf.monthlySalary !== undefined) setMonthlySalary(settings.cpf.monthlySalary);
+                if (settings.cpf.annualBonus !== undefined) setAnnualBonus(settings.cpf.annualBonus);
+                if (settings.cpf.salaryGrowth !== undefined) setSalaryGrowth(settings.cpf.salaryGrowth);
+                if (settings.cpf.projectionYears !== undefined) setProjectionYears(settings.cpf.projectionYears);
+                if (settings.cpf.balances) setBalances(settings.cpf.balances);
+                if (settings.cpf.cpfisData) setCpfisData(settings.cpf.cpfisData);
+            }
             setIsInitialized(true);
         }
-    }, [settings, isInitialized]);
+    }, [settings, isInitialized, loading]);
 
     useEffect(() => {
         if (loading || !onUpdateSettings) return;
@@ -82,7 +104,8 @@ const CPFCard = ({
                 annualBonus,
                 salaryGrowth,
                 projectionYears,
-                balances
+                balances,
+                cpfisData
             };
             // Only update if data changed to avoid infinite loop
             const { updatedAt: prevTime, ...prevCpfWithoutTime } = settings?.cpf || {};
@@ -96,7 +119,7 @@ const CPFCard = ({
             }
         }, 1000);
         return () => clearTimeout(timer);
-    }, [monthlySalary, annualBonus, salaryGrowth, projectionYears, balances, loading, onUpdateSettings, settings?.cpf, isInitialized]);
+    }, [monthlySalary, annualBonus, salaryGrowth, projectionYears, balances, cpfisData, loading, onUpdateSettings, settings?.cpf, isInitialized]);
 
     // Calculate age from DOB if available
     useEffect(() => {
@@ -114,16 +137,49 @@ const CPFCard = ({
     }, [dateOfBirth]);
     // Step 3: Compound Interest Foundation Logic + Ceilings + Dynamic Rates
     const calculationResult = useMemo(() => {
-        return calculateCPFProjection({
+        const result = calculateCPFProjection({
             currentAge: age,
             dateOfBirth,
             monthlySalary,
             annualBonus,
             salaryGrowth,
             projectionYears,
-            balances
+            balances,
+            cpfisData
         });
-    }, [age, monthlySalary, annualBonus, salaryGrowth, projectionYears, balances, dateOfBirth]);
+
+        // Apply inflation adjustment to projection data
+        if (inflationRate > 0) {
+            result.projection = result.projection.map((point, index) => {
+                const discount = 1 / Math.pow(1 + (inflationRate / 100), index);
+                return {
+                    ...point,
+                    oa: point.oa * discount,
+                    sa_ra: point.sa_ra * discount,
+                    ma: point.ma * discount,
+                    total: point.total * discount
+                };
+            });
+
+            // Adjust final balances
+            const finalDiscount = 1 / Math.pow(1 + (inflationRate / 100), projectionYears);
+            result.finalBalances.oa *= finalDiscount;
+            result.finalBalances.sa *= finalDiscount;
+            result.finalBalances.ma *= finalDiscount;
+            result.finalBalances.ra *= finalDiscount;
+
+            // Adjust at55 snapshot if reached
+            if (result.at55.ageReached) {
+                const yearsTo55 = Math.max(0, 55 - age);
+                const discount55 = 1 / Math.pow(1 + (inflationRate / 100), yearsTo55);
+                result.at55.withdrawable *= discount55;
+                result.at55.ra *= discount55;
+                result.at55.target *= discount55;
+            }
+        }
+
+        return result;
+    }, [age, monthlySalary, annualBonus, salaryGrowth, projectionYears, balances, dateOfBirth, inflationRate, cpfisData]);
 
     // Display values with currency conversion (SGD -> Display)
     const formatCurrency = (val) => {
@@ -131,15 +187,158 @@ const CPFCard = ({
             style: 'currency',
             currency: displayCurrency,
             maximumFractionDigits: 0
-        }).format(val * sgdToDisplayRate);
+        }).format(val * sgdToDisplayRate).replace('SGD', 'S$');
     };
+
 
     const formatSGD = (val) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'SGD',
             maximumFractionDigits: 0
-        }).format(val);
+        }).format(val).replace('SGD', 'S$');
+    };
+
+    // --- CPFIS CRUD ---
+    const handleAddCpfisItem = (groupId = null) => {
+        const newItem = {
+            id: `cpfis-${Date.now()}`,
+            name: 'New Investment',
+            value: 0, // Current Value
+            investedAmount: 0, // Initial Principal
+            paymentAmount: 0,
+            startDate: new Date().toISOString().split('T')[0],
+            projectedGrowth: 4,
+            frequency: 'One-time'
+        };
+
+        setCpfisData(prev => ({
+            ...prev,
+            items: [...prev.items, newItem]
+        }));
+    };
+
+    const handleUpdateCpfisItem = (itemId, field, value) => {
+        setCpfisData(prev => ({
+            ...prev,
+            items: prev.items.map(i => i.id === itemId ? { ...i, [field]: value } : i)
+        }));
+    };
+
+    const handleRemoveCpfisItem = (itemId) => {
+        setCpfisData(prev => ({
+            ...prev,
+            items: prev.items.filter(i => i.id !== itemId)
+        }));
+    };
+
+    const getItemMonthly = (item) => {
+        const val = Number(item.paymentAmount || 0);
+        if (item.frequency === 'Yearly') return val / 12;
+        if (item.frequency === 'Quarterly') return val / 3;
+        if (item.frequency === 'One-time') return 0;
+        return val;
+    };
+
+    const renderCisItem = (item) => {
+        return (
+            <div key={item.id} className={styles.detailedItem}>
+                {/* ROW 1: Name & Delete */}
+                <div className={styles.nameSection}>
+                    <label className={styles.fieldLabel}>Investment Name</label>
+                    <input
+                        className={styles.input}
+                        value={item.name}
+                        onChange={(e) => handleUpdateCpfisItem(item.id, 'name', e.target.value)}
+                        placeholder="e.g. Unit Trust"
+                    />
+                </div>
+                <div className={styles.deleteAction}>
+                    <Button variant="icon" size="sm" onClick={() => handleRemoveCpfisItem(item.id)}>
+                        <Trash2 size={14} />
+                    </Button>
+                </div>
+
+                {/* ROW 2: Principal & Date */}
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Initial Principal ({baseCurrencySymbol})</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        className={styles.input}
+                        value={item.investedAmount}
+                        onChange={(e) => handleUpdateCpfisItem(item.id, 'investedAmount', e.target.value)}
+                    />
+                </div>
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Start Date</label>
+                    <CustomDatePicker
+                        value={item.startDate}
+                        onChange={(date) => handleUpdateCpfisItem(item.id, 'startDate', date)}
+                        triggerClassName={styles.input}
+                    />
+                </div>
+
+                {/* ROW 3: Amount & Freq */}
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Payment Amount ({baseCurrencySymbol})</label>
+                    <div className={styles.valueWrapper}>
+                        <input
+                            type="number"
+                            step="0.01"
+                            className={styles.input}
+                            value={item.paymentAmount}
+                            onChange={(e) => handleUpdateCpfisItem(item.id, 'paymentAmount', e.target.value)}
+                        />
+                        {item.frequency !== 'Monthly' && item.frequency !== 'One-time' && (
+                            <span className={styles.monthlyExtrapolation}>
+                                ≈ {baseCurrencySymbol}{Math.round(getItemMonthly(item)).toLocaleString()}/mo
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Payment Freq.</label>
+                    <DropdownButton
+                        label={item.frequency}
+                        variant="ghost"
+                        size="sm"
+                        icon={<ChevronDown size={14} />}
+                        closeOnSelect={true}
+                        buttonStyle={{ fontSize: '0.8rem', width: '100%', justifyContent: 'space-between' }}
+                        items={[
+                            { label: 'One-time', onClick: () => handleUpdateCpfisItem(item.id, 'frequency', 'One-time') },
+                            { label: 'Monthly', onClick: () => handleUpdateCpfisItem(item.id, 'frequency', 'Monthly') },
+                            { label: 'Quarterly', onClick: () => handleUpdateCpfisItem(item.id, 'frequency', 'Quarterly') },
+                            { label: 'Yearly', onClick: () => handleUpdateCpfisItem(item.id, 'frequency', 'Yearly') },
+                        ]}
+                    />
+                </div>
+
+                {/* ROW 4: Value & Growth */}
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Current Value ({baseCurrencySymbol})</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        className={styles.input}
+                        value={item.value}
+                        onChange={(e) => handleUpdateCpfisItem(item.id, 'value', e.target.value)}
+                    />
+                </div>
+                <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Growth %</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        className={styles.input}
+                        value={item.projectedGrowth}
+                        onChange={(e) => handleUpdateCpfisItem(item.id, 'projectedGrowth', e.target.value)}
+                        placeholder="Annual %"
+                    />
+                </div>
+            </div>
+        );
     };
 
     const handleInputChange = (setter) => (e) => {
@@ -159,33 +358,44 @@ const CPFCard = ({
         ma: Number(balances.ma || 0),
         ra: Number(balances.ra || 0)
     };
+
+    const currentCpfisTotal = useMemo(() => {
+        return [
+            ...(cpfisData.items || []),
+            ...(cpfisData.groups || []).flatMap(g => g.items || [])
+        ].reduce((sum, item) => sum + Number(item.value || 0), 0);
+    }, [cpfisData]);
     const finalProjectedData = calculationResult.projection[calculationResult.projection.length - 1];
     const finalProjectedTotal = finalProjectedData ? finalProjectedData.total : 0;
 
+    const targetAge = finalProjectedData ? finalProjectedData.age : (age + projectionYears);
+
     const header = (
-        <div className="summary-info">
-            <div className="summary-name">CPF Calculator 2026</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
-                Last updated: {formatLastUpdated(settings?.cpf?.updatedAt)}
-            </div>
-            <div className={styles.headerGrid} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <div className={styles.headerItem} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <span className={styles.headerLabel}>Current Total</span>
-                    <span className={styles.headerValueSuccess}>{formatCurrency(startBalance.oa + startBalance.sa + startBalance.ma + startBalance.ra)}</span>
-                </div>
-                <div className={styles.headerItem} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <span className={styles.headerLabel}>Projected Total</span>
-                    <span className={styles.headerValueSecondary}>{formatCurrency(finalProjectedTotal)}</span>
-                </div>
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={[
+                { label: 'Current Assets', value: formatCurrency(startBalance.oa + startBalance.sa + startBalance.ma + startBalance.ra + currentCpfisTotal), color: 'var(--neu-success)' },
+                { label: `Projected @ ${targetAge}`, value: formatCurrency(finalProjectedTotal), color: 'var(--neu-brand)' }
+            ]}
+
+
+            gridMetrics={[
+                { label: `OA Cash: ${formatCurrency(startBalance.oa)}`, icon: <Briefcase size={14} />, color: '#3b82f6' },
+                { label: `CPFIS: ${formatCurrency(currentCpfisTotal)}`, icon: <Activity size={14} />, color: '#f43f5e' },
+                { label: `SA: ${formatCurrency(startBalance.sa)}`, icon: <ShieldCheck size={14} />, color: '#f59e0b' },
+                { label: `MA: ${formatCurrency(startBalance.ma)}`, icon: <Activity size={14} />, color: '#10b981' },
+                { label: `Interest: +${formatCurrency(calculationResult.yearlyInterest.total)}/yr`, icon: <TrendingUp size={14} />, color: 'var(--neu-success)' }
+            ]}
+
+        />
     );
+
 
     const pieData = [
         { name: 'OA', value: Math.round(calculationResult.finalBalances.oa), color: '#3b82f6' },
         { name: 'SA', value: Math.round(calculationResult.finalBalances.sa), color: '#f59e0b' },
-        { name: 'RA', value: Math.round(calculationResult.finalBalances.ra), color: '#8b5cf6' }, // Purple for RA
+        { name: 'RA', value: Math.round(calculationResult.finalBalances.ra), color: '#8b5cf6' },
         { name: 'MA', value: Math.round(calculationResult.finalBalances.ma), color: '#10b981' },
+        { name: 'CPFIS', value: Math.round(calculationResult.finalBalances.cpfis), color: '#f43f5e' },
     ].filter(item => item.value > 0);
 
     const CustomTooltip = ({ active, payload, label }) => {
@@ -251,13 +461,12 @@ const CPFCard = ({
         <>
             <ExpandableCard
                 title="CPF"
-                subtitle={`Last updated: ${formatLastUpdated(settings?.cpf?.updatedAt)}`}
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
                 onRefresh={onRefresh}
                 collapsedWidth={220}
-                collapsedHeight={220}
+                collapsedHeight={198}
                 headerContent={header}
                 loading={loading}
                 className={`${styles.card} ${className}`}
@@ -269,7 +478,10 @@ const CPFCard = ({
                         <div className={styles.summaryFullLayout}>
                             <div className={styles.projectionSection}>
                                 <div className={styles.sectionHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                    <h4 className={styles.sectionHeaderTitle} style={{ margin: 0 }}>Projected CPF Growth ({dateOfBirth ? 'By Age' : 'By Year'})</h4>
+                                    <h4 className={styles.sectionHeaderTitle} style={{ margin: 0 }}>
+                                        Projected CPF Growth ({dateOfBirth ? 'By Age' : 'By Year'})
+                                        {inflationRate > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--neu-brand)', fontWeight: 500 }}> (Real Value)</span>}
+                                    </h4>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
                                         <input
@@ -303,6 +515,10 @@ const CPFCard = ({
                                                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
                                                     <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                                                 </linearGradient>
+                                                <linearGradient id="colorCPFISL" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+                                                </linearGradient>
                                             </defs>
                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                             <XAxis
@@ -315,6 +531,7 @@ const CPFCard = ({
                                             <YAxis hide domain={['auto', 'auto']} />
                                             <Tooltip content={<CustomTooltip />} />
                                             <Area name="OA" type="monotone" dataKey="oa" stackId="1" stroke="#3b82f6" fillOpacity={1} fill="url(#colorOAL)" isAnimationActive={false} />
+                                            <Area name="CPFIS" type="monotone" dataKey="cpfis" stackId="1" stroke="#f43f5e" fillOpacity={1} fill="url(#colorCPFISL)" isAnimationActive={false} />
                                             <Area name={age < 55 ? "SA" : "RA"} type="monotone" dataKey="sa_ra" stackId="1" stroke="#f59e0b" fillOpacity={1} fill="url(#colorSAL)" isAnimationActive={false} />
                                             <Area name="MA" type="monotone" dataKey="ma" stackId="1" stroke="#10b981" fillOpacity={1} fill="url(#colorMAL)" isAnimationActive={false} />
                                         </AreaChart>
@@ -323,13 +540,15 @@ const CPFCard = ({
                             </div>
 
                             <div className={styles.summarySection}>
-                                <h4 className={styles.sectionHeaderTitle}>Account Distribution & Interest (2026)</h4>
+                                <h4 className={styles.sectionHeaderTitle}>CPF Summary</h4>
+
                                 <div className={styles.summaryTopRow}>
                                     <div className={styles.chartContainer}>
                                         <div className={styles.chartOverlay}>
-                                            <span className={styles.overlayLabel}>Projected Total</span>
+                                            <span className={styles.overlayLabel}>Total Projected ({targetAge})</span>
                                             <span className={styles.overlayValue}>{formatCurrency(finalProjectedTotal)}</span>
                                         </div>
+
                                         <ResponsiveContainer width="100%" height={180}>
                                             <PieChart>
                                                 <Pie
@@ -344,7 +563,12 @@ const CPFCard = ({
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip content={<CustomTooltip />} />
+                                                <Tooltip
+                                                    content={<CustomTooltip />}
+                                                    position={{ y: 0 }}
+                                                    wrapperStyle={{ left: '50%', transform: 'translateX(-50%)', transition: 'none' }}
+                                                    allowEscapeViewBox={{ x: true, y: true }}
+                                                />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -352,8 +576,13 @@ const CPFCard = ({
                                     <div className={styles.statsPanel}>
                                         <div className={styles.statLine}>
                                             <div className={styles.statDot} style={{ background: '#3b82f6' }} />
-                                            <span className={styles.statLabel}>Projected OA</span>
+                                            <span className={styles.statLabel}>Projected OA Cash</span>
                                             <span className={styles.statValue}>{formatCurrency(calculationResult.finalBalances.oa)}</span>
+                                        </div>
+                                        <div className={styles.statLine}>
+                                            <div className={styles.statDot} style={{ background: '#f43f5e' }} />
+                                            <span className={styles.statLabel}>Projected CPFIS</span>
+                                            <span className={styles.statValue}>{formatCurrency(calculationResult.finalBalances.cpfis)}</span>
                                         </div>
                                         <div className={styles.statLine}>
                                             <div className={styles.statDot} style={{ background: '#f59e0b' }} />
@@ -372,9 +601,11 @@ const CPFCard = ({
                                         </div>
                                         <div className={styles.divider} />
                                         <div className={styles.statLine}>
-                                            <span className={styles.statLabelEmphasized}>Yearly Interest</span>
-                                            <span className={styles.statValueSuccess}>+{formatCurrency(calculationResult.yearlyInterest.total)}</span>
+                                            <span className={styles.statLabelEmphasized}>Total Projected ({targetAge})</span>
+                                            <span className={styles.statValueHighlight}>{formatCurrency(finalProjectedTotal)}</span>
                                         </div>
+
+
 
                                         {calculationResult.at55.ageReached && (
                                             <>
@@ -409,8 +640,8 @@ const CPFCard = ({
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
                 title="CPF Calculator Settings"
-                width="500px"
-                height="auto"
+                width="700px"
+                height="85vh"
                 headerAlign="start"
             >
                 <div className={styles.windowContainer}>
@@ -476,7 +707,7 @@ const CPFCard = ({
 
                         <div className={styles.inputGridMini}>
                             <div className={styles.inputGroupMini}>
-                                <label className={styles.label}>OA (S$)</label>
+                                <label className={styles.label}>OA Total (S$)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -508,6 +739,26 @@ const CPFCard = ({
                                     onChange={(e) => setBalances({ ...balances, ma: e.target.value })}
                                 />
                             </div>
+                        </div>
+
+                        <div className={styles.sectionDivider} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h4 className={styles.subTitle}>CPFIS Investments</h4>
+                            <Button variant="secondary" size="sm" onClick={() => handleAddCpfisItem()}>
+                                <Plus size={14} style={{ marginRight: '4px' }} />
+                            </Button>
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '-0.5rem' }}>
+                            Investments will be deducted from OA Cash monthly. Interest is only earned on the remaining OA Cash.
+                        </p>
+
+                        <div className={styles.cpfisList}>
+                            {cpfisData.items.map(renderCisItem)}
+                            {cpfisData.items.length === 0 && (
+                                <div className={styles.emptyCpfis}>
+                                    No CPFIS investments added.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

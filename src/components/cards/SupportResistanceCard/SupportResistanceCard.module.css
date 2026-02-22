@@ -121,7 +121,7 @@
     font-weight: 600;
     color: var(--text-secondary);
     /* Matches assumptionKey */
-    font-size: 0.9rem;
+    font-size: 1.5rem;
 }
 
 .price.active {
@@ -154,4 +154,50 @@
     color: #f87171;
     /* var(--neu-error) */
     font-weight: 700;
+}
+
+/* --- Summary Mode List --- */
+.summaryLevelsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 0.4rem;
+}
+
+.summaryLevelRow {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+}
+
+.summaryLevelPrice {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+}
+
+.summaryLevelStar {
+    color: #facc15;
+    font-size: 0.7rem;
+    margin-right: -0.2rem;
+}
+
+.summaryLevelAction {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.summaryLevelAction.buy {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+}
+
+.summaryLevelAction.hold {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--neu-text-tertiary);
 }

@@ -18,15 +18,20 @@ const SavingsEditorWindow = ({
     scenarios,
     settings,
     stocksCharts = [],
+    onUpdateExpenses,
+    cardName,
+    onUpdateCardName,
     baseCurrency = 'USD',
     baseCurrencySymbol = '$',
     onAddScenario,
     onRemoveScenario,
     onUpdateScenario,
-    onUpdateExpenses,
-    cardName,
-    onUpdateCardName
+    displayCurrency = 'USD',
+    displayCurrencySymbol = '$',
+    baseToDisplayRate = 1,
+    sgdToDisplayRate = 1
 }) => {
+
     const [newExpenseName, setNewExpenseName] = useState('');
 
     // Auto-resize group title textareas
@@ -180,6 +185,8 @@ const SavingsEditorWindow = ({
 
         const expenses = normalizeExpenses(scenario.expenses);
 
+        const sgdToBase = baseToDisplayRate !== 0 ? (sgdToDisplayRate / baseToDisplayRate) : 1;
+
         let newItem;
         if (type === 'cpf') {
             const salary = Number(settings?.cpf?.monthlySalary || 0);
@@ -190,12 +197,13 @@ const SavingsEditorWindow = ({
             newItem = {
                 id: `linked-cpf-${Date.now()}`,
                 name: 'CPF Contribution',
-                value: Math.round(cpfValue),
+                value: Math.round(cpfValue * sgdToBase),
                 frequency: 'Monthly',
                 isLinked: true,
                 source: 'CPF Card'
             };
         } else if (type === 'total-other') {
+
             const allItems = [
                 ...normalizedOtherInvestments.items,
                 ...normalizedOtherInvestments.groups.flatMap(g => g.items || [])
@@ -303,18 +311,20 @@ const SavingsEditorWindow = ({
         groups.forEach(g => g.items.forEach(i => total += getItemMonthly(i)));
         linked.forEach(i => total += getItemMonthly(i));
 
-        const monthlyPay = Number(scenario.monthlyPay || 0);
+        const isManualPay = scenario.isManualPay;
+        const monthlyPay = (!isManualPay && settings?.cpf?.monthlySalary)
+            ? Number(settings.cpf.monthlySalary) * (baseToDisplayRate !== 0 ? (sgdToDisplayRate / baseToDisplayRate) : 1)
+            : Number(scenario.monthlyPay || 0);
 
         // Check if CPF is already linked to avoid double counting
         const isCpfLinked = linked.some(i => i.source === 'CPF Card');
 
-        // Only calculate specific CPF value if it is NOT linked (for display purposes if needed, but here we want to allow removal)
-        // Actually, to fix the user issue: If it is NOT linked, we should NOT deduct it automatically.
-        // The user wants full control. Use the system only if linked.
         let cpf = 0;
 
         return { totalExpenses: total, cpf, monthlySavings: monthlyPay - cpf - total };
     };
+
+
 
     return (
         <Window
@@ -373,84 +383,65 @@ const SavingsEditorWindow = ({
                                     <div className={styles.inputGrid}>
                                         <div className={styles.inputGroup}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                                <label className={styles.label}>Monthly Pay ({baseCurrencySymbol})</label>
+                                                <label className={styles.label} style={{ marginBottom: 0 }}>Monthly Pay ({baseCurrency})</label>
+
                                                 {settings?.cpf?.monthlySalary && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        {!scenario.isManualPay ? (
-                                                            <span style={{ fontSize: '0.65rem', color: 'var(--neu-success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                <Link size={10} /> Linked
-                                                            </span>
-                                                        ) : (
-                                                            <span style={{ fontSize: '0.65rem', color: 'var(--neu-text-tertiary)', fontWeight: 700 }}>
-                                                                Manual entry
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    <DropdownButton
+                                                        label={!scenario.isManualPay ? 'Synced: CPF Salary' : "Autofill"}
+                                                        icon={<ChevronDown size={10} />}
+                                                        items={[
+                                                            {
+                                                                label: `CPF Salary (${baseCurrencySymbol}${Math.round(Number(settings.cpf.monthlySalary) * (baseToDisplayRate !== 0 ? (sgdToDisplayRate / baseToDisplayRate) : 1)).toLocaleString()})`,
+                                                                onClick: () => {
+                                                                    const sgdToBase = baseToDisplayRate !== 0 ? (sgdToDisplayRate / baseToDisplayRate) : 1;
+                                                                    onUpdateScenario(scenario.id, {
+                                                                        monthlyPay: Number(settings.cpf.monthlySalary) * sgdToBase,
+                                                                        isManualPay: false
+                                                                    });
+                                                                }
+                                                            }
+                                                        ]}
+                                                        variant="text"
+                                                        style={{ fontSize: '0.75rem', padding: '0 4px', height: 'auto' }}
+                                                        buttonStyle={{
+                                                            color: !scenario.isManualPay ? 'var(--neu-success)' : 'var(--neu-accent)',
+                                                            fontSize: '0.75rem',
+                                                            padding: 0,
+                                                            gap: '2px',
+                                                            height: 'auto',
+                                                            border: 'none',
+                                                            background: 'transparent',
+                                                            boxShadow: 'none'
+                                                        }}
+                                                    />
                                                 )}
                                             </div>
                                             <div className={styles.valueWrapper}>
-                                                {!scenario.isManualPay && settings?.cpf?.monthlySalary ? (
-                                                    <div className={styles.flatValue}>
-                                                        ${Number(settings.cpf.monthlySalary).toLocaleString()}
-                                                        <button
-                                                            onClick={() => onUpdateScenario(scenario.id, 'isManualPay', true)}
-                                                            style={{
-                                                                marginLeft: '12px',
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                fontSize: '0.65rem',
-                                                                color: 'var(--neu-text-tertiary)',
-                                                                fontWeight: 600,
-                                                                cursor: 'pointer',
-                                                                textDecoration: 'underline'
-                                                            }}
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <div style={{ position: 'relative' }}>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            className={styles.input}
-                                                            value={scenario.monthlyPay}
-                                                            onChange={(e) => onUpdateScenario(scenario.id, 'monthlyPay', e.target.value)}
-                                                            placeholder="Enter salary"
-                                                        />
-                                                        {settings?.cpf?.monthlySalary && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    onUpdateScenario(scenario.id, 'isManualPay', false);
-                                                                    onUpdateScenario(scenario.id, 'monthlyPay', Number(settings.cpf.monthlySalary));
-                                                                }}
-                                                                style={{
-                                                                    position: 'absolute',
-                                                                    right: '10px',
-                                                                    top: '50%',
-                                                                    transform: 'translateY(-50%)',
-                                                                    background: 'rgba(var(--neu-success-rgb), 0.1)',
-                                                                    border: 'none',
-                                                                    borderRadius: '4px',
-                                                                    padding: '2px 8px',
-                                                                    fontSize: '0.6rem',
-                                                                    color: 'var(--neu-success)',
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer'
-                                                                }}
-                                                            >
-                                                                Link CPF
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                <span className={styles.monthlyExtrapolation}>
-                                                    ≈ ${Math.round(Number(scenario.monthlyPay || 0) * 12).toLocaleString()}/year
-                                                </span>
+                                                <div style={{ position: 'relative' }}>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className={`${styles.input} ${!scenario.isManualPay ? styles.autofillActive : ''}`}
+                                                        value={scenario.monthlyPay}
+                                                        onChange={(e) => onUpdateScenario(scenario.id, 'monthlyPay', e.target.value)}
+                                                        placeholder="Enter salary"
+                                                        title={!scenario.isManualPay ? 'Automatically updating from CPF Salary. Edit manually to disconnect.' : ''}
+                                                    />
+                                                    {baseToDisplayRate !== 1 && (
+                                                        <span className={styles.conversionPreview}>
+                                                            Dashboard ({displayCurrency}): {displayCurrencySymbol}{Math.round(Number(scenario.monthlyPay || 0) * baseToDisplayRate).toLocaleString()}
+                                                        </span>
+                                                    )}
+
+                                                    <span className={styles.monthlyExtrapolation}>
+                                                        ≈ {baseCurrencySymbol}{Math.round(Number(scenario.monthlyPay || 0) * 12).toLocaleString()}/year
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className={styles.inputGroup}>
-                                            <label className={styles.label}>Initial Savings ({baseCurrencySymbol})</label>
+
+                                            <label className={styles.label}>Initial Savings ({baseCurrency})</label>
                                             <div className={styles.valueWrapper}>
                                                 <input
                                                     type="number"
@@ -484,8 +475,9 @@ const SavingsEditorWindow = ({
                                                     onChange={(e) => onUpdateScenario(scenario.id, 'annualExpenseGrowth', e.target.value)}
                                                 />
                                                 <span className={styles.monthlyExtrapolation}>
-                                                    ≈ +${Math.round((totalExpenses * (Number(scenario.annualExpenseGrowth || 0) / 100)) * 12).toLocaleString()}/year
+                                                    ≈ +{baseCurrencySymbol}{Math.round((totalExpenses * (Number(scenario.annualExpenseGrowth || 0) / 100)) * 12).toLocaleString()}/year
                                                 </span>
+
                                             </div>
                                         </div>
                                     </div>
@@ -590,12 +582,19 @@ const SavingsEditorWindow = ({
                                                             value={item.value}
                                                             onChange={(e) => handleUpdateItem(scenario.id, item.id, 'value', e.target.value)}
                                                         />
+                                                        {baseToDisplayRate !== 1 && (
+                                                            <span className={styles.conversionPreview}>
+                                                                Dash: {displayCurrencySymbol}{Math.round(Number(item.value || 0) * baseToDisplayRate).toLocaleString()}
+                                                            </span>
+                                                        )}
+
                                                         {item.frequency !== 'Monthly' && (
                                                             <span className={styles.monthlyExtrapolation}>
-                                                                ≈ ${Math.round(item.value / (item.frequency === 'Yearly' ? 12 : 3)).toLocaleString()}/mo
+                                                                ≈ {baseCurrencySymbol}{Math.round(item.value / (item.frequency === 'Yearly' ? 12 : 3)).toLocaleString()}/mo
                                                             </span>
                                                         )}
                                                     </div>
+
                                                     <DropdownButton
                                                         label={item.frequency}
                                                         variant="ghost"
@@ -692,13 +691,14 @@ const SavingsEditorWindow = ({
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                        <span className={styles.linkedValue}>${item.value.toLocaleString()}</span>
+                                                        <span className={styles.linkedValue}>{baseCurrencySymbol}{item.value.toLocaleString()}</span>
                                                         {item.frequency !== 'Monthly' && (
                                                             <span style={{ fontSize: '0.65rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>
-                                                                ≈ ${Math.round(item.value / (item.frequency === 'Yearly' ? 12 : 3)).toLocaleString()}/mo
+                                                                ≈ {baseCurrencySymbol}{Math.round(item.value / (item.frequency === 'Yearly' ? 12 : 3)).toLocaleString()}/mo
                                                             </span>
                                                         )}
                                                     </div>
+
                                                     <Button variant="icon" size="sm" onClick={() => handleRemoveLinked(scenario.id, item.id)}>
                                                         <Trash2 size={14} />
                                                     </Button>

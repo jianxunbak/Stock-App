@@ -7,6 +7,7 @@ import styles from './ProfitabilityCard.module.css';
 import VerticalBarChart from '../../ui/Charts/VerticalBarChart';
 import { useTheme } from '../../../context/ThemeContext';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 
 const ProfitabilityCard = ({
     currency = 'USD',
@@ -17,7 +18,8 @@ const ProfitabilityCard = ({
     onHide = null,
     className = "",
     variant = 'default',
-    loading: parentLoading = false
+    loading: parentLoading = false,
+    collapsedHeight = 198
 }) => {
     const { stockData, loading: stockLoading, loadStockData } = useStockData();
     const isLoading = parentLoading || stockLoading;
@@ -150,30 +152,17 @@ const ProfitabilityCard = ({
     }
 
     const header = (
-        <div className="summary-info stock-health-summary">
-            <div className="summary-name">Profitability</div>
-            <div className="summary-price-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', width: '100%', alignItems: 'start', columnGap: '0.5rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>ROE</span>
-                        <span style={{ fontSize: '1rem', fontWeight: 700, color: roe > 12 ? 'var(--neu-success)' : 'var(--neu-warning)' }}>
-                            {roe.toFixed(1)}%
-                        </span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--neu-text-tertiary)', fontWeight: 600 }}>ROIC</span>
-                        <span style={{ fontSize: '1rem', fontWeight: 700, color: roic > 12 ? 'var(--neu-success)' : 'var(--neu-warning)' }}>
-                            {roic.toFixed(1)}%
-                        </span>
-                    </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-                    {renderTrendOnly('Rev', revTrend)}
-                    {renderTrendOnly('Rec', recTrend)}
-                    {renderTrendOnly('CCC', cccTrend)}
-                </div>
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={[
+                { label: 'ROE', value: roe.toFixed(1), suffix: '%', color: roe > 12 ? 'var(--neu-success)' : (roe > 0 ? '#facc15' : 'var(--neu-error)') },
+                { label: 'ROIC', value: roic.toFixed(1), suffix: '%', color: roic > 12 ? 'var(--neu-success)' : (roic > 0 ? '#facc15' : 'var(--neu-error)') }
+            ]}
+            gridMetrics={[
+                { label: 'Revenue', icon: <revTrend.icon size={14} />, color: revTrend.color },
+                { label: 'Receivables', icon: <recTrend.icon size={14} />, color: recTrend.color },
+                { label: 'Cash Cycle', icon: <cccTrend.icon size={14} />, color: cccTrend.color }
+            ]}
+        />
     );
 
     const menuItems = [];
@@ -186,7 +175,7 @@ const ProfitabilityCard = ({
             onToggle={onToggle}
             onHide={onHide}
             collapsedWidth={220}
-            collapsedHeight={220}
+            collapsedHeight={collapsedHeight}
             loading={isLoading}
             headerContent={stockData && (profitability && growth) ? header : null}
 

@@ -4,6 +4,7 @@ import CardToggleButton from '../CardToggleButton/CardToggleButton';
 import { useStockData } from '../../../hooks/useStockData';
 import styles from './SupportResistanceCard.module.css';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 
 const SupportResistanceCard = ({
     currency = 'USD',
@@ -14,7 +15,8 @@ const SupportResistanceCard = ({
     onHide = null,
     className = "",
     variant = 'default',
-    loading: parentLoading = false
+    loading: parentLoading = false,
+    collapsedHeight = 198
 }) => {
     const { stockData, loading: stockLoading, loadStockData } = useStockData();
     const isLoading = parentLoading || stockLoading;
@@ -24,16 +26,28 @@ const SupportResistanceCard = ({
     const currentPrice = stockData?.overview?.price;
 
     const header = (
-        <div className="summary-info">
-            <div className="summary-name">Support & Resistance</div>
-            {hasData ? (
-                <div className="summary-price" style={{ color: 'var(--neu-success)' }}>
-                    {levels.length} Levels
-                </div>
-            ) : (
-                <div className="summary-price" style={{ color: 'var(--neu-text-tertiary)' }}>N/A</div>
-            )}
-        </div>
+        <SummaryCardContent
+            mainMetrics={hasData ? [
+                {
+                    label: 'Primary Level',
+                    value: (levels[0].price * currentRate).toFixed(2),
+                    suffix: '',
+                    color: Number(currentPrice) <= Number(levels[0].price) ? 'var(--neu-success)' : 'var(--neu-error)'
+                },
+                {
+                    label: 'Action',
+                    value: Number(currentPrice) <= Number(levels[0].price) ? 'BUY' : 'HOLD',
+                    color: Number(currentPrice) <= Number(levels[0].price) ? 'var(--neu-success)' : 'var(--neu-error)'
+                }
+            ] : [
+                { label: 'Levels', value: 'N/A', color: 'var(--neu-text-tertiary)' }
+            ]}
+            gridMetrics={hasData ? levels.slice(1, 4).map(level => ({
+                label: (level.price * currentRate).toFixed(2),
+                icon: level.score >= 6 ? '★' : null,
+                color: Number(currentPrice) <= Number(level.price) ? 'var(--neu-success)' : 'var(--neu-error)'
+            })) : []}
+        />
     );
 
     const menuItems = [];
@@ -45,7 +59,7 @@ const SupportResistanceCard = ({
             onToggle={onToggle}
             onHide={onHide}
             collapsedWidth={220}
-            collapsedHeight={220}
+            collapsedHeight={collapsedHeight}
             loading={isLoading}
             headerContent={stockData ? header : null}
 

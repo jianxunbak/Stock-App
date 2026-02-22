@@ -22,7 +22,7 @@
     display: flex;
     flex-direction: column;
     overflow: visible;
-    /* Allow menu to pop out */
+    /* Allow shadows to spill out */
     box-sizing: border-box;
 }
 
@@ -30,14 +30,11 @@
     height: 100% !important;
     min-height: 100% !important;
     display: flex;
-    padding: 0.4rem;
     flex-direction: column;
     align-items: stretch;
     box-sizing: border-box;
     overflow: visible;
-    /* CRUCIAL: Allow menu to pop out */
     text-align: left;
-    /* Tighter vertical padding */
 }
 
 .expandable-card.is-collapsed .expandable-card-header-content {
@@ -85,6 +82,7 @@
     flex-direction: column;
     gap: 1.5rem;
     box-sizing: border-box;
+    padding: 0.5rem;
 }
 
 /* Tighten gap when controls are stacked vertically */
@@ -176,14 +174,19 @@
 .collapsed-controls-row {
     display: flex;
     justify-content: space-between;
-    /* Align both buttons to the right */
     align-items: center;
     width: 100%;
     z-index: 20;
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
     gap: 0.5rem;
-    /* Space between edit and chevron */
+    margin-top: 0;
+    height: 38px;
+    /* Reduced from 44px to afford more space */
+    min-height: 38px;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
+
 
 .collapsed-custom-controls {
     display: flex;
@@ -194,29 +197,24 @@
 .collapsed-summary-wrapper {
     flex: 1;
     display: block;
-    /* Let the internal container (grid) handle layout */
     width: 100%;
-    overflow: hidden;
+    overflow: visible;
     /* Contain content within collapsed card boundaries */
-    padding: 0 0.4rem;
     box-sizing: border-box;
 }
 
-.expandable-card-loading-overlay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 100;
-    background: var(--neu-bg);
-    padding: 0.5rem 1rem;
-    border-radius: 50px;
-    box-shadow: 4px 4px 10px var(--neu-shadow-dark), -4px -4px 10px var(--neu-shadow-light);
-    display: flex;
-    align-items: center;
-    pointer-events: none;
-    animation: fadeIn 0.3s ease;
-    white-space: nowrap;
+/* Loading overlay and blur are now handled by StyledCard.jsx + StyledCard.css */
+
+.expandable-card-loading-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--neu-text-secondary);
+    letter-spacing: 0.02em;
+}
+
+.expandable-card-content-wrapper {
+    transition: filter 0.3s ease, opacity 0.3s ease;
+    width: 100%;
 }
 
 .expandable-card-loading-container {
@@ -227,6 +225,37 @@
     width: 100%;
     min-height: 100px;
     padding: 2rem;
+}
+
+/* --- Mobile Responsiveness --- */
+/* --- Global Responsive Layout --- */
+
+/* Allow cards to size naturally based on content on ALL screens */
+.expandable-card.is-collapsed,
+.is-collapsed.styled-card-container,
+.is-collapsed.styled-card-root,
+.styled-card-root[data-collapsed="true"] {
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.expandable-card.is-collapsed .expandable-card-header {
+    height: auto;
+    min-height: 100px;
+    /* Sensible minimum */
+    width: 100% !important;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.expandable-card.is-collapsed .expandable-card-header-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* Keep title at the top */
+    flex: 1;
 }
 
 @keyframes fadeIn {

@@ -124,10 +124,24 @@
     text-overflow: ellipsis;
 }
 
-.legendValue {
-    font-weight: 600;
-    color: var(--text-primary);
+.legendValueGroup {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
 }
+
+.legendValue {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.legendPercent {
+    font-size: 0.7rem;
+    color: var(--neu-text-tertiary);
+    font-weight: 600;
+}
+
 
 /* Custom Recharts Tooltip */
 .chartTooltip {

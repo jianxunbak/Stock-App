@@ -35,36 +35,6 @@
     width: 100%;
 }
 
-.headerMeta {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--neu-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: -0.25rem;
-}
-
-.headerValueGroup {
-    margin-top: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-}
-
-.mainValue {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--neu-success);
-    line-height: 1;
-}
-
-.valueLabel {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--neu-text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
 
 /* Projection Control */
 .projectionControl {
@@ -244,4 +214,89 @@
 .input[type=number] {
     -moz-appearance: textfield;
     appearance: textfield;
+
+}
+
+/* Analysis-style Analysis Summary Layout Overrides */
+:global(.stock-summary-container.stacked) {
+    display: grid !important;
+    grid-template-columns: 35% 1fr !important;
+    grid-template-rows: auto 1fr !important;
+    column-gap: 2rem !important;
+    row-gap: 0.5rem !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+:global(.stock-summary-container.stacked .price-chart-summary) {
+    grid-column: 2 !important;
+    grid-row: 1 / -1 !important;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+:global(.stock-summary-container.stacked .stock-info-column) {
+    grid-column: 1 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+:global(.summary-price) {
+    font-size: 1.8rem !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+    letter-spacing: -0.03em !important;
+    color: var(--neu-text-primary);
+}
+
+:global(.summary-key-stats) {
+
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem 1rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--neu-border-subtle);
+    width: 100%;
+}
+
+:global(.stat-item) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+:global(.stat-label) {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--neu-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+:global(.stat-value) {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--neu-text-primary);
+}
+
+:global(.summary-ring-wrapper) {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+:global(.summary-score) {
+    position: absolute;
+    font-size: 0.95rem !important;
+    font-weight: 850 !important;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }

@@ -21,7 +21,6 @@
     z-index: -1;
     opacity: 0;
     pointer-events: auto;
-    transition: opacity 0.4s ease;
 }
 
 .window-overlay.open {
@@ -104,6 +103,8 @@
     color: var(--neu-text-secondary);
     min-height: 0;
     padding-bottom: 1.5rem;
+    position: relative;
+    z-index: 10;
     /* Restored bottom padding for scroll list breathing room */
     scrollbar-gutter: stable;
 }

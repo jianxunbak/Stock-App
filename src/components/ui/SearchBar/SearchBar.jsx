@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { Search, X, ArrowRight } from 'lucide-react';
 import { SearchBarAnimator } from '../Animator';
+import InlineSpinner from '../InlineSpinner/InlineSpinner';
 import './SearchBar.css';
 
 /**
@@ -20,7 +21,8 @@ const SearchBar = ({
     height = "2.22rem",
     buttonStyle = {},
     iconSize = 18,
-    fontSize = "var(--neu-text-sm)"
+    fontSize = "var(--neu-text-sm)",
+    loading = false
 }) => {
     const [isExpanded, setIsExpanded] = useState(alwaysOpen);
     const [isPressed, setIsPressed] = useState(false);
@@ -167,7 +169,11 @@ const SearchBar = ({
                     className="search-bar-icon-wrapper"
                     onClick={() => !isExpanded && setIsExpanded(true)}
                 >
-                    <Search size={iconSize} />
+                    {loading ? (
+                        <InlineSpinner size={iconSize} />
+                    ) : (
+                        <Search size={iconSize} />
+                    )}
                 </div>
 
                 <AnimatePresence>

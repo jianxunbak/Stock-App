@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Menu, X, Plus, Edit2, Trash2, ChevronDown, Briefcase, Check } from 'lucide-react';
 import styles from './PortfolioPage.module.css';
@@ -171,7 +172,8 @@ const PortfolioPage = () => {
 
     // --- State ---
     const [liveData, setLiveData] = useState({});
-    const [isLoadingData, setIsLoadingData] = useState(false);
+    const [isLoadingData, setIsLoadingData] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
 
     // Keep local currency state in sync with global settings
@@ -390,6 +392,7 @@ const PortfolioPage = () => {
         else handlePortfolioChange(null);
     };
 
+
     const handleRenameStart = () => {
         const current = portfolioList.find(p => p.id === currentPortfolioId);
         if (current) {
@@ -407,11 +410,51 @@ const PortfolioPage = () => {
         }
     };
 
+    const loadPrices = useCallback(async (targets = []) => {
+        if (targets.length === 0) return;
+
+        setIsLoadingData(true);
+        try {
+            const batchData = await fetchStockDataBatch(targets);
+            const processedData = {};
+
+            Object.entries(batchData).forEach(([ticker, data]) => {
+                const price = data.overview?.price || 0;
+                const beta = data.overview?.beta || 1;
+                const sector = data.overview?.sector || 'Unknown';
+                const pegRatio = data.overview?.pegRatio || 0;
+
+                let growth = 0;
+                const growthStr = data.valuation?.assumptions?.["Growth Rate (Yr 1-5)"] ||
+                    data.valuation?.assumptions?.["Projected Sales Growth"];
+                if (growthStr) {
+                    growth = parseFloat(String(growthStr).replace('%', '').replace(',', ''));
+                } else {
+                    growth = (data.growth?.revenueGrowth || 0) * 100;
+                }
+
+                const totalCash = data.valuation?.raw_assumptions?.cash_and_equivalents || 0;
+                const totalDebt = data.valuation?.raw_assumptions?.total_debt || 0;
+
+                processedData[ticker] = { price, beta, sector, growth, pegRatio, totalCash, totalDebt };
+            });
+
+            setLiveData(prev => ({ ...prev, ...processedData }));
+        } catch (e) {
+            console.error("Failed to fetch batch portfolio data", e);
+        } finally {
+            setIsLoadingData(false);
+        }
+    }, []);
+
     // Fetch Live Data
     useEffect(() => {
         if (portfolio.length === 0) {
             setLiveData({});
-            setIsLoadingData(false); // Fix: Clear loading state if portfolio is empty
+            // Only stop "Loading Data" if the portfolio hook itself has finished its initial check
+            if (!portfolioLoading) {
+                setIsLoadingData(false);
+            }
             return;
         }
 
@@ -419,46 +462,12 @@ const PortfolioPage = () => {
         const missing = tickers.filter(t => !liveData[t]);
 
         if (missing.length > 0) {
-            setIsLoadingData(true);
-            const loadData = async () => {
-                try {
-                    const batchData = await fetchStockDataBatch(missing);
-                    const processedData = {};
-
-                    Object.entries(batchData).forEach(([ticker, data]) => {
-                        const price = data.overview?.price || 0;
-                        const beta = data.overview?.beta || 1;
-                        const sector = data.overview?.sector || 'Unknown';
-                        const pegRatio = data.overview?.pegRatio || 0;
-
-                        // Extract growth
-                        let growth = 0;
-                        const growthStr = data.valuation?.assumptions?.["Growth Rate (Yr 1-5)"] ||
-                            data.valuation?.assumptions?.["Projected Sales Growth"];
-                        if (growthStr) {
-                            growth = parseFloat(String(growthStr).replace('%', '').replace(',', ''));
-                        } else {
-                            growth = (data.growth?.revenueGrowth || 0) * 100;
-                        }
-
-                        const totalCash = data.valuation?.raw_assumptions?.cash_and_equivalents || 0;
-                        const totalDebt = data.valuation?.raw_assumptions?.total_debt || 0;
-
-                        processedData[ticker] = { price, beta, sector, growth, pegRatio, totalCash, totalDebt };
-                    });
-
-                    setLiveData(prev => ({ ...prev, ...processedData }));
-                } catch (e) {
-                    console.error("Failed to fetch batch portfolio data", e);
-                } finally {
-                    setIsLoadingData(false);
-                }
-            };
-            loadData();
-        } else {
-            setIsLoadingData(false); // Fix: Ensure loading is cleared if no tickers are missing
+            loadPrices(missing);
+        } else if (!portfolioLoading) {
+            // Only stop if prices are matched AND portfolio is done loading
+            setIsLoadingData(false);
         }
-    }, [portfolio]); // Removed liveData to prevent infinite loop
+    }, [portfolio, loadPrices, portfolioLoading]);
 
     // Fetch TWR
     useEffect(() => {
@@ -800,6 +809,35 @@ const PortfolioPage = () => {
         }
     }, [portfolio, currentPortfolioId, weightedBeta, weightedGrowth, currentUser]);
 
+    const handleRefreshAllData = useCallback(async (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+
+        // Force React to commit the loading state immediately before starting async work.
+        flushSync(() => {
+            setIsRefreshing(true);
+            setIsLoadingData(true);
+        });
+
+        const tickers = [...new Set(portfolio.map(p => (p.ticker || '').trim().toUpperCase()))].filter(Boolean);
+
+        try {
+            // 1. Refresh prices - await this
+            await loadPrices(tickers);
+
+            // 2. Refresh AI Analysis - await this
+            if (savedAnalysis) {
+                await handleAnalyzePortfolio(true);
+            }
+        } catch (err) {
+            console.error("Refresh failed:", err);
+        } finally {
+            // Add a small delay so the user sees the refresh happen clearly
+            setTimeout(() => {
+                setIsRefreshing(false);
+            }, 500);
+        }
+    }, [portfolio, loadPrices, savedAnalysis, handleAnalyzePortfolio]);
+
     // Load User Preferences
     useEffect(() => {
         if (currentUser?.uid) {
@@ -980,10 +1018,16 @@ const PortfolioPage = () => {
 
             <div className={styles.pageGrid}>
                 {cardOrder.map(cardKey => {
+                    const isSpan3 = cardKey === 'summary';
+                    const colSpanClass = isSpan3 ? styles.colSpan3 : styles.colSpan1;
+                    const isOpen = !!openCards[cardKey];
+                    const className = `${colSpanClass} ${isOpen ? styles.expandedWrapper : styles.collapsedWrapper}`;
+
                     if (cardKey === 'summary' && cardVisibility.summary) {
                         return (
                             <PortfolioSummaryCard
                                 key="summary"
+                                className={className}
                                 portfolioList={portfolioList}
                                 currentPortfolioId={currentPortfolioId}
                                 currencySymbol={currencySymbol}
@@ -1020,7 +1064,8 @@ const PortfolioPage = () => {
                                 setRenameValue={setRenameValue}
                                 onRenameSubmit={handleRenameSubmit}
                                 onHide={() => handleHideRequest('summary')}
-                                loading={portfolioLoading || isLoadingData}
+                                onRefresh={handleRefreshAllData}
+                                loading={portfolioLoading || isLoadingData || isRefreshing}
                             />
                         );
                     }
@@ -1029,6 +1074,7 @@ const PortfolioPage = () => {
                         return (
                             <AllocationCard
                                 key="allocation"
+                                className={className}
                                 portfolioList={portfolioList}
                                 portfolioLength={portfolio.length}
                                 openCards={openCards}
@@ -1038,9 +1084,9 @@ const PortfolioPage = () => {
                                 totalValue={totalValue}
                                 currencySymbol={currencySymbol}
                                 isMounted={true}
-                                onRefresh={() => window.location.reload()} // Simplified for now
+                                onRefresh={handleRefreshAllData}
                                 onHide={() => handleHideRequest('allocation')}
-                                loading={portfolioLoading || isLoadingData}
+                                loading={portfolioLoading || isLoadingData || isRefreshing}
                                 catTargets={catTargets}
                                 sectorLimits={sectorLimits}
                                 onManageTargets={() => setShowAllocationEditor(true)}
@@ -1052,6 +1098,7 @@ const PortfolioPage = () => {
                         return (
                             <AiInsightsCard
                                 key="ai"
+                                className={className}
                                 portfolioList={portfolioList}
                                 analysis={analysis}
                                 analyzing={analyzing}
@@ -1062,7 +1109,7 @@ const PortfolioPage = () => {
                                 notes={notes}
                                 onSaveNotes={saveNotes}
                                 onHide={() => handleHideRequest('ai')}
-                                loading={portfolioLoading || isLoadingData}
+                                loading={portfolioLoading || isLoadingData || isRefreshing}
                             />
                         );
                     }
@@ -1071,6 +1118,7 @@ const PortfolioPage = () => {
                         return (
                             <HoldingsCard
                                 key="holdings"
+                                className={className}
                                 portfolioList={portfolio}
                                 displayList={displayList}
                                 openCards={openCards}
@@ -1090,13 +1138,15 @@ const PortfolioPage = () => {
                                 removeFromPortfolio={removeFromPortfolio}
                                 isTestPortfolio={isTestPortfolio}
                                 onHide={() => handleHideRequest('holdings')}
-                                loading={portfolioLoading || isLoadingData}
+                                loading={portfolioLoading || isLoadingData || isRefreshing}
                             />
                         );
                     }
 
                     return null;
                 })}
+
+
             </div>
 
             {/* Globals Modals */}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence, usePresence } from 'framer-motion';
+
 import { CardAnimator } from '../Animator';
 import Button from '../Button';
 import { X } from 'lucide-react';
@@ -79,13 +79,34 @@ const StyledCard = React.memo(({
     }, [controls, persistentControls, variant]);
 
     const renderContent = () => (
-        <div className={`styled-card-content ${variant}`}>
+        <div
+            className={`styled-card-content ${variant}`}
+            style={{
+                height: '100%',
+                minHeight: 'inherit',
+                position: 'relative',
+                opacity: loading ? 0 : 1,
+                pointerEvents: loading ? 'none' : 'auto'
+            }}
+        >
             {(title || finalControls || props.onClose) && (
                 <div
                     className="styled-card-header"
                     style={{ alignItems: headerVerticalAlign }}
                 >
-                    {title && <div className="styled-card-title" style={{ textAlign: headerAlign === 'start' ? 'left' : headerAlign === 'end' ? 'right' : 'center' }}>{title}</div>}
+                    {title && (
+                        <div
+                            className="styled-card-title"
+                            style={{
+                                textAlign: headerAlign === 'start' ? 'left' : headerAlign === 'end' ? 'right' : 'center',
+                                overflow: typeof title !== 'string' ? 'visible' : undefined,
+                                whiteSpace: typeof title !== 'string' ? 'normal' : undefined,
+                                textOverflow: typeof title !== 'string' ? 'clip' : undefined
+                            }}
+                        >
+                            {title}
+                        </div>
+                    )}
                     <div className="styled-card-controls-container" style={{ display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
                         {finalControls && <div className="styled-card-controls">{finalControls}</div>}
                         {onClose && (
@@ -103,50 +124,28 @@ const StyledCard = React.memo(({
                     </div>
                 </div>
             )}
-            {loading ? (
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '100%',
-                    width: '100%',
-                    minHeight: '100px',
-                    padding: '2rem'
-                }}>
-                    <InlineSpinner size="32px" />
-                </div>
-            ) : children}
+
+            {children}
         </div>
     );
 
-    const cardBody = (
+    return (
         <CardAnimator
+            ref={containerRef}
             type="fabricCard"
             active={expanded}
             className={combinedClassName}
             variant={variant}
-            noScale={noScale}
-            distortionFactor={distortionFactor}
-            contentDistortionScale={contentDistortionScale}
+            layout={layout}
+            noScale={noScale || loading}
+            distortionFactor={loading ? 0 : distortionFactor}
+            contentDistortionScale={loading ? 0 : contentDistortionScale}
             shadowScale={shadowScale}
+            onClick={onClick}
             style={{
                 ...style,
                 width: style.width || "100%",
                 height: style.height || "auto",
-            }}
-        >
-            {renderContent()}
-        </CardAnimator>
-    );
-
-    return (
-        <motion.div
-            ref={containerRef}
-            className="styled-card-root"
-            layout={layout}
-            onClick={onClick}
-            style={{
-                width: '100%',
                 position: 'relative',
                 zIndex: expanded ? 10 : 1,
                 ...containerStyle
@@ -154,9 +153,16 @@ const StyledCard = React.memo(({
             transition={{ layout: { type: "spring", stiffness: 90, damping: 20 } }}
             {...props}
         >
-            {cardBody}
-        </motion.div>
+            {renderContent()}
+            {/* Spinner rendered as direct sibling of blurred content, never blurred itself */}
+            {loading && (
+                <div className="expandable-card-loading-overlay">
+                    <InlineSpinner size="32px" />
+                </div>
+            )}
+        </CardAnimator>
     );
+
 });
 
 // Sub-component

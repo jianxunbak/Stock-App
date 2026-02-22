@@ -14,38 +14,6 @@
     color: var(--neu-text-primary);
 }
 
-.headerGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.1rem;
-    width: 100%;
-    margin-top: 0.5rem;
-}
-
-.headerItem {
-    display: flex;
-    flex-direction: column;
-}
-
-.headerLabel {
-    font-size: 0.73rem;
-    color: var(--neu-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    white-space: nowrap;
-}
-
-.headerValueSuccess {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--neu-success);
-}
-
-.headerValueSecondary {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--neu-text-secondary);
-}
 
 .content {
     flex: 1;
@@ -94,23 +62,35 @@
 
 .chartOverlay {
     position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
+    pointer-events: none;
+    z-index: 5;
 }
 
+
 .overlayLabel {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
+    font-weight: 600;
     color: var(--neu-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
 }
 
 .overlayValue {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 800;
     color: var(--neu-text-primary);
+    line-height: 1;
 }
+
 
 .statsPanel {
     display: flex;
@@ -199,7 +179,7 @@
 }
 
 .label {
-    font-size: 0.85rem;
+    font-size: 0.58rem;
     font-weight: 500;
     color: var(--text-secondary);
 }
@@ -226,21 +206,28 @@
     appearance: none;
 }
 
+.neuInput:focus {
+    box-shadow: inset 1px 1px 3px var(--neu-shadow-dark),
+        inset -1px -1px 3px var(--neu-shadow-light);
+}
+
+/* Removal of number arrows */
 .neuInput::-webkit-outer-spin-button,
-.neuInput::-webkit-inner-spin-button {
+.neuInput::-webkit-inner-spin-button,
+.neuInputSmall::-webkit-outer-spin-button,
+.neuInputSmall::-webkit-inner-spin-button,
+.input::-webkit-outer-spin-button,
+.input::-webkit-inner-spin-button {
     -webkit-appearance: none;
     appearance: none;
     margin: 0;
 }
 
-.neuInput[type=number] {
+.neuInput[type=number],
+.neuInputSmall[type=number],
+.input[type=number] {
     -moz-appearance: textfield;
     appearance: textfield;
-}
-
-.neuInput:focus {
-    box-shadow: inset 1px 1px 3px var(--neu-shadow-dark),
-        inset -1px -1px 3px var(--neu-shadow-light);
 }
 
 .lockedInput {
@@ -293,8 +280,9 @@
     padding: 0.75rem 1rem;
     box-shadow: var(--neu-card-shadow);
     border: none;
-    z-index: 50;
+    z-index: 999;
     position: relative;
+
     pointer-events: none;
 }
 
@@ -372,9 +360,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1.5rem;
-    font-size: 0.9rem;
-    padding: 0.25rem 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.25rem 0.75rem;
+    overflow: hidden;
 }
 
 .refRow>span {
@@ -492,4 +481,174 @@
 
 .refList li strong {
     color: var(--text-primary);
+}
+
+/* CPFIS Editor Styles - Synced with Other Investments */
+/* Remove number input arrows */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.cpfisList {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.groupContainer {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.5rem;
+}
+
+.groupHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.groupTitle {
+    background: transparent;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    outline: none;
+    flex: 1;
+}
+
+.groupItems {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.detailedItem {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem 1.5rem;
+    align-items: start;
+    transition: all 0.2s ease;
+}
+
+/* Cleaner Grouped Items */
+.groupItems .detailedItem {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 1.25rem 0 !important;
+    box-shadow: none !important;
+}
+
+.groupItems .detailedItem:not(:first-child) {
+    border-top: 1px solid var(--glass-border) !important;
+}
+
+.detailedItem:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.nameSection {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.deleteAction {
+    grid-column: 2;
+    justify-self: end;
+    align-self: start;
+    padding-top: 1.2rem;
+}
+
+.fieldGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.fieldLabel {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--neu-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-left: 2px;
+}
+
+.input {
+    background: var(--neu-bg);
+    border: none;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+        inset -2px -2px 5px var(--neu-shadow-light);
+    outline: none;
+    transition: all 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.input:focus {
+    box-shadow: inset 1px 1px 3px var(--neu-shadow-dark),
+        inset -1px -1px 3px var(--neu-shadow-light);
+}
+
+.valueWrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.monthlyExtrapolation {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--neu-text-secondary);
+    opacity: 0.9;
+    text-align: right;
+    padding-right: 4px;
+    white-space: nowrap;
+}
+
+@media (max-width: 750px) {
+    .detailedItem {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.25rem 0.75rem;
+    }
+}
+
+.emptyCpfis {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed var(--glass-border);
+    border-radius: 12px;
+    color: var(--neu-text-secondary);
+    font-size: 0.9rem;
+    font-style: italic;
 }

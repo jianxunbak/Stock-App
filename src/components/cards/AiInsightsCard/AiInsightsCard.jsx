@@ -1,7 +1,8 @@
 import React from 'react';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 import Button from '../../ui/Button';
-import { Trash2, Sparkles, Edit } from 'lucide-react';
+import { Trash2, Sparkles, Edit, CheckCircle, Clock, AlertCircle, FileText } from 'lucide-react';
 import InlineSpinner from '../../ui/InlineSpinner/InlineSpinner';
 import styles from './AiInsightsCard.module.css';
 
@@ -17,7 +18,8 @@ const AiInsightsCard = ({
     notes = '',
     onSaveNotes,
     onHide,
-    loading = false
+    loading = false,
+    className = ""
 }) => {
 
     const [userNote, setUserNote] = React.useState(notes);
@@ -85,30 +87,27 @@ const AiInsightsCard = ({
     ];
 
     const hasNotes = notes && notes.trim().length > 0;
+
+    const statusLabel = analyzing ? 'Analyzing...' : (analysis ? 'Ready' : 'No Analysis');
+    const statusColor = analyzing ? 'var(--neu-warning)' : (analysis ? 'var(--neu-success)' : 'var(--neu-text-secondary)');
+    const statusIcon = analyzing ? <Clock size={14} /> : (analysis ? <CheckCircle size={14} /> : <AlertCircle size={14} />);
+
     const summary = (
-        <div className={styles.summaryContainer}>
-            <div className={styles.summaryHeaderTitle}>AI Insights</div>
-            <div className={styles.summaryStatus}>
-                {analyzing ? (
-                    <span className={styles.statusWait}>Analyzing...</span>
-                ) : analysis ? (
-                    <span className={styles.statusReady}>Analysis Ready</span>
-                ) : (
-                    <span className={styles.statusNone}>No Analysis</span>
-                )}
-                {hasNotes && (
-                    <>
-                        <span className={styles.separator}>•</span>
-                        <span className={styles.noteStatus}>1 Note</span>
-                    </>
-                )}
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={[
+                { label: 'AI Analysis', value: statusLabel, color: statusColor }
+            ]}
+            gridMetrics={[
+                { label: analyzing ? 'Processing...' : (analysis ? 'Analysis Available' : 'Not Analyzed'), icon: statusIcon, color: statusColor },
+                ...(hasNotes ? [{ label: '1 Note Saved', icon: <FileText size={14} />, color: 'var(--neu-brand)' }] : [])
+            ]}
+        />
     );
 
     return (
         <ExpandableCard
             title="AI Insights"
+            className={className}
             expanded={openCards.ai}
             defaultExpanded={openCards.ai}
             onToggle={() => toggleCard('ai')}
@@ -116,14 +115,13 @@ const AiInsightsCard = ({
             loading={loading}
             menuItems={menuItems}
             headerContent={summary}
-
+            collapsedHeight={198}
         >
             <div className={styles.insightCard}>
                 <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {analyzing ? (
                         <div className={styles.evaluatingText}>
                             <InlineSpinner size="16px" color="var(--text-secondary)" />
-                            <span>AI Analyzing Portfolio...</span>
                         </div>
                     ) : (
                         <>

@@ -21,6 +21,7 @@
     /* Status Colors */
     --neu-success: #2bc253;
     --neu-error: #e04949;
+    --neu-warning: #fbbf24;
     --neu-color-favorite: #fbbf24;
 
     /* Border Radii */
@@ -141,6 +142,7 @@
     /* Status Colors - Poppier */
     --neu-success: #4ade80;
     --neu-error: #f87171;
+    --neu-warning: #fbbf24;
     --neu-color-favorite: #fbbf24;
 
     /* Metallic Text Adjustments - Silver/White High Contrast */

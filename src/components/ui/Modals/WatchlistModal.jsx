@@ -239,8 +239,6 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
         );
     };
 
-    if (!isOpen) return null;
-
     // Calculate latest update date
     const latestUpdate = watchlist.reduce((latest, item) => {
         if (!item.lastUpdated) return latest;

@@ -138,31 +138,47 @@ const ScenarioEditorWindow = ({
                                                 <label className={styles.inputLabel} style={{ marginBottom: 0 }}>Initial Deposit ({baseCurrencySymbol})</label>
                                                 {currentPortfolioValue > 0 && (
                                                     <DropdownButton
-                                                        label="Autofill"
+                                                        label={scenario.autofillDepositSource ? (scenario.autofillDepositSource === 'total' ? 'Synced: Total' : `Synced: ${scenario.autofillDepositSource}`) : "Autofill"}
                                                         icon={<ChevronDown size={10} />}
                                                         items={[
                                                             {
                                                                 label: `All Portfolios (${baseCurrencySymbol}${Math.round(currentPortfolioValue).toLocaleString()})`,
-                                                                onClick: () => onUpdateScenario(chart.id, scenario.id, 'initialDeposit', Math.round(currentPortfolioValue))
+                                                                onClick: () => onUpdateScenario(chart.id, scenario.id, {
+                                                                    initialDeposit: Math.round(currentPortfolioValue),
+                                                                    autofillDepositSource: 'total'
+                                                                })
                                                             },
                                                             ...(portfolioOptions || []).map(p => ({
                                                                 label: `${p.name} (${baseCurrencySymbol}${Math.round(p.value).toLocaleString()})`,
-                                                                onClick: () => onUpdateScenario(chart.id, scenario.id, 'initialDeposit', Math.round(p.value))
+                                                                onClick: () => onUpdateScenario(chart.id, scenario.id, {
+                                                                    initialDeposit: Math.round(p.value),
+                                                                    autofillDepositSource: p.name
+                                                                })
                                                             }))
                                                         ]}
                                                         variant="text"
                                                         style={{ fontSize: '0.75rem', padding: '0 4px', height: 'auto' }}
-                                                        buttonStyle={{ color: 'var(--neu-accent)', fontSize: '0.75rem', padding: 0, gap: '2px', height: 'auto', border: 'none', background: 'transparent', boxShadow: 'none' }}
+                                                        buttonStyle={{
+                                                            color: scenario.autofillDepositSource ? 'var(--neu-success)' : 'var(--neu-accent)',
+                                                            fontSize: '0.75rem',
+                                                            padding: 0,
+                                                            gap: '2px',
+                                                            height: 'auto',
+                                                            border: 'none',
+                                                            background: 'transparent',
+                                                            boxShadow: 'none'
+                                                        }}
                                                     />
                                                 )}
                                             </div>
                                             <input
                                                 type="number"
-                                                className={styles.numberInput}
+                                                className={`${styles.numberInput} ${scenario.autofillDepositSource ? styles.autofillActive : ''}`}
                                                 value={scenario.initialDeposit}
                                                 onChange={(e) => onUpdateScenario(chart.id, scenario.id, 'initialDeposit', e.target.value === '' ? '' : Number(e.target.value))}
                                                 min="0"
                                                 step="100"
+                                                title={scenario.autofillDepositSource ? 'Automatically updating from portfolio value. Edit manually to disconnect.' : ''}
                                             />
                                         </div>
 

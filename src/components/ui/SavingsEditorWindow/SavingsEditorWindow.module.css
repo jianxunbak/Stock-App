@@ -147,6 +147,12 @@
         inset -1px -1px 3px var(--neu-shadow-light);
 }
 
+.input.autofillActive {
+    border-left: 3px solid var(--neu-success);
+    color: var(--neu-success);
+    font-weight: 500;
+}
+
 .readOnlyValue {
     background: var(--neu-bg-light);
     padding: 0.6rem 0.75rem;

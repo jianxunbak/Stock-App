@@ -1,11 +1,12 @@
 import React, { useState, useMemo, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 import Button from '../../ui/Button';
 import CustomSelect from '../../ui/CustomSelect/CustomSelect';
 import CustomDatePicker from '../../ui/CustomDatePicker/CustomDatePicker';
 import Window from '../../ui/Window/Window';
-import { Eye, RefreshCw, Trash2, Plus, ChevronDown, ChevronRight, Edit2, Check, X, GripVertical, ChevronUp, Maximize } from 'lucide-react';
+import { Eye, RefreshCw, Trash2, Plus, ChevronDown, ChevronRight, Edit2, Check, X, GripVertical, ChevronUp, Maximize, TrendingUp, TrendingDown } from 'lucide-react';
 import { useColumnResize } from '../../../hooks/useColumnResize';
 import styles from './HoldingsCard.module.css';
 
@@ -33,7 +34,8 @@ const HoldingsCard = ({
     dayChangePercent = 0,
     isTestPortfolio = false,
     onHide,
-    loading = false
+    loading = false,
+    className = ""
 }) => {
 
     const navigate = useNavigate();
@@ -71,14 +73,23 @@ const HoldingsCard = ({
         { label: 'Reset Column Sizes', onClick: handleResetWidths, icon: <Maximize size={16} /> }
     ];
 
-    // Summary Header - simplified to just count
+    // Summary Header - using SummaryCardContent to match analysis page
+    const sortedByWeight = useMemo(() => {
+        if (!displayList || displayList.length === 0) return [];
+        return [...displayList].sort((a, b) => (b.weightPercent || 0) - (a.weightPercent || 0));
+    }, [displayList]);
+
     const header = (
-        <div className={styles.summaryInfo}>
-            <div className={styles.summaryName}>Holdings</div>
-            <div className={styles.summaryCount}>
-                {displayList?.length || 0} Stocks
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={[
+                { label: 'Holdings', value: `${displayList?.length || 0} Stocks`, color: 'var(--neu-text-primary)' }
+            ]}
+            gridMetrics={sortedByWeight.slice(0, 6).map(item => ({
+                label: `${item.ticker}: ${(item.weightPercent || 0).toFixed(1)}%`,
+                icon: (item.performance || 0) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />,
+                color: (item.performance || 0) >= 0 ? 'var(--neu-success)' : 'var(--neu-error)'
+            }))}
+        />
     );
 
 
@@ -327,15 +338,14 @@ const HoldingsCard = ({
         <>
             <ExpandableCard
                 title="Holdings"
+                className={className}
                 expanded={openCards.holdings}
-                defaultExpanded={openCards.holdings}
                 onToggle={() => toggleCard('holdings')}
                 onHide={onHide}
                 loading={loading}
+                collapsedHeight={198}
                 headerContent={header}
-                className={styles.card}
                 menuItems={menuItems}
-
             >
                 <div className={styles.tableScroll}>
                     <table className={styles.table}>

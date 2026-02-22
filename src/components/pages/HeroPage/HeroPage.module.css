@@ -61,19 +61,7 @@
 
 /* StyledCard Overrides/Helpers */
 .heroCard {
-    /* Mimic expandable card look if StyledCard default isn't enough */
     width: 100%;
-    padding: 0 !important;
-    /* Let inner row handle padding */
-    background: rgba(255, 255, 255, 0.05);
-    /* Ensure glass look */
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-
-    /* Neumorphic shadow similar to PortfolioPage (reduced 50%) */
-    box-shadow:
-        5px 5px 10px rgba(0, 0, 0, 0.05),
-        -2.5px -2.5px 7.5px rgba(255, 255, 255, 0.025);
 }
 
 .cardRow {
@@ -85,7 +73,7 @@
     align-items: center;
     justify-content: space-evenly;
     /* Use space-evenly for better centering */
-    padding: 2rem 1rem;
+    /* padding: 1rem 1rem; */
     /* Reduce side padding to give more space */
     width: 100%;
     box-sizing: border-box;
@@ -99,46 +87,51 @@
     /* Center by default, or flex-start if preferred */
     flex: 1;
     text-align: center;
+    padding: 1rem 0;
 }
 
 .divider {
     width: 1px;
     height: 60px;
-    background: rgba(255, 255, 255, 0.1);
-    margin: 0 2rem;
+    background: var(--neu-border-subtle);
+    margin: 0 1rem;
+    opacity: 0.5;
 }
 
 .label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--neu-text-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 .value {
-    font-size: 2.25rem;
+    font-size: 2rem;
     font-weight: 800;
-    color: #10B981;
-    /* Green accent as requested */
-    line-height: 1;
+    color: var(--neu-success);
+    line-height: 1.2;
 }
 
 @media (max-width: 768px) {
     .mainTitle {
-        font-size: 2rem;
+        font-size: 2.5rem;
     }
 
     .cardRow {
         flex-direction: column;
-        gap: 1.5rem;
-        padding: 1.5rem;
+        gap: 0;
+        /* padding: 1.5rem; */
     }
 
     .divider {
-        width: 60%;
+        width: 100%;
         height: 1px;
-        margin: 0;
+        margin: 1rem 0;
+    }
+
+    .value {
+        font-size: 1.75rem;
     }
 }
 
@@ -147,7 +140,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding-bottom: 1.5rem;
+    /* padding-bottom: 1.5rem; */
     color: var(--text-secondary);
     font-size: 0.9rem;
     cursor: pointer;

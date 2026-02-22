@@ -77,10 +77,22 @@
 }
 
 .grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 1.5rem;
     align-items: flex-start;
+}
+
+@media (min-width: 768px) {
+    .grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1100px) {
+    .grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 
@@ -113,44 +125,41 @@
     color: #F59E0B;
 }
 
-@media (min-width: 768px) {
-    .grid {
-        display: flex;
-    }
+/* Grid handles display mode now */
+
+.colSpan3 {
+    grid-column: 1 / -1;
+    width: 100%;
+    transition: all 0.3s ease;
 }
 
-@media (min-width: 1024px) {
-    .grid {
-        display: flex;
-    }
-}
-
-.colSpan3,
-.colSpan2,
 .colSpan1 {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 0;
-    max-width: 100%;
-    transition: flex 0.3s ease, width 0.3s ease;
+    width: 100%;
+    transition: all 0.3s ease;
 }
 
 .expandedWrapper {
-    flex: 1 1 100% !important;
+    grid-column: 1 / -1 !important;
     width: 100% !important;
 }
 
 .collapsedWrapper {
-    flex: 0 0 auto !important;
-    width: auto !important;
+    /* No longer forcing 100% width here, let colSpan handle it */
+    height: auto;
 }
 
-@media (min-width: 1024px) {
+@media (max-width: 767px) {
+    .grid {
+        gap: 1.5rem !important;
+        /* Match PortfolioPage gap */
+    }
 
-    .colSpan3,
-    .colSpan2,
-    .colSpan1 {
-        flex: 0 0 auto;
-        width: auto;
+    .collapsedWrapper {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        height: auto !important;
+        /* Size to content */
+        aspect-ratio: auto !important;
+        margin-bottom: 0 !important;
     }
 }

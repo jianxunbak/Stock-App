@@ -30,7 +30,7 @@ const HeroPage = () => {
     const [displayCurrency, setDisplayCurrency] = useState('USD');
     const [baseCurrency, setBaseCurrency] = useState('USD'); // Added
     const [liveData, setLiveData] = useState({});
-    const [pricesLoading, setPricesLoading] = useState(false);
+    const [pricesLoading, setPricesLoading] = useState(true);
 
     // Currency conversion rates
     const [baseToDisplayRate, setBaseToDisplayRate] = useState(1);
@@ -155,7 +155,12 @@ const HeroPage = () => {
         const currentSavings = Number(savingsScenario?.initialSavings || 0);
 
         // CPF
-        const currentCpf = Object.values(settings.cpf?.balances || {}).reduce((a, b) => a + Number(b || 0), 0);
+        const currentCpfBalances = Object.values(settings.cpf?.balances || {}).reduce((a, b) => a + Number(b || 0), 0);
+        const currentCpfisTotal = [
+            ...(settings.cpf?.cpfisData?.items || []),
+            ...(settings.cpf?.cpfisData?.groups || []).flatMap(g => g.items || [])
+        ].reduce((sum, item) => sum + Number(item.value || 0), 0);
+        const currentCpf = currentCpfBalances + currentCpfisTotal;
 
         // Other
         let currentOther = 0;
@@ -248,7 +253,8 @@ const HeroPage = () => {
                 annualBonus: Number(settings.cpf?.annualBonus || 0),
                 salaryGrowth: Number(settings.cpf?.salaryGrowth || 0),
                 projectionYears: yearsToProjection,
-                balances: settings.cpf?.balances || { oa: 0, sa: 0, ma: 0, ra: 0 }
+                balances: settings.cpf?.balances || { oa: 0, sa: 0, ma: 0, ra: 0 },
+                cpfisData: settings.cpf?.cpfisData
             });
             const target = cpfProjection.projection ? (cpfProjection.projection[yearsToProjection] || cpfProjection.projection[cpfProjection.projection.length - 1]) : null;
             projectedCpf = target ? target.total : 0;
@@ -382,22 +388,23 @@ const HeroPage = () => {
                         variant="default"
                         onClick={() => navigate('/portfolio')}
                         style={{ cursor: 'pointer' }}
-                        shadowScale={0.5}
-                        contentDistortionScale={0.5}
-                        distortionFactor={0.5}
+                        shadowScale={1}
+                        contentDistortionScale={0.3}
+                        distortionFactor={1}
+                        loading={settingsLoading || pricesLoading}
                     >
                         <div className={styles.cardRow}>
                             <div className={styles.dataItem}>
                                 <span className={styles.label}>Current Estimated Net Worth</span>
                                 <span className={styles.value}>
-                                    {settingsLoading ? '...' : formatCurrency(estimatedNetWorth)}
+                                    {formatCurrency(estimatedNetWorth)}
                                 </span>
                             </div>
                             <div className={styles.divider}></div>
                             <div className={styles.dataItem}>
                                 <span className={styles.label}>Current Portfolio Value</span>
                                 <span className={styles.value}>
-                                    {pricesLoading ? '...' : formatCurrency(totalPortfolioValue * usdToDisplayRate)}
+                                    {formatCurrency(totalPortfolioValue * usdToDisplayRate)}
                                 </span>
                             </div>
                         </div>
@@ -413,22 +420,23 @@ const HeroPage = () => {
                         variant="default"
                         onClick={() => navigate('/wealth')}
                         style={{ cursor: 'pointer' }}
-                        shadowScale={0.5}
-                        contentDistortionScale={0.5}
-                        distortionFactor={0.5}
+                        shadowScale={1}
+                        contentDistortionScale={0.3}
+                        distortionFactor={1}
+                        loading={settingsLoading}
                     >
                         <div className={styles.cardRow}>
                             <div className={styles.dataItem}>
                                 <span className={styles.label}>Estimated Net Worth @ Age 55</span>
                                 <span className={styles.value}>
-                                    {settingsLoading ? '...' : formatCurrency(netWorthAt55)}
+                                    {formatCurrency(netWorthAt55)}
                                 </span>
                             </div>
                             <div className={styles.divider}></div>
                             <div className={styles.dataItem}>
                                 <span className={styles.label}>Estimated Stock Value @ Age 55</span>
                                 <span className={styles.value}>
-                                    {settingsLoading ? '...' : formatCurrency(stocksAt55)}
+                                    {formatCurrency(stocksAt55)}
                                 </span>
                             </div>
                         </div>

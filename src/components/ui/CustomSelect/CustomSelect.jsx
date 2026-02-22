@@ -28,11 +28,20 @@ const CustomSelect = ({
     const menuRef = useRef(null);
     const [internalIsMobile, setInternalIsMobile] = useState(window.innerWidth < 768);
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const isMobile = propIsMobile !== undefined ? propIsMobile : internalIsMobile;
-
     const isControlled = controlledIsOpen !== undefined;
     const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => setIsExpanded(true), 50);
+            return () => clearTimeout(timer);
+        } else {
+            setIsExpanded(false);
+        }
+    }, [isOpen]);
 
     const updateIsOpen = (val) => {
         if (isControlled) {
@@ -155,9 +164,9 @@ const CustomSelect = ({
     const menuContent = (
         <CardAnimator
             type="fabricCard"
-            active={isOpen}
+            active={isExpanded}
             className={styles.customSelectMenu}
-            distortionFactor={distortionFactor}
+            distortionFactor={distortionFactor * 0.8}
             contentDistortionScale={contentDistortionScale}
             style={{
                 width: '100%',

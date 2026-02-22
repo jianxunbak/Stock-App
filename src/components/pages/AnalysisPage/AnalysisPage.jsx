@@ -1,44 +1,39 @@
 import React, { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useStockData } from '../../../hooks/useStockData';
 import { useAuth } from '../../../context/AuthContext';
-import { fetchUserSettings, saveUserSettings, fetchStockData } from '../../../services/api';
+import { fetchUserSettings, saveUserSettings } from '../../../services/api';
 import { useUserSettings } from '../../../hooks/useUserSettings';
-
-import MetricCard from '../../ui/MetricCard/MetricCard';
-
-import MoatCard from '../../cards/MoatCard/MoatCard';
-import ProfitabilityCard from '../../cards/ProfitabilityCard/ProfitabilityCard';
-import DebtCard from '../../cards/DebtCard/DebtCard';
-import GrowthCard from '../../cards/GrowthCard/GrowthCard';
-import ValuationCard from '../../cards/ValuationCard/ValuationCard';
-import SupportResistanceCard from '../../cards/SupportResistanceCard/SupportResistanceCard';
-import FinancialTables from '../../cards/FinancialTables/FinancialTables';
-import FinancialSummary from '../../ui/FinancialSummary';
-
-import Window from '../../ui/Window/Window';
-import WatchlistModal from '../../ui/Modals/WatchlistModal';
-import AddStockToPortfolioModal from '../../ui/Modals/AddStockToPortfolioModal';
 import { usePortfolio } from '../../../hooks/usePortfolio';
 import { useWatchlist } from '../../../hooks/useWatchlist';
-import HideConfirmationModal from '../../ui/Modals/HideConfirmationModal';
-import { ArrowLeft, Briefcase, Zap, TrendingUp, Info, MoreVertical, Edit } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import UserProfileModal from '../../ui/Modals/UserProfileModal';
-import CascadingHeader from '../../ui/CascadingHeader/CascadingHeader';
-import { TopNavLogo, TopNavActions } from '../../ui/Navigation/TopNav';
-import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
-import StockOverviewCard from '../../cards/StockOverviewCard/StockOverviewCard';
-import Button from '../../ui/Button';
-import StockInfoModal from '../../ui/Modals/StockInfoModal';
+
+// Sub-components
+import AnalysisHeader from './components/AnalysisHeader';
+import AnalysisGrid from './components/AnalysisGrid';
+import AnalysisModals from './components/AnalysisModals';
 import InlineSpinner from '../../ui/InlineSpinner/InlineSpinner';
 
 import styles from './AnalysisPage.module.css';
 
-// AnalysisPage - v1.0.1 (Stability Fix)
+// AnalysisPage - v2.0 (Modular Refactor)
 const AnalysisPage = () => {
+    // 1. Data & Auth Hooks
     const { stockData, loadStockData, error, loading } = useStockData();
-    const [ticker, setTicker] = useState('');
+    const { addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
+    const { portfolioList, addStockToPortfolio } = usePortfolio();
+    const { currentUser, logout, loading: authLoading } = useAuth();
+    const { settings, updateSettings } = useUserSettings();
+    const navigate = useNavigate();
+
+    // 2. Search & URL State
+    const [searchParams, setSearchParams] = useSearchParams();
+    const urlTicker = searchParams.get('ticker');
+    const [ticker, setTicker] = useState(urlTicker || '');
+    const [isSearching, setIsSearching] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(!!urlTicker);
+    const lastValidTicker = useRef(null);
+
+    // 3. UI States (Modals, Toggles, etc.)
     const [moatStatusLabel, setMoatStatusLabel] = useState(null);
     const [isMoatEvaluating, setIsMoatEvaluating] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
@@ -46,12 +41,184 @@ const AnalysisPage = () => {
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showAddPortfolioModal, setShowAddPortfolioModal] = useState(false);
     const [showStockInfo, setShowStockInfo] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
     const [analysisComparisons, setAnalysisComparisons] = useState([]);
-    const { addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
 
-    const handleAddToWatchlist = (shouldAdd) => {
+    // Card states (Visibility, Order, Open/Closed)
+    const [cardOrder, setCardOrder] = useState(['stockSummary', 'financialAnalysis', 'profitability', 'moat', 'debt', 'valuation', 'support', 'financials']);
+    const [openCards, setOpenCards] = useState({
+        stockSummary: false, financialAnalysis: false, profitability: false,
+        moat: false, debt: false, valuation: false, support: false, financials: false
+    });
+    const [cardVisibility, setCardVisibility] = useState({
+        stockSummary: true, financialAnalysis: true, profitability: true,
+        moat: true, debt: true, valuation: true, support: true, financials: true
+    });
+    const [hideModalState, setHideModalState] = useState({ isOpen: false, cardKey: null, cardLabel: '' });
+
+    // 4. Constants & Memos
+    const RATES = { 'USD': 1, 'SGD': 1.35, 'EUR': 0.92, 'GBP': 0.79 };
+    const currentRate = RATES[currency];
+    const currencySymbol = currency === 'EUR' ? '€' : (currency === 'GBP' ? '£' : (currency === 'SGD' ? 'S$' : '$'));
+    const isTickerDiverged = urlTicker && stockData?.overview?.symbol !== urlTicker.toUpperCase();
+    const effectiveLoading = loading || initialLoading || isSearching || isTickerDiverged;
+
+    const modifiedScore = useMemo(() => {
+        if (!stockData?.score) return null;
+        let total = 0; let max = 0;
+        const newCriteria = stockData.score.criteria?.map(c => {
+            const isMoat = c.name.toLowerCase().includes('moat');
+            let status = c.status?.toLowerCase();
+            if (isMoat) {
+                if (isMoatEvaluating) status = 'evaluating';
+                else if (!moatStatusLabel) status = 'pending';
+                else status = moatStatusLabel.toLowerCase().includes('no') ? 'fail' : 'pass';
+            }
+            if (status !== 'pending' && status !== 'evaluating') {
+                max += 1; if (status === 'pass') total += 1;
+            }
+            return { ...c, status };
+        });
+        return { ...stockData.score, total, max, criteria: newCriteria };
+    }, [stockData?.score, moatStatusLabel, isMoatEvaluating]);
+
+    // 5. Effects & Listeners
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        if (!authLoading && !currentUser) navigate('/');
+    }, [authLoading, currentUser, navigate]);
+
+    useEffect(() => {
+        if (error) setShowErrorModal(true);
+    }, [error]);
+
+    // Persistence: Load ticker from URL/Storage
+    useEffect(() => {
+        const savedTicker = localStorage.getItem('lastTicker');
+        if (urlTicker) {
+            setTicker(urlTicker);
+            loadStockData(urlTicker)
+                .then(() => {
+                    lastValidTicker.current = urlTicker;
+                    // Only persist valid tickers to localStorage
+                    if (urlTicker !== savedTicker) localStorage.setItem('lastTicker', urlTicker);
+                })
+                .catch(() => {
+                    // Ticker not found — will be handled by the error modal close
+                })
+                .finally(() => {
+                    setInitialLoading(false);
+                    setIsSearching(false);
+                });
+            setMoatStatusLabel(null); setIsMoatEvaluating(false);
+        } else if (savedTicker) {
+            setSearchParams({ ticker: savedTicker });
+        } else {
+            setInitialLoading(false);
+        }
+    }, [urlTicker, loadStockData, setSearchParams]);
+
+    // Sync shielding for remote settings
+    const ignoreRemoteSyncUntil = useRef(0);
+    const loadSettings = useCallback((e) => {
+        if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') return;
+        if (e?.detail?.settings) {
+            const settings = e.detail.settings;
+            const defer = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
+            defer(() => {
+                startTransition(() => {
+                    if (settings.cardVisibility?.analysis) setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
+                    if (settings.cardOrder?.analysis) setCardOrder(settings.cardOrder.analysis);
+                    if (settings.baseCurrency) setCurrency(settings.baseCurrency);
+                });
+            });
+            return;
+        }
+        if (currentUser?.uid) {
+            fetchUserSettings(currentUser.uid).then(settings => {
+                if (Date.now() < ignoreRemoteSyncUntil.current) return;
+                if (settings?.analysisCardStates) {
+                    setOpenCards(prev => {
+                        const newState = { ...prev, ...settings.analysisCardStates };
+                        localStorage.setItem('analysis_card_states', JSON.stringify(newState));
+                        return newState;
+                    });
+                }
+                if (settings?.cardVisibility?.analysis) setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
+                if (settings?.cardOrder?.analysis) setCardOrder(settings.cardOrder.analysis);
+                if (settings?.baseCurrency) setCurrency(settings.baseCurrency);
+                if (settings?.analysisComparisons) setAnalysisComparisons(settings.analysisComparisons);
+            });
+        }
+    }, [currentUser?.uid]);
+
+    useEffect(() => {
+        loadSettings();
+        window.addEventListener('user-settings-updated', loadSettings);
+        return () => window.removeEventListener('user-settings-updated', loadSettings);
+    }, [loadSettings]);
+
+    // 6. Handlers
+    // 6. Handlers
+    const handleSearch = useCallback((val) => {
+        if (val && val.preventDefault) val.preventDefault();
+        const tickerValue = (typeof val === 'string' ? val : ticker).trim();
+        if (!tickerValue) return;
+        const upperTicker = tickerValue.toUpperCase();
+        setIsSearching(true);
+        setShowErrorModal(false);
+        if (upperTicker === urlTicker) {
+            loadStockData(upperTicker, true).finally(() => setIsSearching(false));
+            return;
+        }
+        setTimeout(() => setSearchParams({ ticker: upperTicker }), 0);
+    }, [ticker, urlTicker, loadStockData, setSearchParams]);
+
+    const toggleCard = useCallback((card) => {
+        ignoreRemoteSyncUntil.current = Date.now() + 2000;
+        setOpenCards(prev => {
+            const newState = { ...prev, [card]: !prev[card] };
+            localStorage.setItem('analysis_card_states', JSON.stringify(newState));
+            if (currentUser?.uid) saveUserSettings(currentUser.uid, { analysisCardStates: newState });
+            return newState;
+        });
+    }, [currentUser?.uid, saveUserSettings]);
+
+    const handleConfirmHide = useCallback(async () => {
+        const { cardKey } = hideModalState;
+        if (!cardKey) return;
+
+        try {
+            const currentVisibility = { ...cardVisibility, [cardKey]: false };
+            const updatedOrder = cardOrder.filter(k => k !== cardKey);
+
+            setCardVisibility(currentVisibility);
+            setCardOrder(updatedOrder);
+
+            if (currentUser?.uid) {
+                const newSettings = {
+                    ...settings,
+                    cardVisibility: { ...settings?.cardVisibility, analysis: currentVisibility },
+                    cardOrder: { ...settings?.cardOrder, analysis: updatedOrder }
+                };
+                await saveUserSettings(currentUser.uid, newSettings);
+                window.dispatchEvent(new CustomEvent('user-settings-updated', { detail: { settings: newSettings, source: 'internal' } }));
+            }
+
+            setHideModalState(prev => ({ ...prev, isOpen: false }));
+        } catch (error) {
+            console.error('Failed to save visibility settings:', error);
+        }
+    }, [hideModalState, cardVisibility, cardOrder, currentUser?.uid, saveUserSettings, settings]);
+
+    const handleAddToWatchlist = useCallback((shouldAdd) => {
         if (!stockData?.overview?.symbol) return;
-
         if (shouldAdd) {
             addToWatchlist({
                 ticker: stockData.overview.symbol,
@@ -61,7 +228,6 @@ const AnalysisPage = () => {
                 changePercent: stockData.overview.changePercent,
                 currency: currency,
                 score: stockData.score?.total || 0,
-                // Add default fields needed by WatchlistModal
                 signal: 'Hold',
                 supportLevel: 0,
                 intrinsicValue: 0
@@ -69,633 +235,144 @@ const AnalysisPage = () => {
         } else {
             removeFromWatchlist(stockData.overview.symbol);
         }
-    };
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-    const { portfolioList, addStockToPortfolio } = usePortfolio();
+    }, [stockData, addToWatchlist, removeFromWatchlist, currency]);
 
-    useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-    const [searchParams, setSearchParams] = useSearchParams();
-    const urlTicker = searchParams.get('ticker');
-    const navigate = useNavigate();
-    const { currentUser, logout, loading: authLoading } = useAuth();
-    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
-    const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
-
-    // Keep local currency state in sync with global settings
-    useEffect(() => {
-        if (settings?.baseCurrency && settings.baseCurrency !== currency) {
-            setCurrency(settings.baseCurrency);
+    // --- Error Handling ---
+    const handleCloseError = useCallback(() => {
+        setShowErrorModal(false);
+        // If we have a previously valid ticker, revert back to it
+        if (lastValidTicker.current && lastValidTicker.current !== urlTicker) {
+            setSearchParams({ ticker: lastValidTicker.current });
+            setTicker(lastValidTicker.current);
+        } else if (!lastValidTicker.current) {
+            // No valid data was ever loaded — navigate back to previous page
+            navigate(-1);
         }
-    }, [settings?.baseCurrency, currency]);
+    }, [urlTicker, setSearchParams, navigate]);
 
-    const handleCurrencyChange = (newCurrency) => {
-        setCurrency(newCurrency);
-        updateSettings({ baseCurrency: newCurrency });
-    };
-
-    // console.log("AnalysisPage Settings:", { settings, settingsLoading });
-
-    // Currency conversion rates (base: USD)
-    const RATES = { 'USD': 1, 'SGD': 1.35, 'EUR': 0.92, 'GBP': 0.79 };
-    const currentRate = RATES[currency];
-    const currencySymbol = currency === 'EUR' ? '€' : (currency === 'GBP' ? '£' : (currency === 'SGD' ? 'S$' : '$'));
-
-    const [initialLoading, setInitialLoading] = useState(() => {
-        const params = new URLSearchParams(window.location.search);
-        return !!params.get('ticker');
-    });
-
-    // Collapsible Cards State
-    // Collapsible Cards State
-    const [openCards, setOpenCards] = useState({
-        stockSummary: false,
-        financialAnalysis: false,
-        profitability: false,
-        moat: false,
-        debt: false,
-        valuation: false,
-        support: false,
-        financials: false
-    });
-
-    // Load initial state from local storage on mount (fastest)
-    useEffect(() => {
-        const saved = localStorage.getItem('analysis_card_states');
-        if (saved) {
-            try {
-                setOpenCards(prev => ({ ...prev, ...JSON.parse(saved) }));
-            } catch (e) {
-                console.error("Failed to parse saved card states", e);
-            }
-        }
-    }, []);
-
-    const [cardVisibility, setCardVisibility] = useState({
-        stockSummary: true,
-        financialAnalysis: true,
-        profitability: true,
-        moat: true,
-        debt: true,
-        valuation: true,
-        support: true,
-        financials: true
-    });
-    const [cardOrder, setCardOrder] = useState(['stockSummary', 'financialAnalysis', 'profitability', 'moat', 'debt', 'valuation', 'support', 'financials']);
-
-    const [hideModalState, setHideModalState] = useState({
-        isOpen: false,
-        cardKey: null,
-        cardLabel: ''
-    });
-
-    const cardLabels = {
-        stockSummary: 'Stock Summary',
-        financialAnalysis: 'Financial Analysis',
-        profitability: 'Profitability',
-        moat: 'Moat Evaluation',
-        debt: 'Debt Analysis',
-        valuation: 'Valuation',
-        support: 'Support & Resistance',
-        financials: 'Financial Statements'
-    };
-
-    const handleHideRequest = (key) => {
-        setHideModalState({
-            isOpen: true,
-            cardKey: key,
-            cardLabel: cardLabels[key] || key
-        });
-    };
-
-    const handleConfirmHide = async () => {
-        const { cardKey } = hideModalState;
-        if (!cardKey) return;
-
-        const newVisibility = {
-            ...cardVisibility,
-            [cardKey]: false
-        };
-
-        // Update local state
-        setCardVisibility(newVisibility);
-
-        // Save to DB
-        if (currentUser?.uid) {
-            const currentSettings = await fetchUserSettings(currentUser.uid);
-            const newSettings = {
-                ...currentSettings,
-                cardVisibility: {
-                    ...currentSettings?.cardVisibility,
-                    analysis: newVisibility
-                }
-            };
-            await saveUserSettings(currentUser.uid, newSettings);
-
-            // Notify other components (like UserProfileModal if it were open)
-            window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: newSettings, source: 'internal' }
-            }));
-        }
-
-        setHideModalState({ isOpen: false, cardKey: null, cardLabel: '' });
-    };
-
+    // --- Profile Modal ---
     const handleCloseProfileModal = useCallback(() => setShowProfileModal(false), []);
 
-    // Load User Preferences from DB
-    const ignoreRemoteSyncUntil = useRef(0);
-
-    const loadSettings = useCallback((e) => {
-        if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') {
-            return;
-        }
-
-        // 1. If we have a data-rich event (Optimistic Update from Modal)
-        if (e?.detail?.settings) {
-            const settings = e.detail.settings;
-            // Defer update to next idle period to prioritize Modal UI
-            const defer = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
-
-            defer(() => {
-                startTransition(() => {
-                    if (settings.cardVisibility?.analysis) {
-                        setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
-                    }
-                    if (settings.cardOrder?.analysis) {
-                        setCardOrder(settings.cardOrder.analysis);
-                    }
-                    if (settings.baseCurrency) {
-                        setCurrency(settings.baseCurrency);
-                    }
-                });
-            });
-            return;
-        }
-
-        // 2. Regular Fetch (Initial load or fallback)
-        if (currentUser?.uid) {
-            fetchUserSettings(currentUser.uid).then(settings => {
-                // SYNC SHIELD: Catch in-flight requests that might be stale
-                if (Date.now() < ignoreRemoteSyncUntil.current) return;
-
-                if (settings?.analysisCardStates) {
-                    setOpenCards(prev => {
-                        const newState = { ...prev, ...settings.analysisCardStates };
-                        localStorage.setItem('analysis_card_states', JSON.stringify(newState));
-                        return newState;
-                    });
-                }
-                if (settings?.cardVisibility?.analysis) {
-                    setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
-                }
-                if (settings?.cardOrder?.analysis) {
-                    setCardOrder(settings.cardOrder.analysis);
-                }
-                if (settings?.baseCurrency) {
-                    setCurrency(settings.baseCurrency);
-                }
-                if (settings?.analysisComparisons) setAnalysisComparisons(settings.analysisComparisons);
-            });
-        }
-    }, [currentUser?.uid]);
-
-    useEffect(() => {
-        loadSettings();
-
-        // Listen for internal settings updates
-        window.addEventListener('user-settings-updated', loadSettings);
-        return () => window.removeEventListener('user-settings-updated', loadSettings);
-    }, [loadSettings]);
-
-    const lastToggleTime = useRef(0);
-
-    const toggleCard = (card) => {
-        const now = Date.now();
-        if (now - lastToggleTime.current < 1000) return;
-        lastToggleTime.current = now;
-
-        // Block remote sync for 2 seconds to allow DB to update and avoid stale overwrites
-        ignoreRemoteSyncUntil.current = Date.now() + 2000;
-
-        setOpenCards(prev => {
-            const newState = { ...prev, [card]: !prev[card] };
-
-            // 1. Save to Local Storage (Immediate)
-            localStorage.setItem('analysis_card_states', JSON.stringify(newState));
-
-            // 2. Save to DB (Background)
-            if (currentUser?.uid) {
-                saveUserSettings(currentUser.uid, { analysisCardStates: newState });
-            }
-
-            return newState;
-        });
-    };
-
-    // Persistence: Load ticker from localStorage or URL on mount and update
-    useEffect(() => {
-        const savedTicker = localStorage.getItem('lastTicker');
-
-        if (urlTicker) {
-            setTicker(urlTicker);
-            loadStockData(urlTicker).finally(() => setInitialLoading(false));
-            if (urlTicker !== savedTicker) {
-                localStorage.setItem('lastTicker', urlTicker);
-            }
-
-            // Reset states when ticker changes
-            setMoatStatusLabel(null);
-            setIsMoatEvaluating(false);
-
-        } else if (savedTicker) {
-            setSearchParams({ ticker: savedTicker });
-        } else {
-            setInitialLoading(false);
-        }
-    }, [urlTicker, loadStockData, setSearchParams]);
-
-    const handleAddAnalysisComparison = (newTicker) => {
-        const term = newTicker.toUpperCase();
-        if (analysisComparisons.includes(term)) return;
-        const newList = [...analysisComparisons, term];
-        setAnalysisComparisons(newList);
-        if (currentUser?.uid) {
-            saveUserSettings(currentUser.uid, { analysisComparisons: newList });
-        }
-    };
-
-    const handleRemoveAnalysisComparison = (tickerToRemove) => {
-        const newList = analysisComparisons.filter(t => t !== tickerToRemove);
-        setAnalysisComparisons(newList);
-        if (currentUser?.uid) {
-            saveUserSettings(currentUser.uid, { analysisComparisons: newList });
-        }
-    };
-
-    // Auth Protection
-    useEffect(() => {
-        if (!authLoading && !currentUser) {
-            navigate('/');
-        }
-    }, [authLoading, currentUser, navigate]);
-
-
-    // Error Handling: Show Modal on error
-    useEffect(() => {
-        if (error) {
-            setShowErrorModal(true);
-        }
-    }, [error]);
-
-    const handleSearch = async (val) => {
-        // Prevent default if it's an event
-        if (val && val.preventDefault) val.preventDefault();
-
-        // Check if val is a string (passed from TopNav) or event/undefined
-        const tickerValue = (typeof val === 'string' ? val : ticker).trim();
-
-        if (!tickerValue) return; // Block empty search
-
-        const upperTicker = tickerValue.toUpperCase();
-
-        // Update URL immediately - existing useEffect will handle loading & validation
-        setSearchParams({ ticker: upperTicker });
-    };
-
-    const handleLogout = async () => {
+    // --- Portfolio Integration ---
+    const handleAddStockToPortfolio = useCallback(async (data) => {
+        const { portfolioIds, ...rest } = data;
         try {
-            await logout();
-            navigate('/');
-        } catch (error) {
-            console.error("Failed to log out", error);
-        }
-    };
-
-
-
-    const handleCloseError = () => {
-        setShowErrorModal(false);
-    };
-
-    const handleAddStockToPortfolio = async (data) => {
-        const { portfolioIds, ...stockData } = data;
-
-        try {
-            const promises = portfolioIds.map(async (id) => {
-                return addStockToPortfolio(id, stockData);
-            });
-
-            await Promise.all(promises);
+            await Promise.all(portfolioIds.map(id => addStockToPortfolio(id, rest)));
             setShowAddPortfolioModal(false);
         } catch (error) {
-            console.error("Failed to add stock to portfolio(s):", error);
+            console.error('Failed to add stock to portfolios:', error);
             throw error;
         }
-    };
+    }, [addStockToPortfolio]);
 
+    const setShowStockInfoCallback = useCallback((val) => setShowStockInfo(val), []);
+    const setShowAddPortfolioModalCallback = useCallback((val) => setShowAddPortfolioModal(val), []);
+    const setShowWatchlistCallback = useCallback((val) => setShowWatchlist(val), []);
+    const setShowProfileModalCallback = useCallback((val) => setShowProfileModal(val), []);
 
+    const handleSetCurrency = useCallback((c) => {
+        setCurrency(c);
+        updateSettings({ baseCurrency: c });
+    }, [setCurrency, updateSettings]);
 
-    const modifiedScore = useMemo(() => {
-        if (!stockData?.score) return null;
+    const handleLogoutAction = useCallback(async () => {
+        await logout();
+        navigate('/');
+    }, [logout, navigate]);
 
-        let total = 0;
-        let max = 0;
+    const handleHideRequest = useCallback((k) => {
+        setHideModalState({ isOpen: true, cardKey: k, cardLabel: k });
+    }, []);
 
-        const newCriteria = stockData.score.criteria?.map(c => {
-            const isMoat = c.name.toLowerCase().includes('moat');
-            let status = c.status?.toLowerCase();
-
-            if (isMoat) {
-                if (isMoatEvaluating) status = 'evaluating';
-                else if (!moatStatusLabel) status = 'pending';
-                else status = moatStatusLabel.toLowerCase().includes('no') ? 'fail' : 'pass';
-            }
-
-            // Only add to score if not pending/evaluating
-            if (status !== 'pending' && status !== 'evaluating') {
-                max += 1;
-                if (status === 'pass') total += 1;
-            }
-
-            return { ...c, status };
+    const handleAddComparison = useCallback((t) => {
+        const upperTicker = t.toUpperCase();
+        setAnalysisComparisons(prev => {
+            if (prev.includes(upperTicker)) return prev;
+            const newList = [...prev, upperTicker];
+            if (currentUser?.uid) saveUserSettings(currentUser.uid, { analysisComparisons: newList });
+            return newList;
         });
+    }, [currentUser?.uid, saveUserSettings]);
 
-        return {
-            ...stockData.score,
-            total,
-            max,
-            criteria: newCriteria
-        };
-    }, [stockData?.score, moatStatusLabel, isMoatEvaluating]);
+    const handleRemoveComparison = useCallback((t) => {
+        const upperTicker = t.toUpperCase();
+        setAnalysisComparisons(prev => {
+            const newList = prev.filter(x => x !== upperTicker);
+            if (currentUser?.uid) saveUserSettings(currentUser.uid, { analysisComparisons: newList });
+            return newList;
+        });
+    }, [currentUser?.uid, saveUserSettings]);
 
-    if (authLoading) return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw', background: 'var(--neu-bg)' }}>
-            <InlineSpinner size="40px" />
-        </div>
-    );
 
-    const actionGroupContent = (
-        <TopNavActions
-            searchTicker={ticker}
-            setSearchTicker={setTicker}
-            handleSearch={handleSearch}
-            currency={currency}
-            setCurrency={handleCurrencyChange}
-            setShowWatchlist={setShowWatchlist}
-            setShowProfileModal={setShowProfileModal}
-            handleLogout={handleLogout}
-        />
-    );
-
-    const backButtonContent = !loading && (
-        <Button
-            onClick={() => navigate('/')}
-            variant="icon"
-        >
-            <ArrowLeft size={20} />
-        </Button>
-    );
-
+    // 7. Render
     return (
         <div className={styles.container}>
             <div className={styles.wrapper} style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '20px', left: '0px', zIndex: 80, pointerEvents: 'none' }}>
-                    <TopNavLogo />
-                </div>
-
-                <CascadingHeader
-                    topRightContent={actionGroupContent}
-                    bottomLeftContent={backButtonContent}
-                    gap="40px"
+                <AnalysisHeader
+                    ticker={ticker}
+                    setTicker={setTicker}
+                    handleSearch={handleSearch}
+                    currency={currency}
+                    setCurrency={handleSetCurrency}
+                    setShowWatchlist={setShowWatchlistCallback}
+                    setShowProfileModal={setShowProfileModalCallback}
+                    handleLogout={handleLogoutAction}
+                    loading={loading}
                 />
 
-                <Window
-                    isOpen={showErrorModal}
-                    onClose={handleCloseError}
-                    title="Stock Not Found"
-                    headerAlign="start"
-                    width="400px"
-                    height="auto"
-                >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0.5rem' }}>
-                        <div style={{ color: 'var(--neu-text-primary)' }}>
-                            <p style={{ lineHeight: '1.5' }}>Could not find {ticker}. Please check the ticker and try again.</p>
-                        </div>
-                    </div>
-                </Window>
-
-                <div className={styles.grid}>
-                    {cardOrder.map(cardKey => {
-                        const isSpan1 = ['debt', 'valuation', 'support'].includes(cardKey);
-                        const colSpanClass = isSpan1 ? styles.colSpan1 : styles.colSpan3;
-                        const isOpen = !!openCards[cardKey];
-                        const cardTicker = ticker || urlTicker || 'no-ticker';
-                        const wrapperClass = `${colSpanClass} ${!isOpen ? styles.collapsedWrapper : styles.expandedWrapper}`;
-
-                        if (cardKey === 'stockSummary' && cardVisibility.stockSummary) {
-                            return (
-                                <div key="stockSummary" className={wrapperClass}>
-                                    <StockOverviewCard
-                                        key={cardTicker}
-                                        stockData={{ ...stockData, score: modifiedScore }}
-                                        currencySymbol={currencySymbol}
-                                        currentRate={currentRate}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('stockSummary')}
-                                        onAddToWatchlist={handleAddToWatchlist}
-                                        onAddToPortfolio={() => setShowAddPortfolioModal(true)}
-                                        onViewDetails={() => setShowStockInfo(true)}
-                                        isFavorite={watchlist.some(item => item.ticker === stockData?.overview?.symbol)}
-                                        onRefresh={() => stockData?.overview?.symbol && loadStockData(stockData.overview.symbol, true)}
-                                        onHide={() => handleHideRequest('stockSummary')}
-                                        comparisonTickers={analysisComparisons}
-                                        onAddComparison={handleAddAnalysisComparison}
-                                        onRemoveComparison={handleRemoveAnalysisComparison}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        if (cardKey === 'financialAnalysis' && cardVisibility.financialAnalysis) {
-                            return (
-                                <div key="financialAnalysis" className={wrapperClass}>
-                                    <GrowthCard
-                                        key={cardTicker}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('financialAnalysis')}
-                                        onHide={() => handleHideRequest('financialAnalysis')}
-                                        isETF={stockData?.overview?.quoteType === 'ETF' || stockData?.overview?.industry === 'ETF'}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        if (cardKey === 'profitability' && cardVisibility.profitability) {
-                            return (
-                                <div key="profitability" className={wrapperClass}>
-                                    <ProfitabilityCard
-                                        key={cardTicker}
-                                        currency={currency}
-                                        currencySymbol={currencySymbol}
-                                        currentRate={currentRate}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('profitability')}
-                                        onHide={() => handleHideRequest('profitability')}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        if (cardKey === 'moat' && cardVisibility.moat) {
-                            return (
-                                <div key="moat" className={wrapperClass}>
-                                    <MoatCard
-                                        key={cardTicker}
-                                        onMoatStatusChange={setMoatStatusLabel}
-                                        onIsEvaluatingChange={setIsMoatEvaluating}
-                                        currency={currency}
-                                        currencySymbol={currencySymbol}
-                                        currentRate={currentRate}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('moat')}
-                                        onHide={() => handleHideRequest('moat')}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        if (cardKey === 'debt' && cardVisibility.debt) {
-                            return (
-                                <div key="debt" className={wrapperClass}>
-                                    <DebtCard
-                                        key={cardTicker}
-                                        currency={currency}
-                                        currencySymbol={currencySymbol}
-                                        currentRate={currentRate}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('debt')}
-                                        onHide={() => handleHideRequest('debt')}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        if (cardKey === 'valuation' && cardVisibility.valuation) {
-                            return (
-                                <div key="valuation" className={wrapperClass}>
-                                    <ValuationCard
-                                        key={cardTicker}
-                                        currency={currency}
-                                        currencySymbol={currencySymbol}
-                                        currentRate={currentRate}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('valuation')}
-                                        onHide={() => handleHideRequest('valuation')}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        if (cardKey === 'support' && cardVisibility.support) {
-                            return (
-                                <div key="support" className={wrapperClass}>
-                                    <SupportResistanceCard
-                                        key={cardTicker}
-                                        currency={currency}
-                                        currencySymbol={currencySymbol}
-                                        currentRate={currentRate}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('support')}
-                                        onHide={() => handleHideRequest('support')}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        if (cardKey === 'financials' && cardVisibility.financials) {
-                            return (
-                                <div key="financials" className={wrapperClass}>
-                                    <FinancialTables
-                                        key={cardTicker}
-                                        currencySymbol={currencySymbol}
-                                        currentRate={currentRate}
-                                        isOpen={isOpen}
-                                        onToggle={() => toggleCard('financials')}
-                                        onHide={() => handleHideRequest('financials')}
-                                        loading={loading || initialLoading}
-                                    />
-                                </div>
-                            );
-                        }
-
-                        return null;
-                    })}
-                </div>
-
-                {
-                    showWatchlist && (
-                        <WatchlistModal
-                            isOpen={showWatchlist}
-                            onClose={() => setShowWatchlist(false)}
-                            currency={currency}
-                            currencySymbol={currencySymbol}
-                            currentRate={currentRate}
-                        />
-                    )
-                }
-
-                {
-                    showProfileModal && currentUser && (
-                        <UserProfileModal
-                            isOpen={showProfileModal}
-                            onClose={handleCloseProfileModal}
-                            user={currentUser}
-                        />
-                    )
-                }
-
-                <AddStockToPortfolioModal
-                    isOpen={showAddPortfolioModal}
-                    onClose={() => setShowAddPortfolioModal(false)}
-                    ticker={stockData?.overview?.symbol || ticker}
-                    portfolioList={portfolioList}
-                    onAdd={handleAddStockToPortfolio}
-                    isMobile={isMobile}
-                    currentRate={currentRate}
+                <AnalysisGrid
+                    cardOrder={cardOrder}
+                    openCards={openCards}
+                    cardVisibility={cardVisibility}
+                    ticker={ticker}
+                    urlTicker={urlTicker}
+                    stockData={stockData}
+                    modifiedScore={modifiedScore}
+                    currency={currency}
                     currencySymbol={currencySymbol}
+                    currentRate={currentRate}
+                    watchlist={watchlist}
+                    analysisComparisons={analysisComparisons}
+                    effectiveLoading={effectiveLoading}
+                    styles={styles}
+                    toggleCard={toggleCard}
+                    handleAddToWatchlist={handleAddToWatchlist}
+                    setShowAddPortfolioModal={setShowAddPortfolioModalCallback}
+                    setShowStockInfo={setShowStockInfoCallback}
+                    loadStockData={loadStockData}
+                    handleHideRequest={handleHideRequest}
+                    setMoatStatusLabel={setMoatStatusLabel}
+                    setIsMoatEvaluating={setIsMoatEvaluating}
+                    handleAddAnalysisComparison={handleAddComparison}
+                    handleRemoveAnalysisComparison={handleRemoveComparison}
                 />
 
-                {
-                    showStockInfo && stockData && (
-                        <StockInfoModal
-                            isOpen={showStockInfo}
-                            onClose={() => setShowStockInfo(false)}
-                            stockData={stockData}
-                            currencySymbol={currencySymbol}
-                            currentRate={currentRate}
-                        />
-                    )
-                }
-
-                <HideConfirmationModal
-                    isOpen={hideModalState.isOpen}
-                    onClose={() => setHideModalState(prev => ({ ...prev, isOpen: false }))}
-                    onConfirm={handleConfirmHide}
-                    cardLabel={hideModalState.cardLabel}
+                <AnalysisModals
+                    showErrorModal={showErrorModal}
+                    handleCloseError={handleCloseError}
+                    ticker={ticker || urlTicker}
+                    showWatchlist={showWatchlist}
+                    setShowWatchlist={setShowWatchlistCallback}
+                    currency={currency}
+                    currencySymbol={currencySymbol}
+                    currentRate={currentRate}
+                    showProfileModal={showProfileModal}
+                    handleCloseProfileModal={handleCloseProfileModal}
+                    currentUser={currentUser}
+                    showAddPortfolioModal={showAddPortfolioModal}
+                    setShowAddPortfolioModal={setShowAddPortfolioModalCallback}
+                    stockData={stockData}
+                    portfolioList={portfolioList}
+                    handleAddStockToPortfolio={handleAddStockToPortfolio}
+                    isMobile={isMobile}
+                    showStockInfo={showStockInfo}
+                    setShowStockInfo={setShowStockInfoCallback}
+                    hideModalState={hideModalState}
+                    setHideModalState={setHideModalState}
+                    handleConfirmHide={handleConfirmHide}
                 />
-            </div >
-        </div >
+            </div>
+        </div>
     );
 };
 

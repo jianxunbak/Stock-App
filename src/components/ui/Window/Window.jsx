@@ -18,56 +18,82 @@ const Window = ({
     contentClassName,
     maxHeight = '85vh'
 }) => {
+    const [isExpanded, setIsExpanded] = React.useState(false);
+
     useEffect(() => {
         if (isOpen) {
+            // Slight delay to ensure CardAnimator detects the mount-then-active transition
+            const timer = setTimeout(() => setIsExpanded(true), 50);
+
             // Calculate scrollbar width before locking
             const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-
             document.body.style.overflow = 'hidden';
             document.body.classList.add('window-open');
             if (scrollbarWidth > 0) {
                 document.body.style.paddingRight = `${scrollbarWidth}px`;
             }
+            return () => clearTimeout(timer);
         } else {
+            setIsExpanded(false);
             document.body.style.overflow = 'unset';
             document.body.style.paddingRight = '0px';
             document.body.classList.remove('window-open');
         }
-
-        return () => {
-            document.body.style.overflow = 'unset';
-            document.body.style.paddingRight = '0px';
-            document.body.classList.remove('window-open');
-        };
     }, [isOpen]);
 
     const backdropVariants = {
         closed: { opacity: 0 },
-        open: { opacity: 1 }
+        open: { opacity: 0.9 }
+    };
+
+    const contentVariants = {
+        closed: { opacity: 0, scale: 0.8, rotateX: 10, y: 50 },
+        open: {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            rotateX: 0,
+            transition: {
+                type: 'spring',
+                stiffness: 280,
+                damping: 24,
+                opacity: { duration: 0.3 }
+            }
+        },
+        exit: {
+            opacity: 0,
+            y: 30,
+            scale: 0.9,
+            rotateX: -5,
+            transition: { duration: 0.4, ease: "easeInOut" }
+        }
     };
 
     return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <div className="window-wrapper">
+                <motion.div
+                    key="window-wrapper"
+                    className="window-wrapper"
+                    initial={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.5 }}
+                    style={{ perspective: '1200px' }}
+                >
                     <motion.div
-                        className="window-overlay open"
+                        className="window-overlay"
                         initial="closed"
                         animate="open"
                         exit="closed"
                         variants={backdropVariants}
+                        transition={{ duration: 0.4 }}
                         onClick={onClose}
                     />
                     <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
-                        transition={{
-                            type: 'spring',
-                            stiffness: 260,
-                            damping: 20,
-                            opacity: { duration: 0.2 }
-                        }}
+                        variants={contentVariants}
+                        initial="closed"
+                        animate="open"
+                        exit="exit"
                         style={{
                             width,
                             height,
@@ -77,13 +103,14 @@ const Window = ({
                             flexDirection: 'column',
                             zIndex: 10,
                             pointerEvents: 'auto',
-                            position: 'relative'
+                            position: 'relative',
+                            transformStyle: 'preserve-3d'
                         }}
                     >
                         <StyledCard
                             className="window-card"
                             title={title}
-                            expanded={true}
+                            expanded={isExpanded}
                             onClose={hideCloseButton ? undefined : onClose}
                             headerAlign={headerAlign}
                             headerVerticalAlign={headerVerticalAlign}
@@ -96,10 +123,10 @@ const Window = ({
                                 minHeight: 0,
                                 display: 'flex',
                                 flexDirection: 'column',
-                                overflow: 'visible' // Allow shadows/highlights to show
+                                overflow: 'visible'
                             }}
-                            distortionFactor={1.2}
-                            contentDistortionScale={0.24}
+                            distortionFactor={1.4}
+                            contentDistortionScale={0.3}
                             noScale={false}
                             style={{
                                 flex: 1,
@@ -107,7 +134,7 @@ const Window = ({
                                 minHeight: 0,
                                 display: 'flex',
                                 flexDirection: 'column',
-                                overflow: 'visible' // Allow shadows on the animator level too
+                                overflow: 'visible'
                             }}
                         >
                             <div className={`window-content ${contentClassName || ''}`}>
@@ -115,7 +142,7 @@ const Window = ({
                             </div>
                         </StyledCard>
                     </motion.div>
-                </div>
+                </motion.div>
             )}
         </AnimatePresence>,
         document.body

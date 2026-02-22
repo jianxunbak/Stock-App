@@ -14,9 +14,6 @@
     /* Create the "black space" / cropping effect */
     backdrop-filter: blur(1.5px);
     transition: all 0.3s ease;
-    /* Create the "black space" / cropping effect */
-    backdrop-filter: blur(1.5px);
-    transition: all 0.3s ease;
 
     max-width: 80rem;
     margin: 0 auto;
@@ -27,7 +24,7 @@
 .csh-sticky-left {
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 75;
     /* Same z-index, but later in DOM so visually on top if they overlap, though they shouldn't here */
     display: flex;
     justify-content: flex-start;

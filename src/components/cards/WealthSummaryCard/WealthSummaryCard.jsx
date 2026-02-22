@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 import DropdownButton from '../../ui/DropdownButton/DropdownButton';
-import { Calendar, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
+import { Calendar, TrendingUp, Wallet, ArrowRight, PieChart, Briefcase, Landmark, ShieldCheck, Activity } from 'lucide-react';
 import styles from './WealthSummaryCard.module.css';
 import BaseChart from '../../ui/BaseChart/BaseChart';
 import { formatLastUpdated } from '../../../utils/dateUtils';
@@ -30,8 +31,8 @@ const WealthSummaryCard = ({
     // const { settings, updateSettings, loading: settingsLoading } = useUserSettings(); // Removed
     const settingsLoading = loading; // Alias for compatibility with existing code below if any
 
-    // Projection relative year (0 = current, 1 = in 1 year, etc.)
     const [projectedYear, setProjectedYear] = useState(0);
+    const [inflationRate, setInflationRate] = useState(0);
 
     // Local state for selected scenarios to allow immediate feedback
     const [savingsScenarioId, setSavingsScenarioId] = useState(null);
@@ -59,8 +60,12 @@ const WealthSummaryCard = ({
         } else if (!incomingStocksIds && settings?.stocks?.charts && !lastSyncedSettings) {
             // Default initialization if no active ids yet
             const defaults = {};
+
             settings.stocks.charts.forEach(c => {
-                if (c.scenarios?.length > 0) defaults[c.id] = c.scenarios[0].id;
+                if (c.scenarios?.length > 0) {
+                    const firstVisible = c.scenarios.find(s => s.visible) || c.scenarios[0];
+                    defaults[c.id] = firstVisible.id;
+                }
             });
             setStocksScenarioIds(defaults);
         }
@@ -70,6 +75,13 @@ const WealthSummaryCard = ({
         const lastYear = lastSyncedSettings?.wealth?.projectedYear;
         if (incomingYear !== undefined && incomingYear !== lastYear) {
             setProjectedYear(incomingYear);
+        }
+
+        // 4. Inflation Rate Sync
+        const incomingInflation = settings?.wealth?.inflationRate;
+        const lastInflation = lastSyncedSettings?.wealth?.inflationRate;
+        if (incomingInflation !== undefined && incomingInflation !== lastInflation) {
+            setInflationRate(incomingInflation);
         }
 
         setLastSyncedSettings(settings);
@@ -83,6 +95,19 @@ const WealthSummaryCard = ({
                 wealth: {
                     ...settings?.wealth,
                     projectedYear: year
+                }
+            });
+        }
+    };
+
+    const handleInflationRateChange = (rate) => {
+        const numRate = rate === '' ? '' : Number(rate);
+        setInflationRate(numRate);
+        if (onUpdateSettings && numRate !== '') {
+            onUpdateSettings({
+                wealth: {
+                    ...settings?.wealth,
+                    inflationRate: numRate
                 }
             });
         }
@@ -120,16 +145,18 @@ const WealthSummaryCard = ({
             style: 'currency',
             currency: displayCurrency,
             maximumFractionDigits: 0
-        }).format(val * rate);
+        }).format(val * rate).replace('SGD', 'S$');
     };
+
 
     const formatBaseCurrency = (val) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: baseCurrency,
             maximumFractionDigits: 0
-        }).format(val);
+        }).format(val).replace('SGD', 'S$');
     };
+
 
     // --- Calculation Logic ---
 
@@ -222,11 +249,12 @@ const WealthSummaryCard = ({
         const cpfProjection = calculateCPFProjection({
             currentAge: currentAge || 30,
             dateOfBirth: settings?.dateOfBirth,
-            monthlySalary: Number(settings?.cpf?.monthlySalary || monthlyPay),
+            monthlySalary: Number(settings?.cpf?.monthlySalary || 0),
             annualBonus: Number(settings?.cpf?.annualBonus || 0),
             salaryGrowth: Number(settings?.cpf?.salaryGrowth || 0),
             projectionYears: projectedYear,
-            balances: settings?.cpf?.balances || {}
+            balances: settings?.cpf?.balances || {},
+            cpfisData: settings?.cpf?.cpfisData || { items: [], groups: [] }
         });
 
         // Get the value at the target year
@@ -241,18 +269,8 @@ const WealthSummaryCard = ({
         // DEBUG LOGS
         // console.log("DEBUG: WealthSummaryCard stocksValue calc. Year:", projectedYear, "CurrentVal:", currentPortfolioValueUSD);
 
-        // If we are at year 0 (Current) and we have real portfolio data, use it!
-        // This solves the issue where "Asset Breakdown" showed the Scenario Initial Deposit (Projected) instead of Real Current Value
-        if (projectedYear === 0 && currentPortfolioValueUSD !== null && currentPortfolioValueUSD !== undefined) {
-            console.log("DEBUG: USING REAL PORTFOLIO VALUE:", currentPortfolioValueUSD);
-            return currentPortfolioValueUSD * usdToBase;
-        } else if (projectedYear === 0) {
-            console.log("DEBUG: Skipping Override. Year 0 but CurrentVal is", currentPortfolioValueUSD);
-        }
-
         if (!settings?.stocks?.charts) return 0;
 
-        // ... (rest of projection logic) ...
         const activeStockCharts = settings.stocks.charts.map(chart => {
             const selectedScenarioId = stocksScenarioIds[chart.id];
             const scenarios = chart.scenarios || [];
@@ -262,9 +280,11 @@ const WealthSummaryCard = ({
 
             return {
                 ...chart,
-                visible: true,
+                // Respect explicit chart visibility from settings
+                visible: chart.visible !== false,
                 scenarios: scenarios.map(s => ({
                     ...s,
+                    // Visible only if it matches our target scenario for the consolidated view
                     visible: targetScenario ? s.id === targetScenario.id : false
                 }))
             };
@@ -306,16 +326,17 @@ const WealthSummaryCard = ({
         return targetData ? targetData.value : 0;
     }, [settings?.otherInvestments, projectedYear, currentAge]);
 
-    console.log("DEBUG: WealthSummaryCard Render", {
-        projectedYear,
-        stocksValue,
-        savings: savingsAndCpf.savings,
-        cpf: savingsAndCpf.cpf,
-        other: otherInvestmentsValue,
-        settingsProjYear: settings?.wealth?.projectedYear
-    });
+    // --- Apply Inflation Adjustment ---
+    const inflationDiscountFactor = useMemo(() => {
+        if (projectedYear === 0 || !inflationRate) return 1;
+        return 1 / Math.pow(1 + (Number(inflationRate) / 100), projectedYear);
+    }, [inflationRate, projectedYear]);
 
-    const netWorth = stocksValue + savingsAndCpf.savings + (savingsAndCpf.cpf * sgdToBase) + otherInvestmentsValue;
+    const netWorth = (stocksValue + savingsAndCpf.savings + (savingsAndCpf.cpf * sgdToBase) + otherInvestmentsValue) * inflationDiscountFactor;
+    const adjustedStocksValue = stocksValue * inflationDiscountFactor;
+    const adjustedSavings = savingsAndCpf.savings * inflationDiscountFactor;
+    const adjustedCpf = (savingsAndCpf.cpf * sgdToBase) * inflationDiscountFactor;
+    const adjustedOther = otherInvestmentsValue * inflationDiscountFactor;
 
     // 4. Annual Net Worth Growth Projection (for Chart)
     const netWorthGrowthData = useMemo(() => {
@@ -377,7 +398,8 @@ const WealthSummaryCard = ({
             annualBonus: Number(settings?.cpf?.annualBonus || 0),
             salaryGrowth: Number(settings?.cpf?.salaryGrowth || 0),
             projectionYears: Math.min(maxProjection, 100),
-            balances: settings?.cpf?.balances || {}
+            balances: settings?.cpf?.balances || {},
+            cpfisData: settings?.cpf?.cpfisData || { items: [], groups: [] }
         });
         const cpfProjection = cpfProjectionObj.projection;
 
@@ -387,17 +409,14 @@ const WealthSummaryCard = ({
             const selectedScenarioId = stocksScenarioIds[chart.id];
             const scenarios = chart.scenarios || [];
 
-            // Determine which scenario to use:
-            // 1. Explicitly selected in WealthSummaryCard dropdown
-            // 2. Or the first 'visible' scenario in the Stocks settings
-            // 3. Or the first scenario exists
             const targetScenario = selectedScenarioId
                 ? scenarios.find(s => s.id === selectedScenarioId)
                 : (scenarios.find(s => s.visible) || scenarios[0]);
 
             return {
                 ...chart,
-                visible: true, // Force chart visible for calculation
+                // Respect explicit chart visibility from settings
+                visible: chart.visible !== false,
                 scenarios: scenarios.map(s => ({
                     ...s,
                     // Visible only if it matches our target scenario
@@ -425,19 +444,14 @@ const WealthSummaryCard = ({
 
         for (let y = 0; y <= Math.min(maxProjection, 100); y++) {
             const ageAtYear = (currentAge || 30) + y;
-            const yearLabel = (currentAge !== null) ? `${ageAtYear}` : `${startYear + y}`;
+            const yearLabel = (currentAge !== null) ? `Age ${ageAtYear} (${startYear + y})` : `Year ${startYear + y}`;
 
             // Stocks
             // Safety check: use last value if y exceeds projection
             const stockData = stockProjection[y] || stockProjection[stockProjection.length - 1];
             // Stocks are already in Base Currency. DO NOT convert with usdToBase.
 
-            // Override for Year 0 if we have real portfolio data (same as Breakdown Logic)
             let totalStocksThisYear = stockData ? stockData.totalValue : 0;
-            if (y === 0 && currentPortfolioValueUSD !== null && currentPortfolioValueUSD !== undefined) {
-                // Use USD->Base rate (which is usdToDisplay / baseToDisplay, or simply usdToBase variable)
-                totalStocksThisYear = currentPortfolioValueUSD * usdToBase;
-            }
 
             const otherInvData = otherInvProjection[y] || otherInvProjection[otherInvProjection.length - 1];
             const totalOtherInvThisYear = otherInvData ? otherInvData.value : 0;
@@ -447,30 +461,33 @@ const WealthSummaryCard = ({
             const cpfData = cpfProjection[y] || cpfProjection[cpfProjection.length - 1];
             const currentCpfVal = cpfData ? cpfData.total : 0;
 
+            // Apply Inflation to Chart Data
+            const inflationAtY = (projectedYear === 0 || !inflationRate) ? 1 : 1 / Math.pow(1 + (Number(inflationRate) / 100), y);
+
+            const adjStocks = Math.round(totalStocksThisYear * inflationAtY);
+            const adjCpf = Math.round(currentCpfVal * sgdToBase * inflationAtY);
+            const adjSavings = Math.round(runningSavings * inflationAtY);
+            const adjOther = Math.round(totalOtherInvThisYear * inflationAtY);
+
             data.push({
                 year: startYear + y,
                 age: ageAtYear,
                 date: yearLabel,
-                stocks: Math.round(totalStocksThisYear), // Value is in Base Currency
-                cpf: Math.round(currentCpfVal * sgdToBase), // CPF is SGD, convert to Base
-                savings: Math.round(runningSavings), // Savings is in Base (?) - Check this
-                other: Math.round(totalOtherInvThisYear),
-                netWorth: Math.round(
-                    totalStocksThisYear +
-                    runningSavings +
-                    (currentCpfVal * sgdToBase) +
-                    totalOtherInvThisYear
-                )
+                stocks: adjStocks,
+                cpf: adjCpf,
+                savings: adjSavings,
+                other: adjOther,
+                netWorth: Math.round(adjStocks + adjSavings + adjCpf + adjOther)
             });
 
-            // Calculate NEXT year values for Savings
-            const grownExpenses = totalExpenses * Math.pow(1 + expenseGrowthRate, y + 1); // Next year's expenses
+            // Calculate NEXT year values for Savings (Nominal)
+            const grownExpenses = totalExpenses * Math.pow(1 + expenseGrowthRate, y + 1);
             const nextYearMonthlySavings = monthlyPay - cpfContributionEmployee - grownExpenses;
 
             runningSavings = (runningSavings * (1 + bankInterestRate)) + (nextYearMonthlySavings * 12);
         }
         return data;
-    }, [settings, savingsScenarioId, stocksScenarioIds, currentAge, projectedYear, settings?.stocks, settings?.otherInvestments, settings?.cpf]);
+    }, [settings, savingsScenarioId, stocksScenarioIds, currentAge, projectedYear, inflationRate, settings?.stocks, settings?.otherInvestments, settings?.cpf, currentPortfolioValueUSD, usdToBase, sgdToBase]);
 
     const netWorthSeries = [
         { id: 'netWorth', name: 'Net Worth', dataKey: 'netWorth', color: 'var(--neu-success)' },
@@ -480,72 +497,152 @@ const WealthSummaryCard = ({
         { id: 'other', name: 'Other Inv.', dataKey: 'other', color: '#8b5cf6', strokeDasharray: '4 4' }
     ];
 
-    const header = (
-        <div className="summary-info">
-            <div className="summary-name">Estimated Net Worth</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
-                Last updated: {formatLastUpdated(overallLastUpdated)}
+    const yearControl = (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--neu-text-secondary)', fontWeight: 500 }}>Years:</span>
+                <input
+                    type="number"
+                    style={{
+                        width: '50px',
+                        padding: '0.25rem 0.4rem',
+                        textAlign: 'center',
+                        background: 'var(--neu-bg)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.85rem',
+                        boxShadow: 'inset 2px 2px 5px var(--neu-shadow-dark), inset -2px -2px 5px var(--neu-shadow-light)',
+                        outline: 'none'
+                    }}
+                    className={styles.input}
+                    value={projectedYear}
+                    onChange={(e) => {
+                        const val = e.target.value === '' ? '' : Number(e.target.value);
+                        setProjectedYear(val);
+                        if (val !== '') {
+                            handleProjectedYearChange(val);
+                        }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                />
             </div>
-            <div className={styles.headerMeta}>
-                {targetYear} {targetAge !== null && `• Age ${targetAge}`}
-            </div>
-            <div className={styles.headerValueGroup}>
-                <div className={styles.mainValue}>{formatCurrency(netWorth)}</div>
-                <div className={styles.valueLabel}>Projected Net Worth</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--neu-text-secondary)', fontWeight: 500 }}>Inflation:</span>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                        type="number"
+                        step="0.1"
+                        style={{
+                            width: '65px',
+                            padding: '0.25rem 1.25rem 0.25rem 0.4rem',
+                            textAlign: 'center',
+                            background: 'var(--neu-bg)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem',
+                            boxShadow: 'inset 2px 2px 5px var(--neu-shadow-dark), inset -2px -2px 5px var(--neu-shadow-light)',
+                            outline: 'none'
+                        }}
+                        className={styles.input}
+                        value={inflationRate}
+                        onChange={(e) => handleInflationRateChange(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    <span style={{ position: 'absolute', right: '6px', fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', pointerEvents: 'none' }}>%</span>
+                </div>
             </div>
         </div>
     );
 
+    const header = (
+        <div className="stock-summary-container stacked" style={{ height: '100%', width: '100%' }}>
+            <div className="stock-info-column">
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--neu-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Net Worth ({targetAge || targetYear})
+                    </div>
+                    <div className="summary-price" style={{ color: 'var(--neu-success)' }}>
+
+                        {formatCurrency(netWorth)}
+                    </div>
+                </div>
+
+                <div className="summary-key-stats" style={{ marginTop: '0.15rem', gap: '0.25rem 0.5rem' }}>
+                    <div className="stat-item">
+                        <span className="stat-label">Stocks</span>
+                        <span className="stat-value" style={{ color: '#3b82f6', fontSize: '0.8rem' }}>{formatCurrency(adjustedStocksValue)}</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-label">Cash</span>
+                        <span className="stat-value" style={{ color: '#10b981', fontSize: '0.8rem' }}>{formatCurrency(adjustedSavings)}</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-label">CPF</span>
+                        <span className="stat-value" style={{ color: '#f59e0b', fontSize: '0.8rem' }}>{formatCurrency(adjustedCpf / sgdToDisplayRate, false, true)}</span>
+                    </div>
+                    <div className="stat-item">
+                        <span className="stat-label">Other</span>
+                        <span className="stat-value" style={{ color: '#8b5cf6', fontSize: '0.8rem' }}>{formatCurrency(adjustedOther)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="price-chart-summary">
+                <BaseChart
+                    data={netWorthGrowthData}
+                    series={netWorthSeries}
+                    height={135}
+                    gridPadding={{ top: 0, right: 0, bottom: 0, left: 0 }}
+                    showGrid={true}
+                    showXAxis={true}
+                    xAxisFormatter={(val) => val.replace(/Age |Year | \(.*\)/g, '')}
+                    showYAxis={true}
+                    variant="transparent"
+                    yAxisFormatter={(val) => {
+                        const convertedVal = val * baseToDisplayRate;
+                        if (convertedVal >= 1000000) return `${displayCurrencySymbol}${(convertedVal / 1000000).toFixed(0)}M`;
+                        if (convertedVal >= 1000) return `${displayCurrencySymbol}${(convertedVal / 1000).toFixed(0)}k`;
+                        return `${displayCurrencySymbol}${convertedVal.toFixed(0)}`;
+                    }}
+                    tooltipValueFormatter={(val) => formatCurrency(val)}
+                />
+            </div>
+        </div>
+    );
+
+
+
+
     return (
         <ExpandableCard
             title="Estimated Net Worth"
-            subtitle={`Last updated: ${formatLastUpdated(overallLastUpdated)}`}
             expanded={isOpen}
             onToggle={onToggle}
             onHide={onHide}
             onRefresh={onRefresh}
             collapsedWidth={220}
-            collapsedHeight={220}
+            collapsedHeight={240}
             headerContent={header}
-            // Only show full loading state if we have NO settings at all. 
-            // Otherwise, let the user see the cached/stale data while we update in background.
+            collapsedHeaderControls={yearControl}
             loading={loading}
             className={className}
-
         >
+
+
             <div className={styles.container}>
                 {/* Net Worth Growth Chart */}
                 <div className={styles.chartSection}>
                     <div className={styles.sectionHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <h4 className={styles.sectionTitle} style={{ margin: 0 }}>Estimated Net Worth ({currentAge !== null ? 'By Age' : 'By Year'})</h4>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
-                            <input
-                                type="number"
-                                style={{
-                                    width: '60px',
-                                    padding: '0.25rem 0.5rem',
-                                    textAlign: 'center',
-                                    background: 'var(--neu-bg)',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    color: 'var(--text-primary)',
-                                    fontSize: '0.85rem',
-                                    boxShadow: 'inset 2px 2px 5px var(--neu-shadow-dark), inset -2px -2px 5px var(--neu-shadow-light)',
-                                    outline: 'none'
-                                }}
-                                className={styles.input}
-                                value={projectedYear}
-                                onChange={(e) => {
-                                    const val = e.target.value === '' ? '' : Number(e.target.value);
-                                    setProjectedYear(val);
-                                    if (val !== '') {
-                                        handleProjectedYearChange(val);
-                                    }
-                                }}
-                            />
-                        </div>
+                        <h4 className={styles.sectionTitle} style={{ margin: 0 }}>
+                            Estimated Net Worth ({currentAge !== null ? 'By Age' : 'By Year'})
+                            {inflationRate > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--neu-brand)', fontWeight: 500 }}> (Adjusted for {inflationRate}% Inflation)</span>}
+                        </h4>
+                        {yearControl}
                     </div>
+
                     <div className={styles.chartContainer}>
                         <BaseChart
                             data={netWorthGrowthData}
@@ -553,6 +650,7 @@ const WealthSummaryCard = ({
                             height={250}
                             showGrid={true}
                             showXAxis={true}
+                            xAxisFormatter={(val) => val.replace(/Age |Year | \(.*\)/g, '')}
                             showYAxis={true}
                             yAxisFormatter={(val) => {
                                 // Charts usually use base values, we convert to display
@@ -562,16 +660,10 @@ const WealthSummaryCard = ({
                                 return `${displayCurrencySymbol}${convertedVal.toFixed(0)}`;
                             }}
                             tooltipValueFormatter={(val) => formatCurrency(val)}
-                            tooltipLabelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                    const item = payload[0].payload;
-                                    return item.age ? `Age ${item.age} (${item.year})` : `Year ${item.year}`;
-                                }
-                                return label;
-                            }}
                         />
                     </div>
                 </div>
+
 
                 {/* Active Plans (Controls Chart and Breakdown) */}
                 <div className={styles.scenarioSection}>
@@ -617,22 +709,22 @@ const WealthSummaryCard = ({
                     <div className={styles.metricsContainer}>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Stocks</span>
-                            <span className={styles.metricValue}>{formatCurrency(stocksValue)}</span>
+                            <span className={styles.metricValue}>{formatCurrency(adjustedStocksValue)}</span>
                         </div>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Cash Savings</span>
-                            <span className={styles.metricValue}>{formatCurrency(savingsAndCpf.savings)}</span>
+                            <span className={styles.metricValue}>{formatCurrency(adjustedSavings)}</span>
                         </div>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>CPF Estimate</span>
-                            <span className={styles.metricValue}>{formatCurrency(savingsAndCpf.cpf, false, true)}</span>
+                            <span className={styles.metricValue}>{formatCurrency(adjustedCpf / sgdToDisplayRate, false, true)}</span>
                         </div>
                         <div className={styles.metricRow}>
                             <span className={styles.metricLabel}>Other Investments</span>
-                            <span className={styles.metricValue}>{formatCurrency(otherInvestmentsValue)}</span>
+                            <span className={styles.metricValue}>{formatCurrency(adjustedOther)}</span>
                         </div>
                         <div className={`${styles.metricRow} ${styles.totalRow}`}>
-                            <span className={styles.metricLabel}>Net Worth ({targetYear})</span>
+                            <span className={styles.metricLabel}>Net Worth ({targetAge || targetYear})</span>
                             <span className={styles.metricValue}>{formatCurrency(netWorth)}</span>
                         </div>
                     </div>

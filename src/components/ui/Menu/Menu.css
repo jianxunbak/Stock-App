@@ -21,6 +21,7 @@
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
+    overflow: visible !important;
 }
 
 /* Placements */
@@ -73,6 +74,7 @@
 .menu-content-container:not(.transparent) {
     /* Background and shadow are handled by CardAnimator */
     box-shadow: none !important;
+    overflow: visible !important;
 }
 
 .menu-content-container.transparent {
@@ -85,6 +87,7 @@
     display: flex;
     gap: 0.5rem;
     width: 100%;
+    overflow: visible !important;
 }
 
 .menu-items-grid.vertical {
@@ -96,6 +99,21 @@
     flex-wrap: wrap;
     justify-content: center;
     min-width: max-content;
+}
+
+/* Ensure buttons inside the menu keep their shadows */
+.menu-items-grid .neu-btn-base {
+    box-shadow: var(--neu-card-shadow) !important;
+    overflow: visible !important;
+}
+
+.menu-items-grid .neu-btn-base:hover {
+    box-shadow: var(--neu-card-shadow-hover) !important;
+}
+
+.menu-items-grid .neu-btn-base.active,
+.menu-items-grid .neu-btn-base.pressed-latch {
+    box-shadow: var(--neu-card-shadow-inset-deep) !important;
 }
 
 /* Variant styles if needed */

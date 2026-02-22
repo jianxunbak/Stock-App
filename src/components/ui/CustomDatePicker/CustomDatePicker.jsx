@@ -21,8 +21,30 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
     const [viewDate, setViewDate] = useState(parseDate(value));
     const [coords, setCoords] = useState({ top: 0, left: 0 });
     const [internalIsMobile, setInternalIsMobile] = useState(window.innerWidth < 768);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isSubExpanded, setIsSubExpanded] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => setIsExpanded(true), 50);
+            return () => clearTimeout(timer);
+        } else {
+            setIsExpanded(false);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (activeDropdown) {
+            const timer = setTimeout(() => setIsSubExpanded(true), 50);
+            return () => clearTimeout(timer);
+        } else {
+            setIsSubExpanded(false);
+        }
+    }, [activeDropdown]);
 
     const isMobile = propIsMobile !== undefined ? propIsMobile : internalIsMobile;
+    const isDark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+    const subDropdownSurfaceColor = isDark ? "#1A1D21" : "#eaeaea";
 
     useEffect(() => {
         const handleResize = () => setInternalIsMobile(window.innerWidth < 768);
@@ -156,14 +178,28 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
         );
     }
 
-    const handleMonthChange = (monthIndex) => {
-        setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1));
+    const handleMonthChange = (e, monthIndex) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        // Immediate close triggers exit animation instantly
         setActiveDropdown(null);
+        // Small delay for the heavy state update prevents blocking the UI thread during the exit start
+        setTimeout(() => {
+            setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1));
+        }, 70);
     };
 
-    const handleYearChange = (year) => {
-        setViewDate(new Date(year, viewDate.getMonth(), 1));
+    const handleYearChange = (e, year) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         setActiveDropdown(null);
+        setTimeout(() => {
+            setViewDate(new Date(year, viewDate.getMonth(), 1));
+        }, 70);
     };
 
     useEffect(() => {
@@ -188,10 +224,10 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
     const renderPopupContent = () => (
         <CardAnimator
             type="fabricCard"
-            active={isOpen}
+            active={isExpanded}
             className={styles.datePickerPopup}
             maxRadius={20}
-            distortionFactor={distortionFactor}
+            distortionFactor={distortionFactor * 0.8}
             contentDistortionScale={contentDistortionScale}
             style={{
                 width: '100%',
@@ -213,18 +249,26 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
                         <AnimatePresence>
                             {activeDropdown === 'month' && (
                                 <motion.div
+                                    key="month-dropdown"
                                     className={styles.customDropdown}
-                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    initial={{ opacity: 0, scale: 1, y: -10 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    exit={{ opacity: 0, scale: 1, y: 0 }} transition={{ duration: 0.1, ease: "easeOut" }}
                                 >
-                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }} distortionFactor={distortionFactor} contentDistortionScale={contentDistortionScale}>
+                                    <CardAnimator
+                                        type="fabricCard"
+                                        active={isSubExpanded}
+                                        surfaceColor={subDropdownSurfaceColor}
+                                        style={{ padding: '0.25rem', opacity: 1 }}
+                                        distortionFactor={distortionFactor * 0.6}
+                                        contentDistortionScale={contentDistortionScale}
+                                    >
                                         <div className={styles.dropdownList}>
                                             {monthNames.map((name, i) => (
                                                 <button
                                                     key={name}
                                                     className={`${styles.dropdownItem} ${viewDate.getMonth() === i ? styles.active : ''}`}
-                                                    onClick={() => handleMonthChange(i)}
+                                                    onClick={(e) => handleMonthChange(e, i)}
                                                 >
                                                     {name}
                                                 </button>
@@ -248,18 +292,26 @@ const CustomDatePicker = ({ value, onChange, triggerClassName, isMobile: propIsM
                         <AnimatePresence>
                             {activeDropdown === 'year' && (
                                 <motion.div
+                                    key="year-dropdown"
                                     className={styles.customDropdown}
-                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    initial={{ opacity: 0, scale: 1, y: -10 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    exit={{ opacity: 0, scale: 1, y: 0 }} transition={{ duration: 0.1, ease: "easeOut" }}
                                 >
-                                    <CardAnimator type="fabricCard" active={true} style={{ padding: '0.25rem' }} distortionFactor={distortionFactor} contentDistortionScale={contentDistortionScale}>
+                                    <CardAnimator
+                                        type="fabricCard"
+                                        active={isSubExpanded}
+                                        surfaceColor={subDropdownSurfaceColor}
+                                        style={{ padding: '0.25rem', opacity: 1 }}
+                                        distortionFactor={distortionFactor * 0.6}
+                                        contentDistortionScale={contentDistortionScale}
+                                    >
                                         <div className={styles.dropdownList} ref={yearListRef}>
                                             {years.map(y => (
                                                 <button
                                                     key={y}
                                                     className={`${styles.dropdownItem} ${viewDate.getFullYear() === y ? styles.active : ''}`}
-                                                    onClick={() => handleYearChange(y)}
+                                                    onClick={(e) => handleYearChange(e, y)}
                                                 >
                                                     {y}
                                                 </button>

@@ -5,6 +5,7 @@ import Button from '../Button/Button';
 import Menu from '../Menu/Menu';
 import ExpandableCard from '../ExpandableCard/ExpandableCard';
 import DropdownButton from '../DropdownButton/DropdownButton';
+import SummaryCardContent from '../SummaryCardContent/SummaryCardContent';
 import { useStockData } from '../../../hooks/useStockData';
 import { useColumnResize } from '../../../hooks/useColumnResize';
 import './FinancialStatementsTable.css';
@@ -29,6 +30,7 @@ const FinancialStatementsTable = ({
     onHide = null,
     stackControls = false,
     loading: parentLoading = false,
+    collapsedHeight = 198,
     ...props
 }) => {
 
@@ -155,12 +157,20 @@ const FinancialStatementsTable = ({
     const latestDate = income.dates?.[0];
 
     const header = (
-        <div className="summary-info">
-            <div className="summary-name">Financials</div>
-            <div className="summary-change" style={{ color: 'var(--neu-text-tertiary)', marginTop: '0.5rem' }}>
-                Open to view more details
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={[
+                {
+                    label: `Revenue (${latestDate || 'latest'})`,
+                    value: latestRevenue ? formatCurrency(latestRevenue) : 'N/A',
+                    color: 'var(--neu-text-primary)'
+                }
+            ]}
+            gridMetrics={[
+                { label: 'Income Statement', icon: <Landmark size={14} />, color: activeTab === 'income_statement' ? 'var(--neu-brand)' : 'var(--neu-text-tertiary)' },
+                { label: 'Balance Sheet', icon: <Calculator size={14} />, color: activeTab === 'balance_sheet' ? 'var(--neu-brand)' : 'var(--neu-text-tertiary)' },
+                { label: 'Cash Flow', icon: <Activity size={14} />, color: activeTab === 'cash_flow' ? 'var(--neu-brand)' : 'var(--neu-text-tertiary)' }
+            ]}
+        />
     );
 
     const isETF = stockData?.overview?.is_etf || stockData?.overview?.quoteType === 'ETF';
@@ -201,7 +211,7 @@ const FinancialStatementsTable = ({
                 defaultExpanded={isOpen}
                 onToggle={onToggle}
                 collapsedWidth={220}
-                collapsedHeight={220}
+                collapsedHeight={collapsedHeight}
                 loading={isLoading}
                 headerContent={header}
                 className={`fs-table-card ${className}`}

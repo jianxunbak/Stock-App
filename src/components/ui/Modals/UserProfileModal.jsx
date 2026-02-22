@@ -313,7 +313,6 @@ const UserProfileModal = memo(({ isOpen, onClose, user, onLogout }) => {
         }, 800); // 800ms debounce
     };
 
-    if (!isOpen || !user) return null;
 
     const menuItems = useMemo(() => [
         {

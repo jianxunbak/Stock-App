@@ -50,12 +50,12 @@ const StockHeader = ({
     };
 
     if (view === 'summary') {
-        const shortName = name.split(' ')[0].replace(/[,.]/g, '');
+        const shortName = (name || "").split(' ')[0].replace(/[,.]/g, '');
 
         return (
             <div className="summary-info stock-header-summary">
                 <div className="summary-identity-group" style={{ position: 'relative' }}>
-                    {name && <div className="summary-name">{shortName}</div>}
+                    {name && <div className="summary-name">{name}</div>}
                     {ticker && <div className="summary-ticker">{ticker}</div>}
                 </div>
                 <div className="summary-price-group">

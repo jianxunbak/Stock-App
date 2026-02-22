@@ -1,8 +1,26 @@
 /* BaseChart Container */
 .base-chart-wrapper {
     position: relative;
-    position: relative;
     width: 100%;
+}
+
+/* When BaseChart is inside the collapsed stacked summary, fill available height */
+.stock-summary-container.stacked .price-chart-summary .base-chart-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+}
+
+.stock-summary-container.stacked .price-chart-summary .base-chart-container {
+    flex: 1;
+    height: 100% !important;
+    min-height: 0;
+}
+
+/* Hide duplicate controls in collapsed header (they appear in the ExpandableCard header instead) */
+.stock-summary-container.stacked .price-chart-summary .base-chart-controls {
+    display: none;
 }
 
 /* REMOVE BLUE FOCUS RINGS FROM CHARTS */
@@ -19,8 +37,7 @@
     justify-content: flex-start;
     align-items: center;
     gap: 0.5rem;
-    margin-top: 1rem;
-    margin-bottom: 1rem;
+    margin-top: 0;
     padding: 0;
 }
 
@@ -29,7 +46,6 @@
     width: 100%;
     height: 300px;
     position: relative;
-    padding-right: 1rem;
 }
 
 /* Custom Recharts Tooltip */
@@ -44,7 +60,7 @@
 }
 
 .tooltip-date {
-    font-size: 0.75rem;
+    font-size: 0.6rem;
     color: var(--neu-text-secondary);
     margin-bottom: 0.5rem;
     display: block;
@@ -62,8 +78,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
-    font-size: 0.9rem;
+    gap: 0.5rem;
+    font-size: 0.7rem;
     font-weight: 600;
 }
 
@@ -74,7 +90,7 @@
 
 /* Axis Styles */
 .recharts-cartesian-axis-tick-value {
-    font-size: 12px;
+    font-size: 0.6rem;
     font-family: inherit;
     fill: var(--neu-text-tertiary);
 }

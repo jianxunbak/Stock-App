@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 import BaseChart from '../../ui/BaseChart/BaseChart';
 import ScenarioEditorWindow from '../../ui/ScenarioEditorWindow/ScenarioEditorWindow';
-import { Settings } from 'lucide-react';
+import { Settings, TrendingUp, BarChart2, PieChart, Activity } from 'lucide-react';
 import styles from './StocksCard.module.css';
 import { formatLastUpdated } from '../../../utils/dateUtils';
 import { calculateStockProjection } from '../../../utils/stockUtils';
@@ -32,7 +33,8 @@ const StocksCard = ({
     loading = false,
     currentPortfolioValueUSD = 0,
     portfolioOptions = [],
-    onRefresh = null
+    onRefresh = null,
+    inflationRate = 0
 }) => {
     // Calculate current portfolio value in base currency for scenario initialization
     const usdToBase = useMemo(() => {
@@ -193,12 +195,62 @@ const StocksCard = ({
             if (c.id !== chartId) return c;
             return {
                 ...c,
-                scenarios: c.scenarios.map(s =>
-                    s.id === scenarioId ? { ...s, [field]: value } : s
-                )
+                scenarios: c.scenarios.map(s => {
+                    if (s.id !== scenarioId) return s;
+
+                    // Support multi-field updates
+                    if (typeof field === 'object' && field !== null) {
+                        return { ...s, ...field };
+                    }
+
+                    // Otherwise single field update
+                    const updates = { [field]: value };
+                    // If manually editing initialDeposit, clear auto-update source
+                    if (field === 'initialDeposit') {
+                        updates.autofillDepositSource = null;
+                    }
+                    return { ...s, ...updates };
+                })
             };
         }));
     };
+
+    // Auto-update initialDeposit for scenarios with autofill enabled
+    useEffect(() => {
+        if (!isInitialized) return;
+
+        setCharts(prevCharts => {
+            let changed = false;
+            const newCharts = prevCharts.map(c => {
+                const newScenarios = c.scenarios.map(s => {
+                    if (!s.autofillDepositSource) return s;
+
+                    let newValue = s.initialDeposit;
+                    if (s.autofillDepositSource === 'total') {
+                        newValue = Math.round(currentPortfolioValueBase);
+                    } else {
+                        const option = portfolioOptionsBase.find(p => p.name === s.autofillDepositSource);
+                        if (option) {
+                            newValue = Math.round(option.value);
+                        }
+                    }
+
+                    if (newValue !== s.initialDeposit) {
+                        changed = true;
+                        return { ...s, initialDeposit: newValue };
+                    }
+                    return s;
+                });
+
+                if (newScenarios !== c.scenarios) {
+                    return { ...c, scenarios: newScenarios };
+                }
+                return c;
+            });
+
+            return changed ? newCharts : prevCharts;
+        });
+    }, [currentPortfolioValueBase, portfolioOptionsBase, isInitialized]);
 
     const toggleScenarioVisibility = (chartId, scenarioId) => {
         setCharts(charts.map(c => {
@@ -238,6 +290,19 @@ const StocksCard = ({
                 currentAge
             });
 
+            // Apply inflation adjustment to projection data
+            if (inflationRate > 0) {
+                chartData.forEach((point, index) => {
+                    const discount = 1 / Math.pow(1 + (inflationRate / 100), index);
+                    // Adjust all 'value_*' and 'invested_*' keys
+                    Object.keys(point).forEach(key => {
+                        if (key.startsWith('value_') || key.startsWith('invested_') || key === 'totalValue' || key === 'totalInvested') {
+                            point[key] *= discount;
+                        }
+                    });
+                });
+            }
+
             const seriesArray = [];
             visibleScenarios.forEach(scenario => {
                 seriesArray.push({
@@ -259,34 +324,36 @@ const StocksCard = ({
         });
     }, [charts, currentAge, projectionYears]);
 
-    const formatCurrency = (value) => {
+    const formatCurrency = (val) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: displayCurrency,
-            minimumFractionDigits: 0,
             maximumFractionDigits: 0
-        }).format(value * baseToDisplayRate);
+        }).format(val * baseToDisplayRate).replace('SGD', 'S$');
     };
 
-    const formatBaseCurrency = (value) => {
+
+    const formatBaseCurrency = (val) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: baseCurrency,
-            minimumFractionDigits: 0,
             maximumFractionDigits: 0
-        }).format(value);
+        }).format(val).replace('SGD', 'S$');
     };
+
 
     const finalValues = useMemo(() => {
         const values = [];
         chartsData.forEach(({ chartData, visibleScenarios }) => {
             if (chartData.length === 0) return;
             const lastPoint = chartData[chartData.length - 1];
+            const targetAge = lastPoint ? lastPoint.age : null;
+
             visibleScenarios.forEach(scenario => {
                 const finalVal = lastPoint ? lastPoint[`value_${scenario.id}`] : 0;
                 values.push({
                     id: scenario.id,
-                    name: scenario.name,
+                    name: targetAge ? `${scenario.name} (${targetAge})` : scenario.name,
                     color: scenario.color,
                     value: finalVal
                 });
@@ -295,52 +362,33 @@ const StocksCard = ({
         return values;
     }, [chartsData]);
 
+
     const header = (
-        <div className="summary-info">
-            <div className="summary-name">Stocks</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
-                Last updated: {formatLastUpdated(settings?.stocks?.updatedAt)}
-            </div>
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.25rem',
-                width: '100%',
-                fontSize: '0.8rem',
-            }}>
-                {finalValues.length > 0 ? (
-                    finalValues.map(item => (
-                        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: item.color }}></span>
-                                {item.name}
-                            </span>
-                            <span style={{ color: 'var(--neu-text-primary)', fontWeight: 600 }}>
-                                {formatCurrency(item.value)}
-                            </span>
-                        </div>
-                    ))
-                ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>No scenarios</span>
-                        <span style={{ color: 'var(--neu-text-primary)', fontWeight: 600 }}>-</span>
-                    </div>
-                )}
-            </div>
-        </div>
+        <SummaryCardContent
+            mainMetrics={finalValues.length > 0 ? [
+                { label: finalValues[0].name, value: formatCurrency(finalValues[0].value), color: finalValues[0].color }
+            ] : [
+                { label: 'Scenarios', value: 'None', color: 'var(--neu-text-secondary)' }
+            ]}
+            gridMetrics={finalValues.slice(1, 7).map(item => ({
+                label: `${item.name}: ${formatCurrency(item.value)}`,
+                icon: <TrendingUp size={14} />,
+                color: item.color
+            }))}
+        />
     );
+
 
     return (
         <>
             <ExpandableCard
                 title="Stocks"
-                subtitle={`Last updated: ${formatLastUpdated(settings?.stocks?.updatedAt)}`}
                 expanded={isOpen}
                 onToggle={onToggle}
                 onHide={onHide}
                 onRefresh={onRefresh}
                 collapsedWidth={220}
-                collapsedHeight={220}
+                collapsedHeight={198}
                 headerContent={header}
                 loading={loading}
                 className={className}
@@ -355,7 +403,10 @@ const StocksCard = ({
             >
                 <div className={styles.container}>
                     <div className={styles.globalControls} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <h4 className={styles.sectionTitle} style={{ margin: 0 }}>Projected Stocks Growth ({baseCurrency})</h4>
+                        <h4 className={styles.sectionTitle} style={{ margin: 0 }}>
+                            Projected Stocks Growth ({baseCurrency})
+                            {inflationRate > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--neu-brand)', fontWeight: 500 }}> (Real Value)</span>}
+                        </h4>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>

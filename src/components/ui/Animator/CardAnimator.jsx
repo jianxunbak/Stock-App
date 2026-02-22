@@ -73,7 +73,7 @@ function useFabricPathHorizontal(width, height, distortion, maxRadius = 12) {
 
 const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation = 'vertical', surfaceColor = "var(--neu-bg)", maxRadius = 24, flat = false, distortionFactor = 1, disableHighlight = false, disableShadow = false, shadowScale = 1 }) => {
     const containerRef = useRef(null);
-    const lastActive = useRef(null);
+    const lastActive = useRef(active);
 
     const [size, setSize] = useState({ w: 0, h: 0 });
     const [dimsReady, setDimsReady] = useState(false);
@@ -111,18 +111,25 @@ const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation
         // Only run if active actually changes
         if (active === lastActive.current) return;
 
-        const duration = 1.0;
+        // Skip animation entirely when distortionFactor is 0 (loading state)
+        if (distortionFactor === 0) {
+            lastActive.current = active;
+            return;
+        }
+
+        const duration = 0.4;
         const prev = lastActive.current;
         lastActive.current = active;
 
-        const targetDistortion = 12 * distortionFactor;
-        const targetDistortionHorizontal = 6 * distortionFactor;
+        const targetDistortion = 24 * distortionFactor;
+        const targetDistortionHorizontal = 12 * distortionFactor;
+        const currentTarget = orientation === 'horizontal' ? targetDistortionHorizontal : targetDistortion;
 
-        // Ensure we reset to 0 even if interrupted
-        runAnimation(distortion, [distortion.get(), active ? -targetDistortion : targetDistortion, 0], {
-            duration,
-            times: [0, 0.35, 1],
-            ease: "easeInOut"
+        // Softer, gentler bounce: Slower duration and smoother curve
+        runAnimation(distortion, [distortion.get(), active ? -currentTarget : currentTarget, 0], {
+            duration: 1.0,
+            times: [0, 0.4, 1],
+            ease: "easeOut"
         });
 
     }, [active, distortion, orientation, distortionFactor]);
@@ -190,7 +197,7 @@ const FabricBackground = React.memo(({ active, isStrokeOnly = false, orientation
     );
 });
 
-const CardAnimator = React.memo(({
+const CardAnimator = React.memo(React.forwardRef(({
     type = 'fabricCard',
     active = false,
     children,
@@ -209,7 +216,7 @@ const CardAnimator = React.memo(({
     disableShadow = false,
     shadowScale = 1,
     ...props
-}) => {
+}, ref) => {
     const [isInternalAnimating, setIsInternalAnimating] = useState(false);
 
     if (type === 'expandableContent') {
@@ -243,11 +250,11 @@ const CardAnimator = React.memo(({
         const contentScaleY = useMotionValue(1);
         const isHorizontal = type === 'fabricHorizontal';
         const effectiveActive = active && isPresent;
-        const prevActive = useRef(null);
+        const prevActive = useRef(effectiveActive);
 
         useEffect(() => {
             if (!isPresent && safeToRemove) {
-                const timer = setTimeout(safeToRemove, 500);
+                const timer = setTimeout(safeToRemove, 150);
                 return () => clearTimeout(timer);
             }
         }, [isPresent, safeToRemove]);
@@ -259,11 +266,17 @@ const CardAnimator = React.memo(({
                 return;
             }
 
+            // Skip animation entirely when distortionFactor is 0 (loading state)
+            if (distortionFactor === 0) {
+                prevActive.current = effectiveActive;
+                return;
+            }
+
             const duration = 1.0;
-            const ease = "easeInOut";
-            const times = [0, 0.35, 1];
+            const ease = "easeOut";
+            const times = [0, 0.4, 1];
             const d = distortionFactor;
-            const scaleAmount = 0.08 * d * contentDistortionScale;
+            const scaleAmount = 0.12 * d * contentDistortionScale;
 
             if (isHorizontal) {
                 if (effectiveActive) {
@@ -287,16 +300,22 @@ const CardAnimator = React.memo(({
 
         return (
             <BaseComponent
+                ref={ref}
                 layout={layout}
                 style={{
                     position: 'relative',
                     zIndex: 1,
-                    transformOrigin: isHorizontal ? "center left" : "top center",
+                    transformOrigin: "center center",
                     willChange: "transform",
+                    scaleX: contentScaleX,
+                    scaleY: contentScaleY,
+                    display: 'flex',
+                    flexDirection: 'column',
                     ...style,
                     background: 'transparent',
                     boxShadow: 'none',
                     border: 'none',
+                    overflow: 'visible'
                 }}
                 className={className}
                 {...props}
@@ -314,27 +333,11 @@ const CardAnimator = React.memo(({
                         shadowScale={shadowScale}
                     />
                 )}
-                <motion.div
-                    style={{
-                        position: 'relative',
-                        zIndex: 2,
-                        scaleX: contentScaleX,
-                        scaleY: contentScaleY,
-                        transformOrigin: "center center",
-                        display: 'flex',
-                        flexDirection: 'column',
-                        width: '100%',
-                        height: '100%',
-                        minHeight: 0,
-                        overflow: 'visible'
-                    }}
-                >
-                    {children}
-                </motion.div>
+                {children}
             </BaseComponent >
         );
     }
     return null;
-});
+}));
 
 export default CardAnimator;

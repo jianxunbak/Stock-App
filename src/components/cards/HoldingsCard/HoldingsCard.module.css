@@ -31,33 +31,6 @@
     /* Reset glass borders for light mode if managed globally or differently */
 }
 
-/* Header Styles */
-.summaryInfo {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 0.5rem;
-    height: 100%;
-    padding-left: 0;
-    padding-top: 0;
-}
-
-.summaryName {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.summaryCount {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-}
-
 /* Table container adjustments */
 .tableScroll {
     width: 100%;

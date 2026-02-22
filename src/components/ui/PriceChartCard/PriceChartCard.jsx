@@ -42,6 +42,11 @@ const PriceChartCard = ({
     comparisonTickers: propsComparisonTickers,
     onAddSeries,
     onRemoveSeries,
+    // Lifted state from parent (optional) - destructured to prevent DOM leakage
+    controlledTimeRange,
+    onTimeRangeChange: onExternalTimeRangeChange,
+    controlledMode,
+    onModeChange,
     ...props
 }) => {
     const isPositive = typeof change === 'string' ? change.startsWith('+') : parseFloat(change) >= 0;
@@ -109,7 +114,6 @@ const PriceChartCard = ({
         return [];
     });
     const [searchTerm, setSearchTerm] = useState('');
-    const [timeRange, setTimeRange] = useState('1Y');
     const [comparisonTickers, setComparisonTickers] = useState(() => {
         if (propsComparisonTickers) return propsComparisonTickers;
         if (manualSeries) {
@@ -135,6 +139,22 @@ const PriceChartCard = ({
     // Error State
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [failedTicker, setFailedTicker] = useState('');
+
+    // Time range and mode state - declared early since effects reference them
+    const [internalTimeRange, setInternalTimeRange] = useState('1Y');
+    const timeRange = controlledTimeRange ?? internalTimeRange;
+    const setTimeRange = (val) => {
+        setInternalTimeRange(val);
+        if (onExternalTimeRangeChange) onExternalTimeRangeChange(val);
+    };
+
+    const [internalMode, setInternalMode] = useState(isPercentageData ? 'percent' : 'price');
+    const mode = controlledMode ?? internalMode;
+    const setMode = (updater) => {
+        const next = typeof updater === 'function' ? updater(mode) : updater;
+        setInternalMode(next);
+        if (onModeChange) onModeChange(next);
+    };
 
     // Determine X-Axis format
     const xAxisFormatter = (dateStr) => {
@@ -271,11 +291,6 @@ const PriceChartCard = ({
         setSeries(baseSeries);
     }, [ticker, comparisonTickers, visibleSMAs, isPositive, isManual, manualSeries]);
 
-
-
-    // --- Actions ---
-
-    const [mode, setMode] = useState(isPercentageData ? 'percent' : 'price'); // 'price' or 'percent'
 
     // Calculate SMAs locally if they are missing from chartData
     const chartDataWithSMAs = React.useMemo(() => {
@@ -469,8 +484,6 @@ const PriceChartCard = ({
         </div>
     );
 
-
-
     return (
         <StyledCard
             expanded={true}
@@ -483,17 +496,23 @@ const PriceChartCard = ({
         >
             <BaseChart
                 data={displayData}
-
                 series={series}
                 currency={currencySymbol}
-                activeTimeRange={timeRange}
-                onTimeRangeChange={setTimeRange}
                 xAxisFormatter={xAxisFormatter}
                 yAxisFormatter={yAxisFormatter}
                 tooltipValueFormatter={tooltipValueFormatter}
                 height={chartHeight}
+                activeTimeRange={timeRange}
+                onTimeRangeChange={setTimeRange}
                 extraControls={
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setMode(prev => prev === 'price' ? 'percent' : 'price')}
+                            style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            {mode === 'price' ? <DollarSign size={16} /> : <Percent size={16} />}
+                        </Button>
                         {allowSMA && (
                             <DropdownButton
                                 icon={<Activity size={16} />}
@@ -505,19 +524,9 @@ const PriceChartCard = ({
                                 }))}
                                 closeOnSelect={false}
                                 align="left"
+                                usePortal={true}
                             />
                         )}
-
-                        {!isPercentageData && (
-                            <Button
-                                variant="outline"
-                                onClick={() => setMode(prev => prev === 'price' ? 'percent' : 'price')}
-                                style={{ width: '36px', height: '36px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                                {mode === 'price' ? <DollarSign size={16} /> : <Percent size={16} />}
-                            </Button>
-                        )}
-
                         {allowComparison && (
                             <SearchBar
                                 placeholder="Compare ticker..."

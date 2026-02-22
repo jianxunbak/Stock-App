@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import {
     AlertTriangle, Cpu, Landmark, Activity, ShoppingBag, Zap,
-    Building, Smartphone, Factory, Lightbulb, Box, TrendingUp,
+    Building, Smartphone, Factory, Lightbulb, Box, TrendingUp, TrendingDown, Minus, CheckCircle,
     Target, BadgeDollarSign, Shield, Rocket, RefreshCw, PieChart as PieChartIcon
 } from 'lucide-react';
 import styles from './AllocationCard.module.css';
@@ -23,7 +24,8 @@ const AllocationCard = ({
     catTargets,
     sectorLimits,
     onManageTargets,
-    loading = false
+    loading = false,
+    className = ""
 }) => {
     if (!portfolioList || portfolioList.length === 0) {
         return (
@@ -31,6 +33,7 @@ const AllocationCard = ({
                 title="Allocation"
                 loading={loading}
                 onHide={onHide}
+                className={className}
             />
         );
     }
@@ -198,78 +201,53 @@ const AllocationCard = ({
         }
     ];
 
-    const summaryCharts = (
-        <div className={styles.summaryContainer}>
-            <div className={styles.summaryHeaderTitle}>Allocation</div>
-            <div className={styles.summaryChartsRow}>
-                {/* Category Summary */}
-                <div className={styles.summaryChart}>
-                    <div className={styles.summaryLabel}>Category</div>
-                    <div style={{ width: 80, height: 80 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={categoryData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={25}
-                                    outerRadius={40}
-                                    paddingAngle={2}
-                                    dataKey="value"
-                                    isAnimationActive={false}
-                                >
-                                    {categoryData.map((entry, index) => {
-                                        const pct = totalValue > 0 ? (entry.value / totalValue) * 100 : 0;
-                                        const color = getStatusColor(entry.name, pct, false);
-                                        return <Cell key={`cell-${index}`} fill={color} stroke="none" />;
-                                    })}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
+    const summaryCharts = useMemo(() => {
+        const sortedCat = [...categoryData].sort((a, b) => b.value - a.value);
+        const sortedSec = [...sectorData].sort((a, b) => b.value - a.value);
+        const topCat = sortedCat[0];
+        const topSec = sortedSec[0];
+        const catPct = topCat && totalValue > 0 ? ((topCat.value / totalValue) * 100).toFixed(1) : '0';
+        const secPct = topSec && totalValue > 0 ? ((topSec.value / totalValue) * 100).toFixed(1) : '0';
 
-                {/* Sector Summary */}
-                <div className={styles.summaryChart}>
-                    <div className={styles.summaryLabel}>Sector</div>
-                    <div style={{ width: 80, height: 80 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={sectorData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={25}
-                                    outerRadius={40}
-                                    paddingAngle={2}
-                                    dataKey="value"
-                                    isAnimationActive={false}
-                                >
-                                    {sectorData.map((entry, index) => {
-                                        const pct = totalValue > 0 ? (entry.value / totalValue) * 100 : 0;
-                                        const color = getStatusColor(entry.name, pct, true);
-                                        return <Cell key={`cell-${index}`} fill={color} stroke="none" />;
-                                    })}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+        // Build grid metrics from categories
+        const gridItems = sortedCat.slice(0, 4).map(entry => {
+            const pct = totalValue > 0 ? (entry.value / totalValue) * 100 : 0;
+            const color = getStatusColor(entry.name, pct, false);
+            const icon = color === '#10B981' ? <CheckCircle size={14} /> : (color === '#F59E0B' ? <Minus size={14} /> : <TrendingDown size={14} />);
+            return { label: `${entry.name}: ${pct.toFixed(1)}%`, icon, color };
+        });
+
+        // Add top 2 sectors
+        sortedSec.slice(0, 2).forEach(entry => {
+            const pct = totalValue > 0 ? (entry.value / totalValue) * 100 : 0;
+            const color = getStatusColor(entry.name, pct, true);
+            const icon = color === '#10B981' ? <CheckCircle size={14} /> : <TrendingDown size={14} />;
+            gridItems.push({ label: `${entry.name}: ${pct.toFixed(1)}%`, icon, color });
+        });
+
+        return (
+            <SummaryCardContent
+                mainMetrics={[
+                    { label: 'Top Category', value: topCat ? topCat.name : 'N/A', color: 'var(--neu-text-primary)' },
+                    { label: 'Top Sector', value: topSec ? topSec.name : 'N/A', color: 'var(--neu-text-primary)' }
+                ]}
+                gridMetrics={gridItems}
+            />
+        );
+    }, [categoryData, sectorData, totalValue, catTargets, sectorLimits]);
 
     return (
         <ExpandableCard
             title="Allocation"
+            className={className}
             expanded={openCards.allocation}
             defaultExpanded={openCards.allocation}
             onToggle={() => toggleCard('allocation')}
             onHide={onHide}
             loading={loading}
+            collapsedHeight={198}
             menuItems={menuItems}
             headerContent={summaryCharts}
-
         >
             <div className={styles.allocationGrid}>
                 {portfolioLength === 0 ? (

@@ -101,8 +101,8 @@
 
 /* Main Page Layout */
 .pageGrid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 1.5rem;
     align-items: flex-start;
     padding-bottom: 2rem;
@@ -112,40 +112,52 @@
     width: 100%;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
     .pageGrid {
-        display: flex;
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
-.colSpan3,
-.colSpan2,
+@media (min-width: 1100px) {
+    .pageGrid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.colSpan3 {
+    grid-column: 1 / -1;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
 .colSpan1 {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 0;
-    transition: flex 0.3s ease, width 0.3s ease;
+    width: 100%;
+    transition: all 0.3s ease;
 }
 
 .expandedWrapper {
-    flex: 1 1 100% !important;
+    grid-column: 1 / -1 !important;
     width: 100% !important;
 }
 
 .collapsedWrapper {
-    flex: 0 0 auto !important;
-    width: auto !important;
+    height: auto;
 }
 
-@media (min-width: 1024px) {
+@media (max-width: 767px) {
+    .pageGrid {
+        gap: 1.5rem !important;
+    }
 
-    .colSpan3,
-    .colSpan2,
-    .colSpan1 {
-        flex: 0 0 auto;
-        width: auto;
+    .collapsedWrapper {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: auto !important;
+        margin-bottom: 0 !important;
     }
 }
+
+
 
 
 .topCard {

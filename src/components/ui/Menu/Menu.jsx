@@ -25,6 +25,7 @@ const Menu = ({
     ...props
 }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
     const menuRef = useRef(null);
 
     const toggleMenu = (e) => {
@@ -34,6 +35,15 @@ const Menu = ({
         }
         setIsOpen(!isOpen);
     };
+
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => setIsExpanded(true), 50);
+            return () => clearTimeout(timer);
+        } else {
+            setIsExpanded(false);
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -157,14 +167,12 @@ const Menu = ({
                             hidden: {
                                 opacity: 0,
                                 scale: 0.92,
-                                y: placement.includes('bottom') ? -10 : 10,
-                                filter: 'blur(10px)'
+                                y: placement.includes('bottom') ? -10 : 10
                             },
                             visible: {
                                 opacity: 1,
                                 scale: 1,
                                 y: 0,
-                                filter: 'blur(0px)',
                                 transition: {
                                     type: "spring",
                                     stiffness: 300,
@@ -176,7 +184,7 @@ const Menu = ({
                             exit: {
                                 opacity: 0,
                                 scale: 0.95,
-                                transition: { duration: 0.8, ease: "easeInOut" }
+                                transition: { duration: 0.4, ease: "easeInOut" }
                             }
                         }}
                         initial="hidden"
@@ -186,12 +194,13 @@ const Menu = ({
                             background: 'transparent',
                             boxShadow: 'none',
                             border: 'none',
-                            borderRadius: 0
+                            borderRadius: 0,
+                            overflow: 'visible'
                         }}
                     >
                         <CardAnimator
                             type={orientation === 'horizontal' ? 'fabricHorizontal' : 'fabricCard'}
-                            active={isOpen}
+                            active={isExpanded}
                             variant={variant === 'transparent' ? 'default' : variant}
                             className={`menu-content-container ${variant === 'transparent' ? 'default' : variant} ${contentClassName}`}
                             surfaceColor={surfaceColor}
@@ -209,6 +218,7 @@ const Menu = ({
                         >
                             <div
                                 className={`menu-items-grid ${orientation}`}
+                                style={{ overflow: 'visible' }}
                             >
                                 {React.Children.toArray(children).filter(Boolean).map((child, index) => (
                                     <motion.div
@@ -226,7 +236,7 @@ const Menu = ({
                                             },
                                             exit: { opacity: 0, scale: 0.5, transition: { duration: 0.2 } }
                                         }}
-                                        style={{ display: 'flex' }}
+                                        style={{ display: 'flex', overflow: 'visible' }}
                                     >
                                         {child}
                                     </motion.div>

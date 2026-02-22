@@ -62,19 +62,22 @@ const BaseChart = ({
     return (
         <div className="base-chart-wrapper">
             {/* Time Range Selector (Integrated) & Extra Controls */}
-            {onTimeRangeChange && (
+            {(onTimeRangeChange || extraControls) && (
                 <div className="base-chart-controls">
-                    <DropdownButton
-                        label={activeTimeRange}
-                        buttonStyle={{ width: '36px', height: '36px', padding: 0, fontSize: '0.75rem' }}
-                        items={timeRanges.map(period => ({
-                            label: period,
-                            isActive: activeTimeRange === period,
-                            onClick: () => onTimeRangeChange(period),
-                        }))}
-                        closeOnSelect={true}
-                        align="left"
-                    />
+                    {onTimeRangeChange && (
+                        <DropdownButton
+                            label={activeTimeRange}
+                            buttonStyle={{ minWidth: '36px', height: '36px', padding: '0 0.5rem', fontSize: '0.75rem' }}
+                            items={timeRanges.map(period => ({
+                                label: period,
+                                isActive: activeTimeRange === period,
+                                onClick: () => onTimeRangeChange(period),
+                            }))}
+                            closeOnSelect={true}
+                            align="left"
+                            usePortal={true}
+                        />
+                    )}
                     {extraControls}
                 </div>
             )}
@@ -84,7 +87,7 @@ const BaseChart = ({
                     <AreaChart
                         data={data}
                         style={{ outline: 'none' }}
-                        margin={{ top: 10, right: 0, left: -40, bottom: 0 }}
+                        margin={{ top: 10, right: 0, left: -50, bottom: 0 }}
                     >
                         <defs>
                             {/* Create dynamic gradients for each series */}

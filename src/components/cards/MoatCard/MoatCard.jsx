@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStockData } from '../../../hooks/useStockData';
 import { evaluateMoat } from '../../../services/gemini';
 import { savePublicMoatAnalysis, getPublicMoatAnalysis, savePrivateMoatAnalysis, getPrivateMoatAnalysis, deletePrivateMoatAnalysis } from '../../../services/moatFirestore';
-import { Sparkles, Loader2, ChevronDown, ChevronUp, ArrowUp, ArrowDown, X, Trash2, Edit } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, ArrowUp, ArrowDown, X, Trash2, Edit } from 'lucide-react';
+import InlineSpinner from '../../ui/InlineSpinner/InlineSpinner';
 import Button from '../../ui/Button/Button';
 import CardToggleButton from '../CardToggleButton/CardToggleButton';
 import {
@@ -14,6 +15,7 @@ import styles from './MoatCard.module.css';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 
 const MoatCard = ({
     onMoatStatusChange,
@@ -26,7 +28,8 @@ const MoatCard = ({
     onHide = null,
     className = "",
     variant = 'default',
-    loading: parentLoading = false
+    loading: parentLoading = false,
+    collapsedHeight = 198
 }) => {
     const { stockData, loading: stockLoading } = useStockData();
     const isLoading = parentLoading || stockLoading;
@@ -226,21 +229,28 @@ const MoatCard = ({
     }, [moatStatus, isActuallyEvaluated, onMoatStatusChange]);
 
     const header = (
-        <div className="summary-info">
-            <div className="summary-name">Economic Moat</div>
-            {isETF ? (
-                <div className="summary-price" style={{ color: 'var(--neu-text-tertiary)' }}>N/A</div>
-            ) : (
-                <>
-                    <div className={`summary-price ${moatStatus.color}`}>
-                        {isActuallyEvaluated ? totalScore : '?'}/5
-                    </div>
-                    <div className={`summary-change ${moatStatus.color}`}>
-                        {isActuallyEvaluated ? moatStatus.label : 'Not Evaluated'}
-                    </div>
-                </>
-            )}
-        </div>
+        <SummaryCardContent
+            mainMetrics={isETF ? [
+                { label: 'Economic Moat', value: 'N/A', color: 'var(--neu-text-tertiary)' }
+            ] : [
+                {
+                    label: 'Moat Score',
+                    value: isActuallyEvaluated ? totalScore.toString() : '?',
+                    suffix: '/5',
+                    color: isActuallyEvaluated ? (totalScore < 2 ? 'var(--neu-error)' : totalScore <= 3 ? '#facc15' : 'var(--neu-success)') : 'var(--neu-text-primary)'
+                },
+                {
+                    label: 'Strength',
+                    value: isActuallyEvaluated ? moatStatus.label : 'Not Evaluated',
+                    color: isActuallyEvaluated ? (totalScore < 2 ? 'var(--neu-error)' : totalScore <= 3 ? '#facc15' : 'var(--neu-success)') : 'var(--neu-text-tertiary)'
+                }
+            ]}
+            gridMetrics={isETF ? [] : categories.map(cat => ({
+                label: cat.label,
+                icon: scores[cat.id] === 1 ? <ArrowUp size={14} /> : (scores[cat.id] === 0.5 ? <ArrowDown size={14} /> : null),
+                color: scores[cat.id] === 1 ? 'var(--neu-success)' : (scores[cat.id] === 0.5 ? '#facc15' : 'var(--neu-text-tertiary)')
+            }))}
+        />
     );
 
     const menuItems = [];
@@ -253,7 +263,7 @@ const MoatCard = ({
             onToggle={onToggle}
             onHide={onHide}
             collapsedWidth={220}
-            collapsedHeight={220}
+            collapsedHeight={collapsedHeight}
             loading={isLoading}
             headerContent={stockData ? header : null}
             className={className}
@@ -274,8 +284,7 @@ const MoatCard = ({
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', width: '100%' }}>
                                         {isEvaluating ? (
                                             <div className={styles.evaluatingText}>
-                                                <Loader2 className={styles.spin} size={16} />
-                                                <span>AI Analyzing Moat...</span>
+                                                <InlineSpinner size="16px" color="var(--neu-brand)" />
                                             </div>
                                         ) : (
                                             <>

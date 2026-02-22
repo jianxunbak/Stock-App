@@ -4,6 +4,7 @@ import { useStockData } from '../../../hooks/useStockData';
 import styles from './ValuationCard.module.css';
 import MetricCard from '../../ui/MetricCard/MetricCard';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
 
 const ValuationCard = ({
     currency = 'USD',
@@ -15,6 +16,7 @@ const ValuationCard = ({
     className = "",
     variant = 'default',
     loading: parentLoading = false,
+    collapsedHeight = 198,
     ...props
 }) => {
     const { stockData, loading: stockLoading, loadStockData } = useStockData();
@@ -62,31 +64,8 @@ const ValuationCard = ({
 
     // Updated color logic based on percentage difference
     const diff = currentValuation?.differencePercent || 0;
-    const statusColor = diff > 0.05 ? 'var(--neu-error)' : (diff < -0.05 ? 'var(--neu-success)' : 'var(--neu-warning)');
-    const statusType = diff > 0.05 ? 'negative' : (diff < -0.05 ? 'positive' : 'warning');
-
-    const header = (
-        <div className="summary-info">
-            {isETF ? (
-                <>
-                    <div className="summary-name">Valuation</div>
-                    <div className="summary-price" style={{ color: 'var(--neu-text-tertiary)' }}>N/A</div>
-                </>
-            ) : (
-                <>
-                    <div className="summary-name" style={{ color: 'var(--neu-text-primary)' }}>Intrinsic Value</div>
-                    <div className="summary-price" style={{ color: statusColor }}>
-                        {currencySymbol}{(currentValuation?.intrinsicValue * currentRate)?.toFixed(2)}
-                    </div>
-                    <div className="summary-change" style={{ color: statusColor }}>
-                        {currentValuation?.status}
-                    </div>
-                </>
-            )}
-        </div>
-    );
-
-    const activeMethod = selectedMethodName || valuation?.recommendedMethod || valuation?.method;
+    const statusColor = diff > 0.15 ? 'var(--neu-error)' : (diff < -0.15 ? 'var(--neu-success)' : 'var(--neu-warning)');
+    const statusType = diff > 0.15 ? 'negative' : (diff < -0.15 ? 'positive' : 'warning');
 
     const getMethodIcon = (methodName, size = 14) => {
         if (!methodName) return <Activity size={size} />;
@@ -98,6 +77,35 @@ const ValuationCard = ({
         if (methodName.includes("Graham")) return <ShieldCheck size={size} />;
         return <Activity size={size} />;
     };
+
+    const activeMethod = selectedMethodName || valuation?.recommendedMethod || valuation?.method;
+
+    const header = (
+        <SummaryCardContent
+            mainMetrics={isETF ? [
+                { label: 'Intrinsic Value', value: 'N/A', color: 'var(--neu-text-tertiary)' }
+            ] : [
+                {
+                    label: 'Intrinsic Value',
+                    value: (currentValuation?.intrinsicValue * currentRate)?.toFixed(2),
+                    suffix: '',
+                    color: statusColor
+                },
+                {
+                    label: 'Status',
+                    value: currentValuation?.status,
+                    color: statusColor
+                }
+            ]}
+            gridMetrics={isETF ? [] : [
+                {
+                    label: activeMethod,
+                    icon: getMethodIcon(activeMethod),
+                    color: 'var(--neu-text-secondary)'
+                }
+            ]}
+        />
+    );
 
     const valMenuItems = [];
     if (!isETF) {
@@ -137,7 +145,7 @@ const ValuationCard = ({
             onToggle={onToggle}
             onHide={onHide}
             collapsedWidth={220}
-            collapsedHeight={220}
+            collapsedHeight={collapsedHeight}
             loading={isLoading}
             headerContent={stockData ? header : null}
             className={className}

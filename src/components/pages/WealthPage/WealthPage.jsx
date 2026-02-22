@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchUserSettings, saveUserSettings, fetchCurrencyRate, fetchStockDataBatch } from '../../../services/api';
@@ -15,6 +16,7 @@ import StocksCard from '../../cards/StocksCard/StocksCard';
 import CPFCard from '../../cards/CPFCard/CPFCard';
 import SavingsCard from '../../cards/SavingsCard/SavingsCard';
 import OtherInvestmentsCard from '../../cards/OtherInvestmentsCard/OtherInvestmentsCard';
+import InlineSpinner from '../../ui/InlineSpinner/InlineSpinner';
 import styles from './WealthPage.module.css';
 
 const WealthPage = () => {
@@ -29,6 +31,7 @@ const WealthPage = () => {
     const [usdToDisplayRate, setUsdToDisplayRate] = useState(1);
     const [sgdToDisplayRate, setSgdToDisplayRate] = useState(1);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [pricesLoading, setPricesLoading] = useState(true);
 
     const { portfolioList } = usePortfolio();
 
@@ -52,6 +55,7 @@ const WealthPage = () => {
 
         if (missing.length > 0) {
             const fetchPrices = async () => {
+                setPricesLoading(true);
                 try {
                     const batchData = await fetchStockDataBatch(missing);
                     const newPrices = {};
@@ -61,9 +65,13 @@ const WealthPage = () => {
                     setLivePrices(prev => ({ ...prev, ...newPrices }));
                 } catch (err) {
                     console.error("Error fetching stock prices:", err);
+                } finally {
+                    setPricesLoading(false);
                 }
             };
             fetchPrices();
+        } else {
+            setPricesLoading(false);
         }
     }, [portfolioList, livePrices]);
 
@@ -104,43 +112,63 @@ const WealthPage = () => {
 
     // Fetch currency rates when currencies change
     useEffect(() => {
+        let isCancelled = false;
+
         const updateRates = async () => {
-            const cache = {};
-            const getRate = async (curr) => {
-                if (curr === 'USD') return 1;
-                if (cache[curr]) return cache[curr];
-                const res = await fetchCurrencyRate(curr);
-                const rate = res?.rate || res || 1;
-                cache[curr] = rate;
-                return rate;
-            };
+            try {
+                const cache = {};
+                const getRate = async (curr) => {
+                    if (curr === 'USD') return 1;
+                    if (cache[curr]) return cache[curr];
+                    const res = await fetchCurrencyRate(curr);
+                    const rate = res?.rate || res || 1;
+                    cache[curr] = rate;
+                    return rate;
+                };
 
-            const displayRate = await getRate(displayCurrency);
-            // 1. Base to Display Rate
-            if (baseCurrency === displayCurrency) {
-                setBaseToDisplayRate(1);
-            } else {
-                const baseRate = await getRate(baseCurrency);
-                setBaseToDisplayRate(displayRate / baseRate);
-            }
+                const displayRate = await getRate(displayCurrency);
 
-            // 2. USD to Display Rate
-            setUsdToDisplayRate(displayRate);
+                if (isCancelled) return;
 
-            // 3. SGD to Display Rate
-            if (displayCurrency === 'SGD') {
-                setSgdToDisplayRate(1);
-            } else {
-                let sgdRate = await getRate('SGD');
-                // Fallback: If API returns 1 for SGD (unlikely 1:1 with USD), verify/force standard rate
-                if (sgdRate === 1) sgdRate = 1.35;
+                // 1. Base to Display Rate
+                let newBaseRate = 1;
+                if (baseCurrency === displayCurrency) {
+                    newBaseRate = 1;
+                } else {
+                    const baseRateValue = await getRate(baseCurrency);
+                    if (isCancelled) return;
+                    newBaseRate = displayRate / baseRateValue;
+                }
 
-                const calculatedRate = displayRate / sgdRate;
-                setSgdToDisplayRate(calculatedRate);
+                // 2. USD to Display Rate
+                const newUsdRate = displayRate;
+
+                // 3. SGD to Display Rate
+                let newSgdRate = 1;
+                if (displayCurrency === 'SGD') {
+                    newSgdRate = 1;
+                } else {
+                    let sgdRateLocal = await getRate('SGD');
+                    if (isCancelled) return;
+                    if (sgdRateLocal === 1) sgdRateLocal = 1.35;
+                    newSgdRate = displayRate / sgdRateLocal;
+                }
+
+                if (!isCancelled) {
+                    setBaseToDisplayRate(newBaseRate);
+                    setUsdToDisplayRate(newUsdRate);
+                    setSgdToDisplayRate(newSgdRate);
+                }
+            } catch (err) {
+                console.error("Error updating currency rates:", err);
             }
         };
 
         updateRates();
+
+        return () => {
+            isCancelled = true;
+        };
     }, [displayCurrency, baseCurrency]);
 
 
@@ -227,18 +255,13 @@ const WealthPage = () => {
     // Load User Preferences from DB
     const ignoreRemoteSyncUntil = useRef(0);
 
-    // Initial Currency Sync
-    useEffect(() => {
-        if (userSettings?.baseCurrency) {
-            setDisplayCurrency(userSettings.baseCurrency);
-            setBaseCurrency(userSettings.baseCurrency);
-        }
-    }, [userSettings?.baseCurrency]);
 
     const handleCurrencyChange = (newCurrency) => {
         setDisplayCurrency(newCurrency);
-        handleUpdateSettings({ baseCurrency: newCurrency });
+        // Only update the display preference, don't overwrite the user's home currency (baseCurrency)
+        // which should be explicitly set in User Details.
     };
+
 
     const loadSettings = useCallback((e) => {
         if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') {
@@ -261,10 +284,13 @@ const WealthPage = () => {
                 }
                 if (data.baseCurrency) {
                     setBaseCurrency(data.baseCurrency);
+                    // Match display currency to base currency on initial load
+                    setDisplayCurrency(data.baseCurrency);
                 }
                 if (data.cardOrder?.wealth) {
                     setCardOrder(prev => (JSON.stringify(prev) === JSON.stringify(data.cardOrder.wealth) ? prev : data.cardOrder.wealth));
                 }
+
                 if (data.cardOpenStates?.wealth) {
                     setOpenCards(prev => {
                         const next = { ...prev, ...data.cardOpenStates.wealth };
@@ -296,7 +322,11 @@ const WealthPage = () => {
     }, [currentUser?.uid]);
 
     const handleRefresh = useCallback(async () => {
-        setIsRefreshing(true);
+        // Force React to commit the loading state immediately before starting async work.
+        // Without flushSync, React 18's batching can skip the loading UI entirely.
+        flushSync(() => {
+            setIsRefreshing(true);
+        });
         // 1. Reset live prices to trigger refetch
         setLivePrices({});
         // 2. Bypass sync shield
@@ -403,7 +433,11 @@ const WealthPage = () => {
         }
     };
 
-    if (authLoading) return <div>Loading...</div>;
+    if (authLoading) return (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw', background: 'var(--neu-bg)' }}>
+            <InlineSpinner size="40px" />
+        </div>
+    );
 
 
     const handleSearch = (val) => {
@@ -455,135 +489,144 @@ const WealthPage = () => {
                         const isSpan3 = cardKey === 'wealthSummary';
                         const colSpanClass = isSpan3 ? styles.colSpan3 : styles.colSpan1;
                         const isOpen = openCards[cardKey];
-                        const wrapperClass = `${colSpanClass} ${isOpen ? styles.expandedWrapper : ''}`;
+                        const className = `${colSpanClass} ${isOpen ? styles.expandedWrapper : styles.collapsedWrapper}`;
 
                         if (cardKey === 'wealthSummary' && cardVisibility.wealthSummary) {
                             return (
-                                <div key="wealthSummary" className={wrapperClass}>
-                                    <WealthSummaryCard
-                                        isOpen={isOpen}
-                                        onToggle={(val) => toggleCard('wealthSummary', val)}
-                                        onHide={() => handleHideRequest('wealthSummary')}
-                                        baseCurrency={baseCurrency}
-                                        baseCurrencySymbol={baseCurrencySymbol}
-                                        displayCurrency={displayCurrency}
-                                        displayCurrencySymbol={displayCurrencySymbol}
-                                        baseToDisplayRate={baseToDisplayRate}
-                                        usdToDisplayRate={usdToDisplayRate}
-                                        sgdToDisplayRate={sgdToDisplayRate}
-                                        settings={userSettings}
-                                        onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings || isRefreshing}
-                                        currentPortfolioValueUSD={totalPortfolioValue}
-                                        onRefresh={handleRefresh}
-                                    />
-                                </div>
+                                <WealthSummaryCard
+                                    key="wealthSummary"
+                                    className={className}
+                                    isOpen={isOpen}
+                                    onToggle={(val) => toggleCard('wealthSummary', val)}
+                                    onHide={() => handleHideRequest('wealthSummary')}
+                                    baseCurrency={baseCurrency}
+                                    baseCurrencySymbol={baseCurrencySymbol}
+                                    displayCurrency={displayCurrency}
+                                    displayCurrencySymbol={displayCurrencySymbol}
+                                    baseToDisplayRate={baseToDisplayRate}
+                                    usdToDisplayRate={usdToDisplayRate}
+                                    sgdToDisplayRate={sgdToDisplayRate}
+                                    settings={userSettings}
+                                    onUpdateSettings={handleUpdateSettings}
+                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    currentPortfolioValueUSD={totalPortfolioValue}
+                                    onRefresh={handleRefresh}
+                                />
                             );
                         }
 
+                        const inflationRate = userSettings?.wealth?.inflationRate || 0;
+
                         if (cardKey === 'stocks' && cardVisibility.stocks) {
                             return (
-                                <div key="stocks" className={wrapperClass}>
-                                    <StocksCard
-                                        isOpen={isOpen}
-                                        onToggle={(val) => toggleCard('stocks', val)}
-                                        onHide={() => handleHideRequest('stocks')}
-                                        dateOfBirth={userSettings?.dateOfBirth}
-                                        baseCurrency={baseCurrency}
-                                        baseCurrencySymbol={baseCurrencySymbol}
-                                        displayCurrency={displayCurrency}
-                                        displayCurrencySymbol={displayCurrencySymbol}
-                                        baseToDisplayRate={baseToDisplayRate}
-                                        usdToDisplayRate={usdToDisplayRate}
-                                        settings={userSettings}
-                                        onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings || isRefreshing}
-                                        currentPortfolioValueUSD={totalPortfolioValue}
-                                        portfolioOptions={portfolioList?.map(p => {
-                                            let val = 0;
-                                            (p.portfolio || []).forEach(item => {
-                                                const ticker = (item.ticker || '').trim().toUpperCase();
-                                                const price = livePrices[ticker] !== undefined ? livePrices[ticker] : (Number(item.price) || 0);
-                                                val += price * (Number(item.shares) || 0);
-                                            });
-                                            return { name: p.name, valueUSD: val };
-                                        })}
-                                        onRefresh={handleRefresh}
-                                    />
-                                </div>
+                                <StocksCard
+                                    key="stocks"
+                                    className={className}
+                                    isOpen={isOpen}
+                                    onToggle={(val) => toggleCard('stocks', val)}
+                                    onHide={() => handleHideRequest('stocks')}
+                                    dateOfBirth={userSettings?.dateOfBirth}
+                                    baseCurrency={baseCurrency}
+                                    baseCurrencySymbol={baseCurrencySymbol}
+                                    displayCurrency={displayCurrency}
+                                    displayCurrencySymbol={displayCurrencySymbol}
+                                    baseToDisplayRate={baseToDisplayRate}
+                                    usdToDisplayRate={usdToDisplayRate}
+                                    settings={userSettings}
+                                    onUpdateSettings={handleUpdateSettings}
+                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    currentPortfolioValueUSD={totalPortfolioValue}
+                                    inflationRate={inflationRate}
+                                    portfolioOptions={portfolioList?.map(p => {
+                                        let val = 0;
+                                        (p.portfolio || []).forEach(item => {
+                                            const ticker = (item.ticker || '').trim().toUpperCase();
+                                            const price = livePrices[ticker] !== undefined ? livePrices[ticker] : (Number(item.price) || 0);
+                                            val += price * (Number(item.shares) || 0);
+                                        });
+                                        return { name: p.name, valueUSD: val };
+                                    })}
+                                    onRefresh={handleRefresh}
+                                />
                             );
                         }
 
                         if (cardKey === 'cpf' && cardVisibility.cpf) {
                             return (
-                                <div key="cpf" className={wrapperClass}>
-                                    <CPFCard
-                                        isOpen={isOpen}
-                                        onToggle={(val) => toggleCard('cpf', val)}
-                                        onHide={() => handleHideRequest('cpf')}
-                                        dateOfBirth={userSettings?.dateOfBirth}
-                                        baseCurrency={baseCurrency}
-                                        baseCurrencySymbol={baseCurrencySymbol}
-                                        displayCurrency={displayCurrency}
-                                        displayCurrencySymbol={displayCurrencySymbol}
-                                        baseToDisplayRate={baseToDisplayRate}
-                                        usdToDisplayRate={usdToDisplayRate}
-                                        sgdToDisplayRate={sgdToDisplayRate}
-                                        settings={userSettings}
-                                        onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings || isRefreshing}
-                                        onRefresh={handleRefresh}
-                                    />
-                                </div>
+                                <CPFCard
+                                    key="cpf"
+                                    className={className}
+                                    isOpen={isOpen}
+                                    onToggle={(val) => toggleCard('cpf', val)}
+                                    onHide={() => handleHideRequest('cpf')}
+                                    dateOfBirth={userSettings?.dateOfBirth}
+                                    baseCurrency={baseCurrency}
+                                    baseCurrencySymbol={baseCurrencySymbol}
+                                    displayCurrency={displayCurrency}
+                                    displayCurrencySymbol={displayCurrencySymbol}
+                                    baseToDisplayRate={baseToDisplayRate}
+                                    usdToDisplayRate={usdToDisplayRate}
+                                    sgdToDisplayRate={sgdToDisplayRate}
+                                    settings={userSettings}
+                                    onUpdateSettings={handleUpdateSettings}
+                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    inflationRate={inflationRate}
+                                    onRefresh={handleRefresh}
+                                />
                             );
                         }
 
                         if (cardKey === 'savings' && cardVisibility.savings) {
                             return (
-                                <div key="savings" className={wrapperClass}>
-                                    <SavingsCard
-                                        isOpen={isOpen}
-                                        onToggle={(val) => toggleCard('savings', val)}
-                                        onHide={() => handleHideRequest('savings')}
-                                        baseCurrency={baseCurrency}
-                                        baseCurrencySymbol={baseCurrencySymbol}
-                                        displayCurrency={displayCurrency}
-                                        displayCurrencySymbol={displayCurrencySymbol}
-                                        baseToDisplayRate={baseToDisplayRate}
-                                        usdToDisplayRate={usdToDisplayRate}
-                                        settings={userSettings}
-                                        onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings || isRefreshing}
-                                        onRefresh={handleRefresh}
-                                    />
-                                </div>
+                                <SavingsCard
+                                    key="savings"
+                                    className={className}
+                                    isOpen={isOpen}
+                                    onToggle={(val) => toggleCard('savings', val)}
+                                    onHide={() => handleHideRequest('savings')}
+                                    baseCurrency={baseCurrency}
+                                    baseCurrencySymbol={baseCurrencySymbol}
+                                    displayCurrency={displayCurrency}
+                                    displayCurrencySymbol={displayCurrencySymbol}
+                                    baseToDisplayRate={baseToDisplayRate}
+                                    usdToDisplayRate={usdToDisplayRate}
+                                    sgdToDisplayRate={sgdToDisplayRate}
+                                    settings={userSettings}
+                                    onUpdateSettings={handleUpdateSettings}
+                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    inflationRate={inflationRate}
+                                    onRefresh={handleRefresh}
+                                />
+
                             );
                         }
 
                         if (cardKey === 'otherInvestments' && cardVisibility.otherInvestments) {
                             return (
-                                <div key="otherInvestments" className={wrapperClass}>
-                                    <OtherInvestmentsCard
-                                        isOpen={isOpen}
-                                        onToggle={(val) => toggleCard('otherInvestments', val)}
-                                        onHide={() => handleHideRequest('otherInvestments')}
-                                        baseCurrency={baseCurrency}
-                                        baseCurrencySymbol={baseCurrencySymbol}
-                                        displayCurrency={displayCurrency}
-                                        displayCurrencySymbol={displayCurrencySymbol}
-                                        baseToDisplayRate={baseToDisplayRate}
-                                        usdToDisplayRate={usdToDisplayRate}
-                                        settings={userSettings}
-                                        onUpdateSettings={handleUpdateSettings}
-                                        loading={!userSettings || isRefreshing}
-                                        onRefresh={handleRefresh}
-                                    />
-                                </div>
+                                <OtherInvestmentsCard
+                                    key="otherInvestments"
+                                    className={className}
+                                    isOpen={isOpen}
+                                    onToggle={(val) => toggleCard('otherInvestments', val)}
+                                    onHide={() => handleHideRequest('otherInvestments')}
+                                    baseCurrency={baseCurrency}
+                                    baseCurrencySymbol={baseCurrencySymbol}
+                                    displayCurrency={displayCurrency}
+                                    displayCurrencySymbol={displayCurrencySymbol}
+                                    baseToDisplayRate={baseToDisplayRate}
+                                    usdToDisplayRate={usdToDisplayRate}
+                                    settings={userSettings}
+                                    onUpdateSettings={handleUpdateSettings}
+                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    inflationRate={inflationRate}
+                                    onRefresh={handleRefresh}
+                                />
                             );
                         }
 
                         return null;
                     })}
+
                 </div>
 
                 {showWatchlist && (

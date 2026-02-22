@@ -4,7 +4,6 @@ import Button from '../Button/Button';
 import { X, Check } from 'lucide-react';
 
 const HideConfirmationModal = ({ isOpen, onClose, onConfirm, cardLabel }) => {
-    if (!isOpen) return null;
 
     return (
         <Window

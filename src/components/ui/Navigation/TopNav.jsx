@@ -49,6 +49,7 @@ export const TopNavActions = ({
     setShowWatchlist = () => { },
     setShowProfileModal = () => { },
     handleLogout = () => { },
+    loading = false
 }) => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -64,6 +65,7 @@ export const TopNavActions = ({
                         setSearchTicker(val);
                         handleSearch(val);
                     }}
+                    loading={loading}
                 />
             )}
 

@@ -23,6 +23,11 @@
     background: var(--neu-bg);
     box-shadow: var(--neu-card-shadow);
     border-radius: var(--neu-radius-sm);
+    overflow: visible !important;
+
+    /* Hardware acceleration to prevent shadow clipping/disappearing during parent animations */
+    transform: translateZ(0);
+    will-change: box-shadow, transform;
 }
 
 /* Icon Variant: Force Square */

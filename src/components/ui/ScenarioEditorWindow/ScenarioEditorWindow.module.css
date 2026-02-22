@@ -230,6 +230,12 @@
         inset -3px -3px 7px var(--neu-shadow-light);
 }
 
+.numberInput.autofillActive {
+    border-left: 3px solid var(--neu-success);
+    color: var(--neu-success);
+    font-weight: 500;
+}
+
 /* Remove number input arrows */
 .numberInput::-webkit-inner-spin-button,
 .numberInput::-webkit-outer-spin-button {

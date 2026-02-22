@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, MoreVertical, RefreshCcw, EyeOff } from 'lucide-react';
 import StyledCard from '../StyledCard';
 import Button from '../Button/Button';
 import DropdownButton from '../DropdownButton/DropdownButton';
-import InlineSpinner from '../InlineSpinner/InlineSpinner';
+
 import './ExpandableCard.css';
 
 /**
  * A generic card component that can expand/collapse to show more content.
+ * 
+ * Loading behaviour:
+ *   1. When `loading` becomes true the card freezes at its current size.
+ *      All titles, buttons, controls and children are hidden – only the
+ *      spinner (rendered by StyledCard) is visible.
+ *   2. When `loading` becomes false the freeze is lifted and the card
+ *      can animate to its intended expanded/collapsed state.
  */
 const ExpandableCard = ({
     children,
@@ -16,6 +23,7 @@ const ExpandableCard = ({
     subtitle,
     headerContent,
     controls,
+    collapsedHeaderControls, // NEW: extra controls to show left of menu when collapsed
     menuItems,
     onRefresh,
     onHide, // NEW: Prop to handle hiding the card
@@ -29,21 +37,32 @@ const ExpandableCard = ({
     className = "",
     stackControls = false,
     isOpen, // Ignore
+    containerStyle,
     ...props
 }) => {
-    // Determine the spinner to use
-    const renderLoading = () => (
-        <div className="expandable-card-loading-container">
-            <InlineSpinner size="32px" />
-        </div>
-    );
+    // Loading spinner is now handled centrally by StyledCard.jsx
 
     // Internal state for uncontrolled mode
     const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+    const isManualRefresh = useRef(false);
+
+
+
+
+    const handleRefreshClick = React.useCallback((e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        isManualRefresh.current = true;
+        if (onRefresh) onRefresh(e);
+    }, [onRefresh]);
 
     // Determine if controlled
     const isControlled = expanded !== undefined;
     const isExpanded = isControlled ? expanded : internalExpanded;
+
+    // During loading, force collapsed so the card shows at its closed-card size
+    // (expanded cards with hidden content would collapse to height 0).
+    // After loading completes, the card animates to its intended open/closed state.
+    const visualExpanded = loading ? false : isExpanded;
 
     const combinedMenuItems = React.useMemo(() => {
         const baseItems = Array.isArray(menuItems) ? [...menuItems] : [];
@@ -55,7 +74,7 @@ const ExpandableCard = ({
             if (!alreadyHasRefresh) {
                 baseItems.push({
                     label: 'Refresh Data',
-                    onClick: onRefresh,
+                    onClick: handleRefreshClick,
                     indicatorNode: <RefreshCcw size={14} />
                 });
             }
@@ -76,11 +95,29 @@ const ExpandableCard = ({
         return baseItems;
     }, [menuItems, onRefresh, onHide]);
 
-    const lastToggleTimeComp = React.useRef(0);
-    const lastEventTypeComp = React.useRef(null);
+    const lastToggleTimeComp = useRef(0);
+    const lastEventTypeComp = useRef(null);
+
+    // Mobile detection for responsive defaults
+    const [isMobile, setIsMobile] = useState(false);
+
+    React.useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Unified sizing: Always span full width and auto height (content-driven)
+    // Mobile check is kept only if we need other specific mobile behaviors later
+    const effectiveCollapsedWidth = '100%';
+    const effectiveCollapsedHeight = typeof collapsedHeight === 'number' ? `${collapsedHeight}px` : collapsedHeight;
 
     const handleToggle = React.useCallback((e) => {
         if (!e) return;
+
+        // Block toggling while loading
+        if (loading) return;
 
         const now = Date.now();
         const eventType = e.type;
@@ -124,7 +161,7 @@ const ExpandableCard = ({
         }
 
         if (onToggle) onToggle(newState);
-    }, [isExpanded, isControlled, onToggle]);
+    }, [isExpanded, isControlled, onToggle, loading]);
 
     // Check if headerContent is a React Element to clone it with props if needed
     const finalHeaderContent = React.isValidElement(headerContent)
@@ -135,117 +172,131 @@ const ExpandableCard = ({
 
     return (
         <StyledCard
-            expanded={isExpanded}
-            className={`expandable-card ${!isExpanded ? 'is-collapsed' : ''} ${className}`}
+            data-collapsed={!visualExpanded}
+            expanded={visualExpanded}
+            className={`expandable-card ${!visualExpanded ? 'is-collapsed' : ''} ${className}`}
             layout={false}
             initial={false}
-            distortionFactor={1}
+            distortionFactor={1.2}
             contentDistortionScale={0.3}
             controls={null} // We handle controls manually in summary and body mode
             persistentControls={null}
-            animate={isExpanded ? "expanded" : "collapsed"}
+            animate={visualExpanded ? "expanded" : "collapsed"}
             variants={{
                 expanded: { width: '100%', height: 'auto' },
-                collapsed: { width: collapsedWidth, height: collapsedHeight }
+                collapsed: { width: effectiveCollapsedWidth, height: effectiveCollapsedHeight }
             }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            transition={loading ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30 }}
             containerStyle={{
-                flex: isExpanded ? '1 1 auto' : '0 0 auto',
-                width: isExpanded ? '100%' : collapsedWidth,
-                minWidth: isExpanded ? 0 : collapsedWidth,
-                maxWidth: isExpanded ? '100%' : collapsedWidth,
+                flex: visualExpanded ? '1 1 auto' : '0 0 auto',
+                width: visualExpanded ? '100%' : effectiveCollapsedWidth,
+                minWidth: visualExpanded ? 0 : effectiveCollapsedWidth,
+                maxWidth: visualExpanded ? '100%' : effectiveCollapsedWidth,
+                height: visualExpanded ? 'auto' : effectiveCollapsedHeight,
+                minHeight: visualExpanded ? 0 : effectiveCollapsedHeight,
+                maxHeight: visualExpanded ? 'none' : effectiveCollapsedHeight,
+                overflow: 'visible',
+                ...containerStyle
             }}
             style={{
                 padding: 0,
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'visible',
-                width: isExpanded ? '100%' : collapsedWidth,
-                height: isExpanded ? 'auto' : collapsedHeight,
+
+                width: visualExpanded ? '100%' : effectiveCollapsedWidth,
+                height: visualExpanded ? 'auto' : effectiveCollapsedHeight,
+                maxHeight: visualExpanded ? 'none' : effectiveCollapsedHeight,
                 isolation: 'isolate', // Safari clipping fix
                 ...style
             }}
+            loading={loading}
         >
-            {loading && (
-                <div className="expandable-card-loading-overlay">
-                    <InlineSpinner size="22px" />
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>Refreshing...</span>
-                </div>
-            )}
-
             <motion.div
                 className="expandable-card-header"
                 onClick={handleToggle}
                 onTouchStart={handleToggle}
                 initial={false}
                 animate={{
-                    minHeight: isExpanded ? 0 : collapsedHeight,
-                    height: isExpanded ? 0 : collapsedHeight,
+                    minHeight: visualExpanded ? 0 : effectiveCollapsedHeight,
+                    height: visualExpanded ? 0 : effectiveCollapsedHeight,
                 }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                transition={loading ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30 }}
                 style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
                     width: '100%',
-                    zIndex: isExpanded ? 1 : 10,
-                    cursor: isExpanded ? 'default' : 'pointer',
+                    zIndex: visualExpanded ? 1 : 10,
+                    cursor: loading ? 'default' : (visualExpanded ? 'default' : 'pointer'),
                     overflow: 'visible',
-                    pointerEvents: isExpanded ? 'none' : 'auto'
+                    pointerEvents: loading ? 'none' : (visualExpanded ? 'none' : 'auto')
                 }}
             >
                 <div
                     className="expandable-card-header-content"
                     style={{
-                        opacity: isExpanded ? 0 : 1,
-                        pointerEvents: isExpanded ? 'none' : 'auto',
-                        transition: 'opacity 0.2s ease',
+                        opacity: loading ? 0 : (visualExpanded ? 0 : 1),
+                        pointerEvents: loading ? 'none' : (visualExpanded ? 'none' : 'auto'),
+                        transition: loading ? 'none' : 'opacity 0.2s ease',
                         height: '100%',
                         display: 'flex',
                         flexDirection: 'column',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        borderRadius: 'inherit',
+                        overflow: 'visible'
                     }}
                 >
-                    {/* Top Row: Title, Controls & Toggle */}
-                    <div className={`collapsed-controls-row ${stackControls ? 'vertical-stack' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <div className="collapsed-left-controls">
-                            {!isExpanded && controls}
-                        </div>
-                        <div className="expandable-card-header-actions">
-                            {!isExpanded && (
-                                <>
-                                    {combinedMenuItems && (
-                                        <DropdownButton
-                                            items={combinedMenuItems}
-                                            variant="icon"
-                                            icon={<MoreVertical size={18} />}
-                                            align="right"
-                                            className="expandable-card-menu-btn"
-                                        />
-                                    )}
-                                    <Button
-                                        variant="icon"
-                                        className="expandable-card-btn"
-                                        onClick={handleToggle}
-                                        onTouchStart={handleToggle}
-                                    >
-                                        <ChevronDown size={20} />
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-                    </div>
+                    {!loading && (
+                        <>
+                            {/* Top Row: Title, Controls & Toggle */}
+                            <div className={`collapsed-controls-row ${stackControls ? 'vertical-stack' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                <div className="collapsed-title-group" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', flex: 1, minWidth: 0 }}>
+                                    {title && <h3 className="expandable-card-expanded-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>{title}</h3>}
+                                </div>
 
-                    <div className="collapsed-summary-wrapper">
-                        {finalHeaderContent ? (
-                            finalHeaderContent
-                        ) : (
-                            <div className="default-header">
-                                <h3>{title}</h3>
-                                {subtitle && <p className="subtitle">{subtitle}</p>}
+                                <div className="expandable-card-header-actions">
+                                    {!visualExpanded && (
+                                        <>
+                                            {/* Extra controls injected to the left of the menu button */}
+                                            {collapsedHeaderControls && (
+                                                <div className="collapsed-header-extra-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginRight: '0.25rem' }}>
+                                                    {collapsedHeaderControls}
+                                                </div>
+                                            )}
+                                            {combinedMenuItems && (
+                                                <DropdownButton
+                                                    items={combinedMenuItems}
+                                                    variant="icon"
+                                                    icon={<MoreVertical size={18} />}
+                                                    align="right"
+                                                    className="expandable-card-menu-btn"
+                                                    usePortal={true}
+                                                />
+                                            )}
+                                            <Button
+                                                variant="icon"
+                                                className="expandable-card-btn"
+                                                onClick={handleToggle}
+                                                onTouchStart={handleToggle}
+                                            >
+                                                <ChevronDown size={20} />
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                    </div>
+
+                            {finalHeaderContent ? (
+                                finalHeaderContent
+                            ) : (
+                                <div className="default-header">
+                                    <h3>{title}</h3>
+                                    {subtitle && <p className="subtitle">{subtitle}</p>}
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
 
             </motion.div>
@@ -253,7 +304,12 @@ const ExpandableCard = ({
             <motion.div
                 className="expandable-card-body"
                 initial={false}
-                animate={isExpanded ? {
+                animate={loading ? {
+                    height: visualExpanded ? 'auto' : 0,
+                    opacity: 0,
+                    y: visualExpanded ? 0 : -2,
+                    overflow: 'hidden'
+                } : (visualExpanded ? {
                     height: 'auto',
                     opacity: 1,
                     y: 0,
@@ -263,13 +319,16 @@ const ExpandableCard = ({
                     opacity: 0,
                     y: -2,
                     overflow: 'hidden'
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                })}
+                transition={loading ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30 }}
                 style={{
-                    position: 'relative'
+                    position: 'relative',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column'
                 }}
             >
-                {isExpanded && (
+                {visualExpanded && !loading && (
                     <div className={`expandable-card-controls-group ${stackControls ? 'vertical-stack' : ''}`}>
                         <div
                             className="expandable-card-title-container"
@@ -303,7 +362,7 @@ const ExpandableCard = ({
                     </div>
                 )}
                 <div className="expandable-card-components-group" style={{ paddingTop: 0 }}>
-                    {children}
+                    {!loading && children}
                 </div>
             </motion.div>
         </StyledCard>

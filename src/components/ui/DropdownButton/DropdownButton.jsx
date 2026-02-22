@@ -53,9 +53,21 @@ const DropdownButton = ({
 
     // ... nudge logic ...
     const [nudgeOffset, setNudgeOffset] = useState({ x: 0, y: 0 });
+    const [portalPosition, setPortalPosition] = useState({ top: 0, left: 0 });
     const [shouldFlip, setShouldFlip] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
     const nudgeRef = useRef({ x: 0, y: 0 });
+    const portalPosRef = useRef({ top: 0, left: 0 });
     const menuRef = useRef(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => setIsExpanded(true), 40);
+            return () => clearTimeout(timer);
+        } else {
+            setIsExpanded(false);
+        }
+    }, [isOpen]);
 
     useLayoutEffect(() => {
         // Skip position calculation if using portal with fixed positioning (centered)
@@ -114,10 +126,14 @@ const DropdownButton = ({
                 }
 
                 // Only update if difference is meaningful to prevent "vibrating"
-                // Increased threshold to 3px for better stability
-                if (Math.abs(nx - currentNudge.x) > 3 || Math.abs(ny - currentNudge.y) > 3) {
+                const hasNudgeChanged = Math.abs(nx - currentNudge.x) > 3 || Math.abs(ny - currentNudge.y) > 3;
+                const hasPortalPosChanged = Math.abs(baseLeft - portalPosRef.current.left) > 3 || Math.abs(baseTop - portalPosRef.current.top) > 3;
+
+                if (hasNudgeChanged || hasPortalPosChanged) {
                     nudgeRef.current = { x: nx, y: ny };
+                    portalPosRef.current = { top: baseTop, left: baseLeft };
                     setNudgeOffset({ x: nx, y: ny });
+                    setPortalPosition({ top: baseTop, left: baseLeft });
                 }
             };
 
@@ -216,11 +232,11 @@ const DropdownButton = ({
             exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
             style={{
                 zIndex: usePortal ? 1000000 : 1000,
-                position: isFixedCentered ? 'fixed' : (usePortal ? 'absolute' : 'absolute'),
-                left: isFixedCentered ? '50%' : (align === 'right' ? 'auto' : 0),
-                right: isFixedCentered ? 'auto' : (align === 'right' ? 0 : 'auto'),
-                top: isFixedCentered ? '50%' : (shouldFlip ? 'auto' : '100%'),
-                bottom: isFixedCentered ? 'auto' : (shouldFlip ? 'calc(100% + 12px)' : 'auto'),
+                position: isFixedCentered ? 'fixed' : (usePortal ? 'fixed' : 'absolute'),
+                left: isFixedCentered ? '50%' : (usePortal ? portalPosition.left : (align === 'right' ? 'auto' : 0)),
+                right: isFixedCentered ? 'auto' : (usePortal ? 'auto' : (align === 'right' ? 0 : 'auto')),
+                top: isFixedCentered ? '50%' : (usePortal ? portalPosition.top : (shouldFlip ? 'auto' : '100%')),
+                bottom: isFixedCentered ? 'auto' : (usePortal ? 'auto' : (shouldFlip ? 'calc(100% + 12px)' : 'auto')),
                 maxHeight: '400px', // Default max-height
                 transform: isFixedCentered
                     ? `translate(-50%, -50%)`
@@ -257,13 +273,13 @@ const DropdownButton = ({
             >
                 <CardAnimator
                     type="fabricCard"
-                    active={isOpen}
+                    active={isExpanded}
                     variant={variant === 'transparent' ? 'transparent' : 'default'}
-                    surfaceColor="var(--neu-bg)"
-                    distortionFactor={props.distortionFactor !== undefined ? props.distortionFactor : 0.5}
-                    contentDistortionScale={props.contentDistortionScale !== undefined ? props.contentDistortionScale : 0.72}
+                    surfaceColor={variant === 'transparent' ? 'transparent' : 'var(--neu-bg)'}
+                    distortionFactor={props.distortionFactor !== undefined ? props.distortionFactor : 0.6}
+                    contentDistortionScale={1}
                     disableHighlight={false}
-                    disableShadow={false}
+                    disableShadow={variant === 'transparent'}
                     style={{
                         padding: '0.25rem',
                         maxHeight: 'inherit',
@@ -272,7 +288,7 @@ const DropdownButton = ({
                         flexDirection: 'column'
                     }}
                 >
-                    <div className="dropdown-items-container">
+                    <div className="dropdown-items-container" style={{ position: 'relative', zIndex: 10 }}>
                         {items.map((item, index) => {
                             if (item.type === 'divider') {
                                 return <div key={index} className="dropdown-divider" />;
@@ -312,7 +328,7 @@ const DropdownButton = ({
                                                 <div style={{ width: 6 }} />
                                             )
                                         )}
-                                        <span>{item.label}</span>
+                                        <span style={{ color: 'var(--neu-text-primary)' }}>{item.label}</span>
                                     </div>
                                 </button>
                             );

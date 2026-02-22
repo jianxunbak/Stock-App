@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { calculateOtherInvestmentProjection } from '../../../utils/otherInvestmentUtils';
 import ExpandableCard from '../../ui/ExpandableCard/ExpandableCard';
-import { Settings, Plus, Trash2, FolderPlus, ChevronDown, TrendingUp } from 'lucide-react';
+import SummaryCardContent from '../../ui/SummaryCardContent/SummaryCardContent';
+import { Settings, Plus, Trash2, FolderPlus, ChevronDown, TrendingUp, TrendingDown, DollarSign, PieChart, Activity } from 'lucide-react';
 import Button from '../../ui/Button';
 import Window from '../../ui/Window/Window';
 import DropdownButton from '../../ui/DropdownButton/DropdownButton';
@@ -91,7 +92,8 @@ const OtherInvestmentsCard = ({
     settings = null,
     onUpdateSettings = null,
     loading = false,
-    onRefresh = null
+    onRefresh = null,
+    inflationRate = 0
 }) => {
     // const { settings, updateSettings, loading: settingsLoading } = useUserSettings(); // Removed
     const [structuredData, setStructuredData] = useState({ items: [], groups: [] });
@@ -100,30 +102,72 @@ const OtherInvestmentsCard = ({
 
     const [isInitialized, setIsInitialized] = useState(false);
 
+    const lastUpdatedAt = React.useRef(null);
+
+    // Sync from props (Parent -> Child)
     useEffect(() => {
-        if (settings && !isInitialized) {
-            setStructuredData(normalizeInvestments(settings.otherInvestments));
-            if (settings.otherInvestments?.projectionYears) {
-                setProjectionYears(settings.otherInvestments.projectionYears);
-            }
+        if (!settings?.otherInvestments) return;
+
+        const incomingData = normalizeInvestments(settings.otherInvestments);
+        const incomingUpdatedAt = settings.otherInvestments.updatedAt;
+
+        // Use timestamps (epoch 0 if missing/legacy)
+        const currentRefTime = lastUpdatedAt.current ? new Date(lastUpdatedAt.current).getTime() : -1;
+        const incomingTime = incomingUpdatedAt ? new Date(incomingUpdatedAt).getTime() : 0;
+
+        // Accept update if:
+        // 1. We haven't tracked anything yet (first load)
+        // 2. Incoming data is strictly newer
+        // 3. Or if not initialized yet, force sync
+        if (currentRefTime === -1 || incomingTime > currentRefTime) {
+            setStructuredData(incomingData);
+            setProjectionYears(Number(settings.otherInvestments.projectionYears || 10));
+
+            // If incoming has no timestamp, we default to 0 (Epoch) so internal updates (Now) supersede it.
+            // If incoming has timestamp, we track it.
+            lastUpdatedAt.current = incomingUpdatedAt || new Date(0).toISOString();
+            setIsInitialized(true);
+        } else if (!isInitialized) {
+            // Fallback: If timestamps match (e.g. both 0) but we need to init
+            setStructuredData(incomingData);
+            setProjectionYears(Number(settings.otherInvestments.projectionYears || 10));
+            lastUpdatedAt.current = new Date(0).toISOString();
             setIsInitialized(true);
         }
-    }, [settings, isInitialized]);
+    }, [settings]);
 
+    // Sync to parent (Child -> Parent)
     useEffect(() => {
-        if (loading || !onUpdateSettings) return;
+        // Only save if initialized and user is settled (not loading)
+        if (loading || !onUpdateSettings || !isInitialized) return;
+
         const timer = setTimeout(() => {
             const currentData = {
                 ...structuredData,
                 projectionYears
             };
+
             const { updatedAt, ...prevInvWithoutTime } = settings?.otherInvestments || {};
-            // Only save if initialized and changed
-            if (JSON.stringify(prevInvWithoutTime) !== JSON.stringify(currentData) && isInitialized) {
+
+            // Normalize both sides for comparison to avoid infinite loops on format mismatches
+            const paramsPrev = {
+                ...normalizeInvestments(prevInvWithoutTime),
+                projectionYears: Number(prevInvWithoutTime.projectionYears || 10)
+            };
+
+            const paramsCurr = {
+                ...normalizeInvestments(currentData),
+                projectionYears: Number(projectionYears || 10)
+            };
+
+            if (JSON.stringify(paramsPrev) !== JSON.stringify(paramsCurr)) {
+                const newTimestamp = new Date().toISOString();
+                lastUpdatedAt.current = newTimestamp; // Update ref first to prevent loopback overwrite
+
                 onUpdateSettings({
                     otherInvestments: {
                         ...currentData,
-                        updatedAt: new Date().toISOString()
+                        updatedAt: newTimestamp
                     }
                 });
             }
@@ -136,16 +180,18 @@ const OtherInvestmentsCard = ({
             style: 'currency',
             currency: displayCurrency,
             maximumFractionDigits: 0
-        }).format(val * baseToDisplayRate);
+        }).format(val * baseToDisplayRate).replace('SGD', 'S$');
     };
+
 
     const formatBaseCurrency = (val) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: baseCurrency,
             maximumFractionDigits: 0
-        }).format(val);
+        }).format(val).replace('SGD', 'S$');
     };
+
 
     const getItemMonthly = (item) => {
         const val = Number(item.paymentAmount || 0);
@@ -194,13 +240,23 @@ const OtherInvestmentsCard = ({
     }, [structuredData]);
 
     const chartData = useMemo(() => {
-        return calculateOtherInvestmentProjection({
+        const projection = calculateOtherInvestmentProjection({
             data: structuredData,
             projectionYears,
             currentAge: getAge(settings?.dateOfBirth),
             startYear: new Date().getFullYear()
         });
-    }, [structuredData, projectionYears, settings?.dateOfBirth]);
+
+        // Apply inflation adjustment
+        if (inflationRate > 0) {
+            projection.forEach((point, index) => {
+                const discount = 1 / Math.pow(1 + (inflationRate / 100), index);
+                point.value *= discount;
+                point.invested *= discount;
+            });
+        }
+        return projection;
+    }, [structuredData, projectionYears, settings?.dateOfBirth, inflationRate]);
 
     const chartSeries = [
         { id: 'value', name: 'Projected Value', dataKey: 'value', color: 'var(--neu-success)' },
@@ -298,46 +354,33 @@ const OtherInvestmentsCard = ({
         }));
     };
 
+    const lastPoint = chartData[chartData.length - 1];
+    const targetAge = lastPoint?.age || (getAge(settings?.dateOfBirth) + projectionYears);
+    const projectedValue = lastPoint ? lastPoint.value : totals.totalAssetValue;
+
     const header = (
-        <div className="summary-info">
-            <div className="summary-name">Other Investments</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--neu-text-tertiary)', marginTop: '-2px', marginBottom: '8px' }}>
-                Last updated: {formatLastUpdated(settings?.otherInvestments?.updatedAt)}
-            </div>
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.35rem',
-                width: '100%',
-                fontSize: '0.8rem',
-                marginTop: '0.25rem'
-            }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Total Value</span>
-                    <span style={{ color: 'var(--neu-success)', fontWeight: 600 }}>
-                        {formatCurrency(totals.totalAssetValue)}
-                    </span>
-                </div>
+        <SummaryCardContent
+            mainMetrics={[
+                { label: 'Total', value: formatCurrency(totals.totalAssetValue), color: 'var(--neu-success)' },
+                { label: `Projected (${targetAge})`, value: formatCurrency(projectedValue), color: 'var(--neu-brand)' }
+            ]}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Performance</span>
-                    <span style={{
-                        fontWeight: 700,
-                        color: totals.totalGrowth >= 0 ? 'var(--neu-success)' : 'var(--neu-danger)',
-                    }}>
-                        {totals.totalGrowth >= 0 ? '+' : ''}{totals.totalGrowth.toFixed(2)}%
-                    </span>
-                </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Monthly Contrib.</span>
-                    <span style={{ color: 'var(--neu-color-favorite)', fontWeight: 600 }}>
-                        {formatCurrency(totals.totalMonthlyFlow)}
-                    </span>
-                </div>
-            </div>
-        </div>
+            gridMetrics={[
+                ...structuredData.groups.slice(0, 3).map(g => ({
+                    label: `${g.name}: ${formatCurrency(g.items.reduce((s, i) => s + Number(i.value || 0), 0))}`,
+                    icon: <PieChart size={14} />,
+                    color: 'var(--neu-color-favorite)'
+                })),
+                ...structuredData.items.slice(0, 3).map(i => ({
+                    label: `${i.name}: ${formatCurrency(i.value)}`,
+                    icon: <Activity size={14} />,
+                    color: 'var(--neu-brand)'
+                }))
+            ].slice(0, 6)}
+        />
     );
+
 
     const renderItemInput = (item, groupId = null) => {
         return (
@@ -453,24 +496,25 @@ const OtherInvestmentsCard = ({
     return (
         <ExpandableCard
             title="Other Investments"
-            subtitle={`Last updated: ${formatLastUpdated(settings?.otherInvestments?.updatedAt)}`}
             expanded={isOpen}
             onToggle={onToggle}
             onHide={onHide}
             onRefresh={onRefresh}
             collapsedWidth={220}
-            collapsedHeight={220}
+            collapsedHeight={198}
             headerContent={header}
             loading={loading}
             className={className}
             menuItems={menuItems}
-
         >
             <div className={styles.container}>
                 <div className={styles.section}>
                     <div className={styles.sectionHeader}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <h4 className={styles.sectionTitle}>Projected Growth ({displayCurrency})</h4>
+                            <h4 className={styles.sectionTitle}>
+                                Projected Growth ({displayCurrency})
+                                {inflationRate > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--neu-brand)', fontWeight: 500 }}> (Real Value)</span>}
+                            </h4>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Years:</span>
