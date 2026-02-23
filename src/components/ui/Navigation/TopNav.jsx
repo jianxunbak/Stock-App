@@ -71,9 +71,9 @@ export const TopNavActions = ({
 
             {/* Desktop Actions */}
             <div className={styles.desktopActions}>
-                {!currentUser && showThemeToggle && <ThemeToggle />}
                 {currentUser && (
                     <>
+                        {showThemeToggle && <ThemeToggle />}
                         {showCurrency && (
                             <CurrencySelector currency={currency} setCurrency={setCurrency} />
                         )}
@@ -124,7 +124,7 @@ export const TopNavActions = ({
                             </Button>
                         }
                     >
-                        {!currentUser && showThemeToggle && <ThemeToggle />}
+                        {showThemeToggle && <ThemeToggle />}
                         {currentUser && showCurrency && (
                             <CurrencySelector
                                 currency={currency}
