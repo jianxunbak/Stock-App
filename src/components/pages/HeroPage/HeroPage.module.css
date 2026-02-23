@@ -11,8 +11,16 @@
 
 @media (min-width: 768px) {
     .container {
-        padding: 0 2rem;
+        padding: 0 1rem;
     }
+}
+
+.wrapper {
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    position: relative;
 }
 
 .centeredContent {
@@ -55,8 +63,8 @@
     flex-direction: column;
     gap: 2rem;
     width: 100%;
-    max-width: 800px;
-    /* Constrain width for a centered look */
+    max-width: 80rem;
+    /* Match AnalysisPage wrapper max-width */
 }
 
 /* StyledCard Overrides/Helpers */

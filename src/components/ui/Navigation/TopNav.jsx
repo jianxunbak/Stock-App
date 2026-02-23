@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, LogOut, PieChart, TrendingUp, ArrowLeft, FlaskConical, MoreVertical, X, Check, Wallet } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import ThemeToggle from './ThemeToggle';
-import Window from '../Window/Window';
 import Button from '../Button/Button';
 import SearchBar from '../SearchBar/SearchBar';
 import Menu from '../Menu/Menu';
@@ -37,7 +35,6 @@ export const TopNavActions = ({
     showWealthBtn = true,
     showUserBtn = true,
     showLogoutBtn = true,
-    showThemeToggle = true,
     alwaysOpenSearch = false,
 
     // Values & Handlers
@@ -73,7 +70,6 @@ export const TopNavActions = ({
             <div className={styles.desktopActions}>
                 {currentUser && (
                     <>
-                        {showThemeToggle && <ThemeToggle />}
                         {showCurrency && (
                             <CurrencySelector currency={currency} setCurrency={setCurrency} />
                         )}
@@ -124,7 +120,6 @@ export const TopNavActions = ({
                             </Button>
                         }
                     >
-                        {showThemeToggle && <ThemeToggle />}
                         {currentUser && showCurrency && (
                             <CurrencySelector
                                 currency={currency}
