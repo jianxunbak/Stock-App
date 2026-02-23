@@ -15,7 +15,7 @@ export const ThemeProvider = ({ children }) => {
         return savedTheme || 'dark'; // Default to dark
     });
 
-    // Sync with Firestore when user logs in
+    // Sync with Firestore when user logs in, force light mode on logout
     useEffect(() => {
         const syncTheme = async () => {
             if (currentUser) {
@@ -26,6 +26,9 @@ export const ThemeProvider = ({ children }) => {
                     // If no theme in Firestore, save current local theme
                     await saveUserTheme(currentUser.uid, theme);
                 }
+            } else {
+                // Force light mode on logout
+                setTheme('light');
             }
         };
         syncTheme();

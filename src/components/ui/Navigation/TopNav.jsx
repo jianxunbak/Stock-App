@@ -57,7 +57,7 @@ export const TopNavActions = ({
 
     return (
         <div className={styles.actionGroup}>
-            {showSearch && (
+            {showSearch && currentUser && (
                 <SearchBar
                     placeholder="Search ticker..."
                     alwaysOpen={alwaysOpenSearch}
@@ -112,56 +112,58 @@ export const TopNavActions = ({
             </div>
 
             {/* Mobile Actions Menu */}
-            <div className={styles.mobileActions}>
-                <Menu
-                    placement="bottom-right"
-                    distortionFactor={0.6}
-                    contentDistortionScale={1.5}
-                    trigger={
-                        <Button variant="icon" className={styles.menuButton}>
-                            <MoreVertical size={24} />
-                        </Button>
-                    }
-                >
-                    {!currentUser && showThemeToggle && <ThemeToggle />}
-                    {currentUser && showCurrency && (
-                        <CurrencySelector
-                            currency={currency}
-                            setCurrency={setCurrency}
-                            isMobile
-                        />
-                    )}
-                    {currentUser && showWatchlistBtn && (
-                        <Button variant="icon" onClick={() => setShowWatchlist(true)} title="Watchlist">
-                            <Star size={16} />
-                        </Button>
-                    )}
-                    {currentUser && showPortfolioBtn && (
-                        <Button variant="icon" onClick={() => navigate('/portfolio')} title="Portfolio">
-                            <PieChart size={16} />
-                        </Button>
-                    )}
-                    {currentUser && showWealthBtn && (
-                        <Button variant="icon" onClick={() => navigate('/wealth')} title="Wealth">
-                            <Wallet size={16} />
-                        </Button>
-                    )}
-                    {currentUser && showUserBtn && (
-                        <Button variant="icon" onClick={() => setShowProfileModal(true)} title="Profile">
-                            {currentUser.photoURL ? (
-                                <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} />
-                            ) : (
-                                <div className={styles.userAvatarPlaceholder}>{currentUser.displayName?.charAt(0).toUpperCase() || 'U'}</div>
-                            )}
-                        </Button>
-                    )}
-                    {currentUser && showLogoutBtn && (
-                        <Button variant="icon" onClick={() => setShowLogoutConfirm(true)} title="Log Out">
-                            <LogOut size={16} />
-                        </Button>
-                    )}
-                </Menu>
-            </div>
+            {currentUser && (
+                <div className={styles.mobileActions}>
+                    <Menu
+                        placement="bottom-right"
+                        distortionFactor={0.6}
+                        contentDistortionScale={1.5}
+                        trigger={
+                            <Button variant="icon" className={styles.menuButton}>
+                                <MoreVertical size={24} />
+                            </Button>
+                        }
+                    >
+                        {!currentUser && showThemeToggle && <ThemeToggle />}
+                        {currentUser && showCurrency && (
+                            <CurrencySelector
+                                currency={currency}
+                                setCurrency={setCurrency}
+                                isMobile
+                            />
+                        )}
+                        {currentUser && showWatchlistBtn && (
+                            <Button variant="icon" onClick={() => setShowWatchlist(true)} title="Watchlist">
+                                <Star size={16} />
+                            </Button>
+                        )}
+                        {currentUser && showPortfolioBtn && (
+                            <Button variant="icon" onClick={() => navigate('/portfolio')} title="Portfolio">
+                                <PieChart size={16} />
+                            </Button>
+                        )}
+                        {currentUser && showWealthBtn && (
+                            <Button variant="icon" onClick={() => navigate('/wealth')} title="Wealth">
+                                <Wallet size={16} />
+                            </Button>
+                        )}
+                        {currentUser && showUserBtn && (
+                            <Button variant="icon" onClick={() => setShowProfileModal(true)} title="Profile">
+                                {currentUser.photoURL ? (
+                                    <img src={currentUser.photoURL} alt="User" className={styles.userAvatarSmall} />
+                                ) : (
+                                    <div className={styles.userAvatarPlaceholder}>{currentUser.displayName?.charAt(0).toUpperCase() || 'U'}</div>
+                                )}
+                            </Button>
+                        )}
+                        {currentUser && showLogoutBtn && (
+                            <Button variant="icon" onClick={() => setShowLogoutConfirm(true)} title="Log Out">
+                                <LogOut size={16} />
+                            </Button>
+                        )}
+                    </Menu>
+                </div>
+            )}
 
             {/* Logout Confirmation Window */}
             <LogoutConfirmationModal

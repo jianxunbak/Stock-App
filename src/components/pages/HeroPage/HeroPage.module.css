@@ -153,3 +153,41 @@
     opacity: 1;
     transform: translateY(-2px);
 }
+
+.loginContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.loginCard {
+    width: auto !important;
+    min-width: 280px;
+    padding: 0.5rem 1rem;
+}
+
+.loginButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.googleIcon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loginText {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}

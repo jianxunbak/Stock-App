@@ -19,7 +19,7 @@ import StyledCard from '../../ui/StyledCard/StyledCard';
 
 const HeroPage = () => {
     const navigate = useNavigate();
-    const { currentUser, logout } = useAuth();
+    const { currentUser, login, logout } = useAuth();
     const { portfolioList } = usePortfolio();
     const { settings, loading: settingsLoading } = useUserSettings();
 
@@ -27,6 +27,7 @@ const HeroPage = () => {
     const [ticker, setTicker] = useState('');
     const [showWatchlist, setShowWatchlist] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [isLoginExpanded, setIsLoginExpanded] = useState(false); // Added for login animation
     const [displayCurrency, setDisplayCurrency] = useState('USD');
     const [baseCurrency, setBaseCurrency] = useState('USD'); // Added
     const [liveData, setLiveData] = useState({});
@@ -350,6 +351,19 @@ const HeroPage = () => {
         navigate('/');
     };
 
+    const handleLogin = async () => {
+        setIsLoginExpanded(true);
+        // Concave pulse triggered by true, then convex pulse triggered by false
+        setTimeout(async () => {
+            setIsLoginExpanded(false);
+            try {
+                await login();
+            } catch (err) {
+                console.error("Login failed", err);
+            }
+        }, 400);
+    };
+
     return (
         <div className={styles.container}>
             <div style={{ position: 'relative', zIndex: 100, paddingBottom: 0 }}>
@@ -377,75 +391,106 @@ const HeroPage = () => {
 
             <div className={styles.centeredContent}>
                 <div className={styles.textStack}>
-                    <h1 className={styles.mainTitle}>Hello, {settings?.name || currentUser?.displayName || 'Investor'}</h1>
-                    <p className={styles.subTitle}>Here is your financial summary.</p>
+                    <h1 className={styles.mainTitle}>
+                        {currentUser
+                            ? `Hello, ${settings?.name || currentUser?.displayName || 'Investor'}`
+                            : 'Welcome back'}
+                    </h1>
+                    <p className={styles.subTitle}>
+                        {currentUser ? 'Here is your financial summary.' : 'Log in to continue'}
+                    </p>
                 </div>
 
-                <div className={styles.cardStack}>
-                    {/* Card 1: Current */}
-                    <StyledCard
-                        className={styles.heroCard}
-                        variant="default"
-                        onClick={() => navigate('/portfolio')}
-                        style={{ cursor: 'pointer' }}
-                        shadowScale={1}
-                        contentDistortionScale={0.3}
-                        distortionFactor={1}
-                        loading={settingsLoading || pricesLoading}
-                    >
-                        <div className={styles.cardRow}>
-                            <div className={styles.dataItem}>
-                                <span className={styles.label}>Current Estimated Net Worth</span>
-                                <span className={styles.value}>
-                                    {formatCurrency(estimatedNetWorth)}
-                                </span>
+                {currentUser ? (
+                    <div className={styles.cardStack}>
+                        {/* Card 1: Current */}
+                        <StyledCard
+                            className={styles.heroCard}
+                            variant="default"
+                            onClick={() => navigate('/portfolio')}
+                            style={{ cursor: 'pointer' }}
+                            shadowScale={1}
+                            contentDistortionScale={0.3}
+                            distortionFactor={1}
+                            loading={settingsLoading || pricesLoading}
+                        >
+                            <div className={styles.cardRow}>
+                                <div className={styles.dataItem}>
+                                    <span className={styles.label}>Current Estimated Net Worth</span>
+                                    <span className={styles.value}>
+                                        {formatCurrency(estimatedNetWorth)}
+                                    </span>
+                                </div>
+                                <div className={styles.divider}></div>
+                                <div className={styles.dataItem}>
+                                    <span className={styles.label}>Current Portfolio Value</span>
+                                    <span className={styles.value}>
+                                        {formatCurrency(totalPortfolioValue * usdToDisplayRate)}
+                                    </span>
+                                </div>
                             </div>
-                            <div className={styles.divider}></div>
-                            <div className={styles.dataItem}>
-                                <span className={styles.label}>Current Portfolio Value</span>
-                                <span className={styles.value}>
-                                    {formatCurrency(totalPortfolioValue * usdToDisplayRate)}
-                                </span>
+                            <div className={styles.shortcutLink}>
+                                <span>View Portfolio Details</span>
+                                <ArrowRight size={16} />
                             </div>
-                        </div>
-                        <div className={styles.shortcutLink}>
-                            <span>View Portfolio Details</span>
-                            <ArrowRight size={16} />
-                        </div>
-                    </StyledCard>
+                        </StyledCard>
 
-                    {/* Card 2: Age 55 */}
-                    <StyledCard
-                        className={styles.heroCard}
-                        variant="default"
-                        onClick={() => navigate('/wealth')}
-                        style={{ cursor: 'pointer' }}
-                        shadowScale={1}
-                        contentDistortionScale={0.3}
-                        distortionFactor={1}
-                        loading={settingsLoading}
-                    >
-                        <div className={styles.cardRow}>
-                            <div className={styles.dataItem}>
-                                <span className={styles.label}>Estimated Net Worth @ Age 55</span>
-                                <span className={styles.value}>
-                                    {formatCurrency(netWorthAt55)}
-                                </span>
+                        {/* Card 2: Age 55 */}
+                        <StyledCard
+                            className={styles.heroCard}
+                            variant="default"
+                            onClick={() => navigate('/wealth')}
+                            style={{ cursor: 'pointer' }}
+                            shadowScale={1}
+                            contentDistortionScale={0.3}
+                            distortionFactor={1}
+                            loading={settingsLoading}
+                        >
+                            <div className={styles.cardRow}>
+                                <div className={styles.dataItem}>
+                                    <span className={styles.label}>Estimated Net Worth @ Age 55</span>
+                                    <span className={styles.value}>
+                                        {formatCurrency(netWorthAt55)}
+                                    </span>
+                                </div>
+                                <div className={styles.divider}></div>
+                                <div className={styles.dataItem}>
+                                    <span className={styles.label}>Estimated Stock Value @ Age 55</span>
+                                    <span className={styles.value}>
+                                        {formatCurrency(stocksAt55)}
+                                    </span>
+                                </div>
                             </div>
-                            <div className={styles.divider}></div>
-                            <div className={styles.dataItem}>
-                                <span className={styles.label}>Estimated Stock Value @ Age 55</span>
-                                <span className={styles.value}>
-                                    {formatCurrency(stocksAt55)}
-                                </span>
+                            <div className={styles.shortcutLink}>
+                                <span>Go into Wealth Projection</span>
+                                <ArrowRight size={16} />
                             </div>
-                        </div>
-                        <div className={styles.shortcutLink}>
-                            <span>Go into Wealth Projection</span>
-                            <ArrowRight size={16} />
-                        </div>
-                    </StyledCard>
-                </div>
+                        </StyledCard>
+                    </div>
+                ) : (
+                    <div className={styles.loginContainer}>
+                        <StyledCard
+                            className={styles.loginCard}
+                            onClick={handleLogin}
+                            expanded={isLoginExpanded}
+                            distortionFactor={0.5}
+                            shadowScale={1.0}
+                            variant="default"
+                        >
+                            <div className={styles.loginButton}>
+                                <div className={styles.googleIcon}>
+                                    <svg viewBox="0 0 24 24" width="24" height="24">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                                    </svg>
+                                </div>
+                                <span className={styles.loginText}>Sign in with Google</span>
+                            </div>
+                        </StyledCard>
+                    </div>
+                )}
             </div>
 
             {showWatchlist && <WatchlistModal isOpen={showWatchlist} onClose={() => setShowWatchlist(false)} />}
