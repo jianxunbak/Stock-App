@@ -306,17 +306,22 @@ const HeroPage = () => {
             projectedOther = otherProjection[yearsToProjection]?.value || 0;
         } catch (e) { }
 
-        // Final Aggregation in Display Currency
+        // Final Aggregation in Display Currency with Inflation Adjustment
         // Savings, Stocks, Other are in Base (user entered). CPF is in SGD.
         // Portfolio Value (Stocks) is technically projected in Base because inputs were Base.
 
-        const totalNetWorth =
-            (projectedSavings * baseToDisplayRate) +
-            (projectedCpf * sgdToDisplayRate) +
-            (projectedStocks * baseToDisplayRate) +
-            (projectedOther * baseToDisplayRate);
+        const inflationRate = settings.wealth?.inflationRate || 0;
+        const inflationDiscountFactor = (yearsToProjection === 0 || !inflationRate)
+            ? 1
+            : 1 / Math.pow(1 + (Number(inflationRate) / 100), yearsToProjection);
 
-        const totalStocks = projectedStocks * baseToDisplayRate;
+        const totalNetWorth =
+            ((projectedSavings * baseToDisplayRate) +
+                (projectedCpf * sgdToDisplayRate) +
+                (projectedStocks * baseToDisplayRate) +
+                (projectedOther * baseToDisplayRate)) * inflationDiscountFactor;
+
+        const totalStocks = (projectedStocks * baseToDisplayRate) * inflationDiscountFactor;
 
         return {
             netWorthAt55: Math.round(totalNetWorth),
