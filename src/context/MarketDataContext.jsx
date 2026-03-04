@@ -14,20 +14,24 @@ export const MarketDataProvider = ({ children }) => {
     const { currentUser } = useAuth();
     const { portfolioList } = useGlobalData();
 
-    const [livePrices, setLivePrices] = useState({});
-    const [currencyRates, setCurrencyRates] = useState({ USD: 1, SGD: 1.35 });
+    // State (Initialize synchronously from cache if possible)
+    const [livePrices, setLivePrices] = useState(() => {
+        const cached = localStorage.getItem(CACHE_KEYS.PRICES);
+        return cached ? JSON.parse(cached) : {};
+    });
+    const [currencyRates, setCurrencyRates] = useState(() => {
+        const cached = localStorage.getItem(CACHE_KEYS.RATES);
+        return cached ? JSON.parse(cached) : { USD: 1, SGD: 1.35 };
+    });
     const [pricesLoading, setPricesLoading] = useState(false);
 
-    // 1. Load from Cache (Immediate)
+    // Stable ref for checking cache status in callbacks without re-triggering them
+    const livePricesRef = useRef(livePrices || {});
     useEffect(() => {
-        const cachedPrices = localStorage.getItem(CACHE_KEYS.PRICES);
-        const cachedRates = localStorage.getItem(CACHE_KEYS.RATES);
+        livePricesRef.current = livePrices;
+    }, [livePrices]);
 
-        if (cachedPrices) setLivePrices(JSON.parse(cachedPrices));
-        if (cachedRates) setCurrencyRates(JSON.parse(cachedRates));
-    }, []);
-
-    // 2. Persistence to Cache
+    // Persistence to Cache
     useEffect(() => {
         if (Object.keys(livePrices).length > 0) {
             localStorage.setItem(CACHE_KEYS.PRICES, JSON.stringify(livePrices));
@@ -79,7 +83,10 @@ export const MarketDataProvider = ({ children }) => {
 
         if (tickers.length === 0) return;
 
-        setPricesLoading(true);
+        // Only set hard loading state if we have no prices at all (avoiding empty screen during background refresh)
+        if (Object.keys(livePricesRef.current).length === 0) {
+            setPricesLoading(true);
+        }
         try {
             const batchData = await fetchStockPricesBatch(tickers);
             const processedData = {};

@@ -14,30 +14,29 @@ const CACHE_KEYS = {
 export const GlobalDataProvider = ({ children }) => {
     const { currentUser } = useAuth();
 
-    // State
-    const [settings, setSettings] = useState({});
-    const [portfolioList, setPortfolioList] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // State (Initialize synchronously from cache if possible)
+    const [settings, setSettings] = useState(() => {
+        const cached = localStorage.getItem(CACHE_KEYS.SETTINGS);
+        return cached ? JSON.parse(cached) : {};
+    });
+    const [portfolioList, setPortfolioList] = useState(() => {
+        const cached = localStorage.getItem(CACHE_KEYS.PORTFOLIOS);
+        return cached ? JSON.parse(cached) : [];
+    });
+    const [loading, setLoading] = useState(() => {
+        const hasSettings = localStorage.getItem(CACHE_KEYS.SETTINGS);
+        const hasPortfolios = localStorage.getItem(CACHE_KEYS.PORTFOLIOS);
+        return !(hasSettings || hasPortfolios);
+    });
     const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-    // Refs for synchronization
-    const settingsRef = useRef({});
+    // Sync with refs
+    const settingsRef = useRef(settings);
+    useEffect(() => { settingsRef.current = settings; }, [settings]);
+
     const pricesFetchTimer = useRef(null);
 
-    // 1. Loading from Cache
-    useEffect(() => {
-        const cachedSettings = localStorage.getItem(CACHE_KEYS.SETTINGS);
-        const cachedPortfolios = localStorage.getItem(CACHE_KEYS.PORTFOLIOS);
-
-        if (cachedSettings) setSettings(JSON.parse(cachedSettings));
-        if (cachedPortfolios) setPortfolioList(JSON.parse(cachedPortfolios));
-
-        if (cachedSettings || cachedPortfolios) {
-            setLoading(false);
-        }
-    }, []);
-
-    // 2. Persistence to Cache
+    // Keep cache updated when state changes
     useEffect(() => {
         if (Object.keys(settings).length > 0) localStorage.setItem(CACHE_KEYS.SETTINGS, JSON.stringify(settings));
     }, [settings]);

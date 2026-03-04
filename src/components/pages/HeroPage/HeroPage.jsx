@@ -367,6 +367,7 @@ const HeroPage = () => {
                                 shadowScale={1}
                                 contentDistortionScale={0.3}
                                 distortionFactor={1}
+                                layout={false}
                                 loading={dataLoading || marketLoading}
                             >
                                 <div className={styles.cardRow}>
@@ -399,6 +400,7 @@ const HeroPage = () => {
                                 shadowScale={1}
                                 contentDistortionScale={0.3}
                                 distortionFactor={1}
+                                layout={false}
                                 loading={settingsLoading}
                             >
                                 <div className={styles.cardRow}>

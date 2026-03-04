@@ -302,6 +302,7 @@ const CardAnimator = React.memo(React.forwardRef(({
             <BaseComponent
                 ref={ref}
                 layout={layout}
+                initial={false}
                 style={{
                     position: 'relative',
                     zIndex: 1,
