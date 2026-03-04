@@ -31,7 +31,8 @@ import HoldingsCard from '../../cards/HoldingsCard/HoldingsCard';
 import CustomSelect from '../../ui/CustomSelect/CustomSelect';
 import CustomDatePicker from '../../ui/CustomDatePicker/CustomDatePicker';
 import AllocationEditorWindow from '../../ui/AllocationEditorWindow/AllocationEditorWindow';
-import { useUserSettings } from '../../../hooks/useUserSettings';
+import { useGlobalData } from '../../../context/GlobalDataContext';
+import { useMarketData } from '../../../context/MarketDataContext';
 
 const DEFAULT_CAT_TARGETS = {
     "Speculative": { min: 0, max: 10 },
@@ -56,14 +57,14 @@ const DEFAULT_SECTOR_LIMITS = {
 import '../../cards/PortfolioSummaryCard/PortfolioSummaryCard.css';
 
 const PortfolioPage = () => {
-    const { currentUser, logout } = useAuth();
+    const { currentUser, logout, loading: authLoading } = useAuth();
     const { theme } = useTheme();
     const navigate = useNavigate();
     const isMobile = window.innerWidth < 768;
 
     // Local state for current portfolio selection
     const [currentPortfolioId, setCurrentPortfolioId] = useState(() => {
-        return localStorage.getItem('lastViewedPortfolioId') || 'main';
+        return localStorage.getItem('lastViewedPortfolioId') || null;
     });
 
     // Save to LocalStorage whenever it changes
@@ -81,7 +82,20 @@ const PortfolioPage = () => {
     });
     const [cardOrder, setCardOrder] = useState(['summary', 'allocation', 'ai', 'holdings']);
 
-    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
+    const {
+        settings,
+        portfolioList,
+        loading: dataLoading,
+        updateSettings
+    } = useGlobalData();
+
+    const {
+        livePrices,
+        currencyRates,
+        pricesLoading: marketLoading,
+        refreshStockPrices
+    } = useMarketData();
+
     const [catTargets, setCatTargets] = useState(DEFAULT_CAT_TARGETS);
     const [sectorLimits, setSectorLimits] = useState(DEFAULT_SECTOR_LIMITS);
     const [showAllocationEditor, setShowAllocationEditor] = useState(false);
@@ -96,97 +110,50 @@ const PortfolioPage = () => {
 
     // Save targets to settings (Debounced)
     useEffect(() => {
-        if (settingsLoading) return;
+        if (dataLoading) return;
 
         const timer = setTimeout(() => {
             const currentAlloc = { catTargets, sectorLimits };
             const savedAlloc = settings?.allocation || { catTargets: DEFAULT_CAT_TARGETS, sectorLimits: DEFAULT_SECTOR_LIMITS };
 
             if (JSON.stringify(savedAlloc) !== JSON.stringify(currentAlloc)) {
-                // console.log("Updating settings allocation", { savedAlloc, currentAlloc });
                 updateSettings({ allocation: currentAlloc });
             }
-        }, 1500); // Increased debounce to 1.5s
+        }, 1500);
         return () => clearTimeout(timer);
-    }, [catTargets, sectorLimits, settingsLoading, settings?.allocation]);
+    }, [catTargets, sectorLimits, dataLoading, settings?.allocation]);
 
-    // Load User Preferences for Portfolio ID and Visibility
-    const loadSettings = useCallback((e) => {
-        // 1. If we have a data-rich event (Optimistic Update from Modal)
-        if (e?.detail?.settings) {
-            const settings = e.detail.settings;
-            // Defer update to next idle period to prioritize Modal UI
-            const defer = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
+    // Local state and currency selection
+    const [currency, setCurrency] = useState('USD');
 
-            defer(() => {
-                startTransition(() => {
-                    if (settings.cardVisibility?.portfolio) {
-                        setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.portfolio }));
-                    }
-                    if (settings.cardOrder?.portfolio) {
-                        setCardOrder(settings.cardOrder.portfolio);
-                    }
-                    if (settings.baseCurrency) {
-                        setCurrency(settings.baseCurrency);
-                    }
-                });
-            });
-            return;
-        }
-
-        // 2. Regular Fetch (Initial load or fallback)
-        if (currentUser?.uid) {
-            fetchUserSettings(currentUser.uid).then(settings => {
-                if (settings?.lastViewedPortfolioId) {
-                    setCurrentPortfolioId(settings.lastViewedPortfolioId);
-                    localStorage.setItem('lastViewedPortfolioId', settings.lastViewedPortfolioId);
-                }
-                if (settings?.cardVisibility?.portfolio) {
-                    setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.portfolio }));
-                }
-                if (settings?.cardOrder?.portfolio) {
-                    setCardOrder(settings.cardOrder.portfolio);
-                }
-                if (settings?.baseCurrency) {
-                    setCurrency(settings.baseCurrency);
-                }
-            });
-        }
-    }, [currentUser?.uid]);
-
+    // Update LOCAL visibility and sync from GLOBAL settings
     useEffect(() => {
-        loadSettings();
-
-        // Listen for internal settings updates
-        window.addEventListener('user-settings-updated', loadSettings);
-        return () => window.removeEventListener('user-settings-updated', loadSettings);
-    }, [loadSettings]);
-
-    // Save to Backend on Change
-    const handlePortfolioChange = (newId) => {
-        setCurrentPortfolioId(newId);
-        if (currentUser?.uid) {
-            saveUserSettings(currentUser.uid, { lastViewedPortfolioId: newId });
+        if (settings?.cardVisibility?.portfolio) {
+            setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.portfolio }));
         }
-    };
-
-    // --- State ---
-    const [liveData, setLiveData] = useState({});
-    const [isLoadingData, setIsLoadingData] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [currency, setCurrency] = useState(() => settings?.baseCurrency || 'USD');
-
-    // Keep local currency state in sync with global settings
-    useEffect(() => {
-        if (settings?.baseCurrency && settings.baseCurrency !== currency) {
+        if (settings?.cardOrder?.portfolio) {
+            setCardOrder(settings.cardOrder.portfolio);
+        }
+        if (settings?.baseCurrency) {
             setCurrency(settings.baseCurrency);
         }
-    }, [settings?.baseCurrency, currency]);
+        if (settings?.lastViewedPortfolioId && !currentPortfolioId) {
+            setCurrentPortfolioId(settings.lastViewedPortfolioId);
+        }
+    }, [settings]);
+
+    const handlePortfolioChange = (newId) => {
+        setCurrentPortfolioId(newId);
+        updateSettings({ lastViewedPortfolioId: newId });
+    };
 
     const handleCurrencyChange = (newCurrency) => {
         setCurrency(newCurrency);
         updateSettings({ baseCurrency: newCurrency });
     };
+
+    const [isLoadingData, setIsLoadingData] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [hiddenColumns, setHiddenColumns] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showWatchlist, setShowWatchlist] = useState(false);
@@ -195,27 +162,50 @@ const PortfolioPage = () => {
     const [showColumnModal, setShowColumnModal] = useState(false);
 
     const {
-        portfolio,
+        portfolio: portfolioFromHook,
         addToPortfolio,
         updatePortfolioItem,
         removeFromPortfolio,
         createPortfolio,
-        portfolioList,
         renamePortfolio,
         deletePortfolio,
         copyItemsFromPortfolio,
         clearPortfolio,
-        comparisonStocks,
+        comparisonStocks: hookComparisonStocks,
         updateComparisonStocks,
-        portfolioLoading,
-        notes,
+        loading: portfolioLoading,
+        notes: hookNotes,
         saveNotes,
-        analysis: savedAnalysis,
+        analysis: hookAnalysis,
         clearAnalysis
     } = usePortfolio(currentPortfolioId);
 
-    // Derive portfolio type (must come after usePortfolio hook)
-    const currentPortfolio = portfolioList.find(p => p.id === currentPortfolioId);
+    // Derive current selection from Global Context List (Instant access)
+    const currentPortfolio = useMemo(() =>
+        portfolioList.find(p => p.id === currentPortfolioId) || {}
+        , [portfolioList, currentPortfolioId]);
+
+    // MERGE LOGIC: Use global context data if hook is still loading for instant display
+    const portfolio = useMemo(() => {
+        if (portfolioLoading && currentPortfolio.portfolio) return currentPortfolio.portfolio;
+        return portfolioFromHook || [];
+    }, [portfolioLoading, currentPortfolio.portfolio, portfolioFromHook]);
+
+    const notes = useMemo(() => {
+        if (portfolioLoading && currentPortfolio.notes) return currentPortfolio.notes;
+        return hookNotes || '';
+    }, [portfolioLoading, currentPortfolio.notes, hookNotes]);
+
+    const savedAnalysis = useMemo(() => {
+        if (portfolioLoading && currentPortfolio.analysis) return currentPortfolio.analysis;
+        return hookAnalysis || '';
+    }, [portfolioLoading, currentPortfolio.analysis, hookAnalysis]);
+
+    const comparisonStocks = useMemo(() => {
+        if (portfolioLoading && currentPortfolio.comparisonStocks) return currentPortfolio.comparisonStocks;
+        return hookComparisonStocks || [];
+    }, [portfolioLoading, currentPortfolio.comparisonStocks, hookComparisonStocks]);
+
     const isTestPortfolio = currentPortfolio?.type === 'test';
 
 
@@ -262,27 +252,12 @@ const PortfolioPage = () => {
             [cardKey]: false
         };
 
-        // Update local state
-        setCardVisibility(newVisibility);
-
-        // Save to DB
-        if (currentUser?.uid) {
-            const currentSettings = await fetchUserSettings(currentUser.uid);
-            // Add safety check for currentSettings
-            const newSettings = {
-                ...currentSettings,
-                cardVisibility: {
-                    ...(currentSettings?.cardVisibility || {}), // Ensure cardVisibility is an object
-                    portfolio: newVisibility
-                }
-            };
-            await saveUserSettings(currentUser.uid, newSettings);
-
-            // Notify other components
-            window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: newSettings }
-            }));
-        }
+        updateSettings({
+            cardVisibility: {
+                ...(settings?.cardVisibility || {}),
+                portfolio: newVisibility
+            }
+        });
 
         setHideModalState({ isOpen: false, cardKey: null, cardLabel: '' });
     };
@@ -334,9 +309,13 @@ const PortfolioPage = () => {
 
     const [menuOpenHoldings, setMenuOpenHoldings] = useState(false);
 
+
+
     // Initial Portfolio Selection Effect
     useEffect(() => {
-        if (!currentPortfolioId && portfolioList.length > 0) {
+        const currentExists = portfolioList.some(p => p.id === currentPortfolioId);
+
+        if ((!currentPortfolioId || !currentExists) && portfolioList.length > 0) {
             // Find first portfolio of current type, default to first available
             const first = portfolioList.find(p => (p.type || 'main') === portfolioType);
             if (first) setCurrentPortfolioId(first.id);
@@ -410,64 +389,15 @@ const PortfolioPage = () => {
         }
     };
 
-    const loadPrices = useCallback(async (targets = []) => {
-        if (targets.length === 0) return;
+    // Empty placeholder for compatibility
+    const loadPrices = useCallback(() => { }, []);
 
-        setIsLoadingData(true);
-        try {
-            const batchData = await fetchStockDataBatch(targets);
-            const processedData = {};
-
-            Object.entries(batchData).forEach(([ticker, data]) => {
-                const price = data.overview?.price || 0;
-                const beta = data.overview?.beta || 1;
-                const sector = data.overview?.sector || 'Unknown';
-                const pegRatio = data.overview?.pegRatio || 0;
-
-                let growth = 0;
-                const growthStr = data.valuation?.assumptions?.["Growth Rate (Yr 1-5)"] ||
-                    data.valuation?.assumptions?.["Projected Sales Growth"];
-                if (growthStr) {
-                    growth = parseFloat(String(growthStr).replace('%', '').replace(',', ''));
-                } else {
-                    growth = (data.growth?.revenueGrowth || 0) * 100;
-                }
-
-                const totalCash = data.valuation?.raw_assumptions?.cash_and_equivalents || 0;
-                const totalDebt = data.valuation?.raw_assumptions?.total_debt || 0;
-
-                processedData[ticker] = { price, beta, sector, growth, pegRatio, totalCash, totalDebt };
-            });
-
-            setLiveData(prev => ({ ...prev, ...processedData }));
-        } catch (e) {
-            console.error("Failed to fetch batch portfolio data", e);
-        } finally {
-            setIsLoadingData(false);
-        }
-    }, []);
-
-    // Fetch Live Data
+    // Effect: Keep isLoadingData False if we have any fallback info (Portfolio Hook finishes)
     useEffect(() => {
-        if (portfolio.length === 0) {
-            setLiveData({});
-            // Only stop "Loading Data" if the portfolio hook itself has finished its initial check
-            if (!portfolioLoading) {
-                setIsLoadingData(false);
-            }
-            return;
-        }
-
-        const tickers = [...new Set(portfolio.map(p => (p.ticker || '').trim().toUpperCase()))].filter(Boolean);
-        const missing = tickers.filter(t => !liveData[t]);
-
-        if (missing.length > 0) {
-            loadPrices(missing);
-        } else if (!portfolioLoading) {
-            // Only stop if prices are matched AND portfolio is done loading
+        if (!portfolioLoading && portfolio) {
             setIsLoadingData(false);
         }
-    }, [portfolio, loadPrices, portfolioLoading]);
+    }, [portfolioLoading, portfolio]);
 
     // Fetch TWR
     useEffect(() => {
@@ -505,15 +435,33 @@ const PortfolioPage = () => {
 
         const items = portfolio.map(item => {
             const rawTicker = (item.ticker || '').trim().toUpperCase();
-            const data = liveData[rawTicker] || { price: 0, beta: 1, sector: 'Unknown', growth: 0, pegRatio: 0, totalCash: 0, totalDebt: 0 };
-            const currentPrice = (data.price || 0) * currentRate;
+            // Important: Handle both the deep nested object from previous sessions and the new flat object from GlobalDataContext
+            const data = livePrices[rawTicker];
+
+            // Normalize current price (it might be a number or {price: number})
+            // Fallback to item.price if live data hasn't loaded yet
+            const rawPrice = (data !== undefined)
+                ? ((typeof data === 'number') ? data : (data.price || 0))
+                : (Number(item.price) || 0);
+
+            const currentPrice = rawPrice * currentRate;
             const shares = parseFloat(item.shares) || 0;
             const totalPrincipal = (parseFloat(item.totalCost) || 0) * currentRate;
             const currentValue = currentPrice * shares;
             const performance = totalPrincipal > 0 ? ((currentValue - totalPrincipal) / totalPrincipal) * 100 : 0;
             const itemCategory = item.category || 'Uncategorized';
 
-            return { ...item, ...data, ticker: rawTicker, category: itemCategory, price: currentPrice, currentValue, principal: totalPrincipal, performance };
+            const dataDefaults = { price: 0, beta: 1, sector: 'Unknown', growth: 0, pegRatio: 0, totalCash: 0, totalDebt: 0 };
+            return {
+                ...item,
+                ...(data || dataDefaults),
+                ticker: rawTicker,
+                category: itemCategory,
+                price: currentPrice,
+                currentValue,
+                principal: totalPrincipal,
+                performance
+            };
         });
 
         const groups = {};
@@ -737,7 +685,7 @@ const PortfolioPage = () => {
             isCriticalRisk: criticalRiskActive,
             mergedChartData: chart_data_final
         };
-    }, [portfolio, liveData, currentRate, searchTicker, twrData, catTargets, sectorLimits]);
+    }, [portfolio, livePrices, currentRate, searchTicker, twrData, catTargets, sectorLimits]);
 
 
     // Handlers
@@ -799,15 +747,28 @@ const PortfolioPage = () => {
         if (!portfolio.length || !currentPortfolioId) return;
         setAnalyzing(true);
         try {
-            const metrics = { weightedBeta: weightedBeta.toFixed(2), weightedGrowth: weightedGrowth.toFixed(2) };
-            const result = await analyzePortfolio(portfolio, metrics, currentUser?.uid, force, currentPortfolioId);
+            // Normalize items for the backend
+            const itemsForApi = portfolio.map(p => ({
+                ticker: p.ticker,
+                shares: p.shares,
+                totalCost: p.totalCost || 0,
+                category: p.category || 'Core'
+            }));
+
+            const metrics = {
+                weightedBeta: (weightedBeta || 1).toFixed(2),
+                weightedGrowth: (weightedGrowth || 0).toFixed(2),
+                totalValue: totalValue || 0
+            };
+
+            const result = await analyzePortfolio(itemsForApi, metrics, currentUser?.uid, force, currentPortfolioId);
             if (result && result.analysis) setAnalysis(result.analysis);
         } catch (e) {
-            console.error(e);
+            console.error("Analysis Failed:", e);
         } finally {
             setAnalyzing(false);
         }
-    }, [portfolio, currentPortfolioId, weightedBeta, weightedGrowth, currentUser]);
+    }, [portfolio, currentPortfolioId, weightedBeta, weightedGrowth, totalValue, currentUser]);
 
     const handleRefreshAllData = useCallback(async (e) => {
         if (e && e.stopPropagation) e.stopPropagation();
@@ -821,8 +782,8 @@ const PortfolioPage = () => {
         const tickers = [...new Set(portfolio.map(p => (p.ticker || '').trim().toUpperCase()))].filter(Boolean);
 
         try {
-            // 1. Refresh prices - await this
-            await loadPrices(tickers);
+            // 1. Refresh global prices
+            await refreshStockPrices(tickers);
 
             // 2. Refresh AI Analysis - await this
             if (savedAnalysis) {
@@ -834,9 +795,10 @@ const PortfolioPage = () => {
             // Add a small delay so the user sees the refresh happen clearly
             setTimeout(() => {
                 setIsRefreshing(false);
+                setIsLoadingData(false);
             }, 500);
         }
-    }, [portfolio, loadPrices, savedAnalysis, handleAnalyzePortfolio]);
+    }, [portfolio, loadPrices, savedAnalysis, handleAnalyzePortfolio, refreshStockPrices]);
 
     // Load User Preferences
     useEffect(() => {
@@ -971,7 +933,10 @@ const PortfolioPage = () => {
             currency={currency} setCurrency={handleCurrencyChange}
             setShowWatchlist={setShowWatchlist}
             setShowProfileModal={setShowProfileModal}
-            handleLogout={logout}
+            handleLogout={async () => {
+                await logout();
+                navigate('/');
+            }}
         />
     );
 
@@ -1065,7 +1030,7 @@ const PortfolioPage = () => {
                                 onRenameSubmit={handleRenameSubmit}
                                 onHide={() => handleHideRequest('summary')}
                                 onRefresh={handleRefreshAllData}
-                                loading={portfolioLoading || isLoadingData || isRefreshing}
+                                loading={isLoadingData || isRefreshing}
                             />
                         );
                     }
@@ -1086,7 +1051,7 @@ const PortfolioPage = () => {
                                 isMounted={true}
                                 onRefresh={handleRefreshAllData}
                                 onHide={() => handleHideRequest('allocation')}
-                                loading={portfolioLoading || isLoadingData || isRefreshing}
+                                loading={isLoadingData || isRefreshing}
                                 catTargets={catTargets}
                                 sectorLimits={sectorLimits}
                                 onManageTargets={() => setShowAllocationEditor(true)}
@@ -1109,7 +1074,7 @@ const PortfolioPage = () => {
                                 notes={notes}
                                 onSaveNotes={saveNotes}
                                 onHide={() => handleHideRequest('ai')}
-                                loading={portfolioLoading || isLoadingData || isRefreshing}
+                                loading={isLoadingData || isRefreshing}
                             />
                         );
                     }
@@ -1138,7 +1103,7 @@ const PortfolioPage = () => {
                                 removeFromPortfolio={removeFromPortfolio}
                                 isTestPortfolio={isTestPortfolio}
                                 onHide={() => handleHideRequest('holdings')}
-                                loading={portfolioLoading || isLoadingData || isRefreshing}
+                                loading={isLoadingData || isRefreshing}
                             />
                         );
                     }
@@ -1242,7 +1207,10 @@ const PortfolioPage = () => {
             <LogoutConfirmationModal
                 isOpen={showLogoutConfirm}
                 onClose={() => setShowLogoutConfirm(false)}
-                onConfirm={logout}
+                onConfirm={async () => {
+                    await logout();
+                    navigate('/');
+                }}
             />
 
             <HideConfirmationModal

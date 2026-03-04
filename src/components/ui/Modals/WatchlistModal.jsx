@@ -521,7 +521,13 @@ const WatchlistModal = ({ isOpen, onClose, currency = 'USD', currencySymbol = '$
                             </thead>
                             <tbody>
                                 {sortedWatchlist.map((item) => (
-                                    <tr key={item.ticker}>
+                                    <tr
+                                        key={item.ticker}
+                                        onMouseEnter={() => {
+                                            // Prefetch stock data when hovering over a watchlist item
+                                            fetchStockData(item.ticker).catch(() => { });
+                                        }}
+                                    >
                                         {!hiddenColumns.includes('instrument') && (
                                             <td
                                                 style={{ cursor: 'pointer', width: columnWidths['instrument'] }}

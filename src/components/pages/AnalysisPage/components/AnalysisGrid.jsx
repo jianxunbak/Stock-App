@@ -1,4 +1,5 @@
-import React from 'react';
+import * as React from 'react';
+import { memo } from 'react';
 import StockOverviewCard from '../../../cards/StockOverviewCard/StockOverviewCard';
 import GrowthCard from '../../../cards/GrowthCard/GrowthCard';
 import ProfitabilityCard from '../../../cards/ProfitabilityCard/ProfitabilityCard';
@@ -7,6 +8,7 @@ import DebtCard from '../../../cards/DebtCard/DebtCard';
 import ValuationCard from '../../../cards/ValuationCard/ValuationCard';
 import SupportResistanceCard from '../../../cards/SupportResistanceCard/SupportResistanceCard';
 import FinancialTables from '../../../cards/FinancialTables/FinancialTables';
+import Skeleton from '../../../ui/Skeleton/Skeleton';
 
 const AnalysisGrid = ({
     cardOrder,
@@ -37,9 +39,24 @@ const AnalysisGrid = ({
 }) => {
 
     const cardTicker = ticker || urlTicker || 'no-ticker';
+    const isInitialLoad = effectiveLoading && !stockData?.overview?.symbol;
+
+    const renderSkeleton = (cardKey) => {
+        if (!cardVisibility[cardKey]) return null;
+        const isWide = cardKey === 'stockSummary';
+        return (
+            <div key={`skeleton-${cardKey}`} className={`${isWide ? styles.colSpan3 : styles.colSpan1} ${styles.collapsedWrapper}`}>
+                <div style={{ padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', height: isWide ? '280px' : '198px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Skeleton width="40%" height="24px" style={{ marginBottom: '1rem' }} />
+                    <Skeleton width="100%" height="120px" borderRadius="12px" />
+                </div>
+            </div>
+        );
+    };
 
     const renderCard = (cardKey) => {
         if (!cardVisibility[cardKey]) return null;
+        if (isInitialLoad) return renderSkeleton(cardKey);
 
         const isOpen = !!openCards[cardKey];
         const sharedProps = {
@@ -154,4 +171,4 @@ const AnalysisGrid = ({
     );
 };
 
-export default React.memo(AnalysisGrid);
+export default memo(AnalysisGrid);

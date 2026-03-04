@@ -22,7 +22,8 @@ const SearchBar = ({
     buttonStyle = {},
     iconSize = 18,
     fontSize = "var(--neu-text-sm)",
-    loading = false
+    loading = false,
+    onPrefetch = () => { }
 }) => {
     const [isExpanded, setIsExpanded] = useState(alwaysOpen);
     const [isPressed, setIsPressed] = useState(false);
@@ -31,6 +32,7 @@ const SearchBar = ({
     const inputRef = useRef(null);
     const containerRef = useRef(null);
     const pressTimerRef = useRef(null);
+    const prefetchTimerRef = useRef(null);
 
     useEffect(() => {
         if (alwaysOpen) {
@@ -101,6 +103,14 @@ const SearchBar = ({
         const value = e.target.value;
         setSearchValue(value);
         if (onSearch) onSearch(value);
+
+        // Predictive Prefetching - trigger after 300ms of typing
+        if (value.length >= 2) {
+            if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+            prefetchTimerRef.current = setTimeout(() => {
+                onPrefetch?.(value.toUpperCase().trim());
+            }, 300);
+        }
     };
 
     const handleKeyDown = (e) => {

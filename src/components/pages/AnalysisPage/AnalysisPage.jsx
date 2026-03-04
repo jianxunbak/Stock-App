@@ -3,7 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useStockData } from '../../../hooks/useStockData';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchUserSettings, saveUserSettings } from '../../../services/api';
-import { useUserSettings } from '../../../hooks/useUserSettings';
+import { useGlobalData } from '../../../context/GlobalDataContext';
+import { useMarketData } from '../../../context/MarketDataContext';
 import { usePortfolio } from '../../../hooks/usePortfolio';
 import { useWatchlist } from '../../../hooks/useWatchlist';
 
@@ -20,9 +21,20 @@ const AnalysisPage = () => {
     // 1. Data & Auth Hooks
     const { stockData, loadStockData, error, loading } = useStockData();
     const { addToWatchlist, removeFromWatchlist, watchlist } = useWatchlist();
-    const { portfolioList, addStockToPortfolio } = usePortfolio();
     const { currentUser, logout, loading: authLoading } = useAuth();
-    const { settings, updateSettings } = useUserSettings();
+    const {
+        settings,
+        portfolioList,
+        loading: settingsLoading,
+        updateSettings: handleUpdateSettings
+    } = useGlobalData();
+
+    const {
+        livePrices,
+        currencyRates,
+        pricesLoading: marketLoading
+    } = useMarketData();
+    const { addStockToPortfolio } = usePortfolio(); // Keep for adding functionality
     const navigate = useNavigate();
 
     // 2. Search & URL State
@@ -90,9 +102,7 @@ const AnalysisPage = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    useEffect(() => {
-        if (!authLoading && !currentUser) navigate('/');
-    }, [authLoading, currentUser, navigate]);
+
 
     useEffect(() => {
         if (error) setShowErrorModal(true);
@@ -124,45 +134,20 @@ const AnalysisPage = () => {
         }
     }, [urlTicker, loadStockData, setSearchParams]);
 
-    // Sync shielding for remote settings
-    const ignoreRemoteSyncUntil = useRef(0);
-    const loadSettings = useCallback((e) => {
-        if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') return;
-        if (e?.detail?.settings) {
-            const settings = e.detail.settings;
-            const defer = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
-            defer(() => {
-                startTransition(() => {
-                    if (settings.cardVisibility?.analysis) setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
-                    if (settings.cardOrder?.analysis) setCardOrder(settings.cardOrder.analysis);
-                    if (settings.baseCurrency) setCurrency(settings.baseCurrency);
-                });
-            });
-            return;
-        }
-        if (currentUser?.uid) {
-            fetchUserSettings(currentUser.uid).then(settings => {
-                if (Date.now() < ignoreRemoteSyncUntil.current) return;
-                if (settings?.analysisCardStates) {
-                    setOpenCards(prev => {
-                        const newState = { ...prev, ...settings.analysisCardStates };
-                        localStorage.setItem('analysis_card_states', JSON.stringify(newState));
-                        return newState;
-                    });
-                }
-                if (settings?.cardVisibility?.analysis) setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
-                if (settings?.cardOrder?.analysis) setCardOrder(settings.cardOrder.analysis);
-                if (settings?.baseCurrency) setCurrency(settings.baseCurrency);
-                if (settings?.analysisComparisons) setAnalysisComparisons(settings.analysisComparisons);
-            });
-        }
-    }, [currentUser?.uid]);
-
     useEffect(() => {
-        loadSettings();
-        window.addEventListener('user-settings-updated', loadSettings);
-        return () => window.removeEventListener('user-settings-updated', loadSettings);
-    }, [loadSettings]);
+        if (settings?.cardVisibility?.analysis) setCardVisibility(prev => ({ ...prev, ...settings.cardVisibility.analysis }));
+        if (settings?.cardOrder?.analysis) setCardOrder(settings.cardOrder.analysis);
+        if (settings?.baseCurrency) setCurrency(settings.baseCurrency);
+        if (settings?.analysisComparisons) setAnalysisComparisons(settings.analysisComparisons);
+
+        if (settings?.analysisCardStates) {
+            setOpenCards(prev => {
+                const newState = { ...prev, ...settings.analysisCardStates };
+                localStorage.setItem('analysis_card_states', JSON.stringify(newState));
+                return newState;
+            });
+        }
+    }, [settings]);
 
     // 6. Handlers
     // 6. Handlers
@@ -181,14 +166,13 @@ const AnalysisPage = () => {
     }, [ticker, urlTicker, loadStockData, setSearchParams]);
 
     const toggleCard = useCallback((card) => {
-        ignoreRemoteSyncUntil.current = Date.now() + 2000;
         setOpenCards(prev => {
             const newState = { ...prev, [card]: !prev[card] };
             localStorage.setItem('analysis_card_states', JSON.stringify(newState));
-            if (currentUser?.uid) saveUserSettings(currentUser.uid, { analysisCardStates: newState });
+            handleUpdateSettings({ analysisCardStates: newState });
             return newState;
         });
-    }, [currentUser?.uid, saveUserSettings]);
+    }, [handleUpdateSettings]);
 
     const handleConfirmHide = useCallback(async () => {
         const { cardKey } = hideModalState;
@@ -201,21 +185,16 @@ const AnalysisPage = () => {
             setCardVisibility(currentVisibility);
             setCardOrder(updatedOrder);
 
-            if (currentUser?.uid) {
-                const newSettings = {
-                    ...settings,
-                    cardVisibility: { ...settings?.cardVisibility, analysis: currentVisibility },
-                    cardOrder: { ...settings?.cardOrder, analysis: updatedOrder }
-                };
-                await saveUserSettings(currentUser.uid, newSettings);
-                window.dispatchEvent(new CustomEvent('user-settings-updated', { detail: { settings: newSettings, source: 'internal' } }));
-            }
+            handleUpdateSettings({
+                cardVisibility: { ...settings?.cardVisibility, analysis: currentVisibility },
+                cardOrder: { ...settings?.cardOrder, analysis: updatedOrder }
+            });
 
             setHideModalState(prev => ({ ...prev, isOpen: false }));
         } catch (error) {
             console.error('Failed to save visibility settings:', error);
         }
-    }, [hideModalState, cardVisibility, cardOrder, currentUser?.uid, saveUserSettings, settings]);
+    }, [hideModalState, cardVisibility, cardOrder, handleUpdateSettings, settings]);
 
     const handleAddToWatchlist = useCallback((shouldAdd) => {
         if (!stockData?.overview?.symbol) return;
@@ -272,8 +251,8 @@ const AnalysisPage = () => {
 
     const handleSetCurrency = useCallback((c) => {
         setCurrency(c);
-        updateSettings({ baseCurrency: c });
-    }, [setCurrency, updateSettings]);
+        handleUpdateSettings({ baseCurrency: c });
+    }, [handleUpdateSettings]);
 
     const handleLogoutAction = useCallback(async () => {
         await logout();
@@ -289,19 +268,19 @@ const AnalysisPage = () => {
         setAnalysisComparisons(prev => {
             if (prev.includes(upperTicker)) return prev;
             const newList = [...prev, upperTicker];
-            if (currentUser?.uid) saveUserSettings(currentUser.uid, { analysisComparisons: newList });
+            handleUpdateSettings({ analysisComparisons: newList });
             return newList;
         });
-    }, [currentUser?.uid, saveUserSettings]);
+    }, [handleUpdateSettings]);
 
     const handleRemoveComparison = useCallback((t) => {
         const upperTicker = t.toUpperCase();
         setAnalysisComparisons(prev => {
             const newList = prev.filter(x => x !== upperTicker);
-            if (currentUser?.uid) saveUserSettings(currentUser.uid, { analysisComparisons: newList });
+            handleUpdateSettings({ analysisComparisons: newList });
             return newList;
         });
-    }, [currentUser?.uid, saveUserSettings]);
+    }, [handleUpdateSettings]);
 
 
     // 7. Render
@@ -318,6 +297,7 @@ const AnalysisPage = () => {
                     setShowProfileModal={setShowProfileModalCallback}
                     handleLogout={handleLogoutAction}
                     loading={loading}
+                    prefetchTicker={(t) => loadStockData(t, false)} // Prefetch optimization
                 />
 
                 <AnalysisGrid

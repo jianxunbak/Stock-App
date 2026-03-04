@@ -3,7 +3,8 @@ import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { fetchUserSettings, saveUserSettings, fetchCurrencyRate, fetchStockDataBatch } from '../../../services/api';
-import { usePortfolio } from '../../../hooks/usePortfolio';
+import { useGlobalData } from '../../../context/GlobalDataContext';
+import { useMarketData } from '../../../context/MarketDataContext';
 import { ArrowLeft } from 'lucide-react';
 import CascadingHeader from '../../ui/CascadingHeader/CascadingHeader';
 import { TopNavLogo, TopNavActions } from '../../ui/Navigation/TopNav';
@@ -22,58 +23,46 @@ import styles from './WealthPage.module.css';
 const WealthPage = () => {
     const navigate = useNavigate();
     const { currentUser, logout, loading: authLoading } = useAuth();
+    const {
+        settings: userSettings,
+        portfolioList,
+        loading: dataLoading,
+        updateSettings: handleUpdateSettings
+    } = useGlobalData();
+
+    const {
+        livePrices,
+        currencyRates,
+        pricesLoading: marketLoading,
+        refreshStockPrices: handleRefreshPrices
+    } = useMarketData();
+
     const [showWatchlist, setShowWatchlist] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [ticker, setTicker] = useState('');
     const [displayCurrency, setDisplayCurrency] = useState('USD');
     const [baseCurrency, setBaseCurrency] = useState('USD');
-    const [baseToDisplayRate, setBaseToDisplayRate] = useState(1);
-    const [usdToDisplayRate, setUsdToDisplayRate] = useState(1);
-    const [sgdToDisplayRate, setSgdToDisplayRate] = useState(1);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [pricesLoading, setPricesLoading] = useState(true);
 
-    const { portfolioList } = usePortfolio();
-
-    const [livePrices, setLivePrices] = useState({});
-
-    // Fetch live prices for all portfolios
+    // Sync local currency selection with user base preference initially
     useEffect(() => {
-        if (!portfolioList || !Array.isArray(portfolioList)) return;
-
-        const mainPortfolios = portfolioList.filter(p => !p.type || p.type === 'main' || p.type === 'test');
-        const allTickers = new Set();
-
-        mainPortfolios.forEach(p => {
-            (p.portfolio || []).forEach(item => {
-                if (item.ticker) allTickers.add(item.ticker.trim().toUpperCase());
-            });
-        });
-
-        const tickers = Array.from(allTickers);
-        const missing = tickers.filter(t => !livePrices[t]);
-
-        if (missing.length > 0) {
-            const fetchPrices = async () => {
-                setPricesLoading(true);
-                try {
-                    const batchData = await fetchStockDataBatch(missing);
-                    const newPrices = {};
-                    Object.entries(batchData).forEach(([ticker, data]) => {
-                        newPrices[ticker] = data.overview?.price || 0;
-                    });
-                    setLivePrices(prev => ({ ...prev, ...newPrices }));
-                } catch (err) {
-                    console.error("Error fetching stock prices:", err);
-                } finally {
-                    setPricesLoading(false);
-                }
-            };
-            fetchPrices();
-        } else {
-            setPricesLoading(false);
+        if (userSettings?.baseCurrency) {
+            setBaseCurrency(userSettings.baseCurrency);
+            setDisplayCurrency(userSettings.baseCurrency);
         }
-    }, [portfolioList, livePrices]);
+    }, [userSettings?.baseCurrency]);
+
+    const { baseToDisplayRate, usdToDisplayRate, sgdToDisplayRate } = useMemo(() => {
+        const displayRate = currencyRates[displayCurrency] || 1;
+        const baseRate = currencyRates[baseCurrency] || 1;
+        const sgdRate = currencyRates['SGD'] || 1.35;
+
+        return {
+            baseToDisplayRate: baseRate !== 0 ? displayRate / baseRate : 1,
+            usdToDisplayRate: displayRate,
+            sgdToDisplayRate: sgdRate !== 0 ? displayRate / sgdRate : 1
+        };
+    }, [displayCurrency, baseCurrency, currencyRates]);
 
     let totalPortfolioValue = 0;
     try {
@@ -84,11 +73,13 @@ const WealthPage = () => {
                 const items = p.portfolio || [];
                 items.forEach(item => {
                     const ticker = (item.ticker || '').trim().toUpperCase();
-                    // Use live price if available, otherwise fallback
-                    const price = livePrices[ticker] !== undefined ? livePrices[ticker] : (Number(item.price) || 0);
+                    const tickerData = livePrices[ticker];
+                    // Fallback to item.price if live data hasn't loaded yet
+                    const price = tickerData !== undefined
+                        ? (typeof tickerData === 'number' ? tickerData : (tickerData?.price || 0))
+                        : (Number(item.price) || 0);
                     const shares = Number(item.shares) || 0;
-                    const val = price * shares;
-                    totalPortfolioValue += val;
+                    totalPortfolioValue += price * shares;
                 });
             });
         }
@@ -110,69 +101,7 @@ const WealthPage = () => {
         return '$';
     }, [baseCurrency]);
 
-    // Fetch currency rates when currencies change
-    useEffect(() => {
-        let isCancelled = false;
-
-        const updateRates = async () => {
-            try {
-                const cache = {};
-                const getRate = async (curr) => {
-                    if (curr === 'USD') return 1;
-                    if (cache[curr]) return cache[curr];
-                    const res = await fetchCurrencyRate(curr);
-                    const rate = res?.rate || res || 1;
-                    cache[curr] = rate;
-                    return rate;
-                };
-
-                const displayRate = await getRate(displayCurrency);
-
-                if (isCancelled) return;
-
-                // 1. Base to Display Rate
-                let newBaseRate = 1;
-                if (baseCurrency === displayCurrency) {
-                    newBaseRate = 1;
-                } else {
-                    const baseRateValue = await getRate(baseCurrency);
-                    if (isCancelled) return;
-                    newBaseRate = displayRate / baseRateValue;
-                }
-
-                // 2. USD to Display Rate
-                const newUsdRate = displayRate;
-
-                // 3. SGD to Display Rate
-                let newSgdRate = 1;
-                if (displayCurrency === 'SGD') {
-                    newSgdRate = 1;
-                } else {
-                    let sgdRateLocal = await getRate('SGD');
-                    if (isCancelled) return;
-                    if (sgdRateLocal === 1) sgdRateLocal = 1.35;
-                    newSgdRate = displayRate / sgdRateLocal;
-                }
-
-                if (!isCancelled) {
-                    setBaseToDisplayRate(newBaseRate);
-                    setUsdToDisplayRate(newUsdRate);
-                    setSgdToDisplayRate(newSgdRate);
-                }
-            } catch (err) {
-                console.error("Error updating currency rates:", err);
-            }
-        };
-
-        updateRates();
-
-        return () => {
-            isCancelled = true;
-        };
-    }, [displayCurrency, baseCurrency]);
-
-
-    // Card visibility state
+    // Card visibility state (derived from settings in context)
     const [cardVisibility, setCardVisibility] = useState({
         wealthSummary: true,
         stocks: true,
@@ -181,8 +110,6 @@ const WealthPage = () => {
         otherInvestments: true
     });
     const [cardOrder, setCardOrder] = useState(['wealthSummary', 'stocks', 'cpf', 'savings', 'otherInvestments']);
-
-    // Card open/collapsed state
     const [openCards, setOpenCards] = useState({
         wealthSummary: false,
         stocks: false,
@@ -191,7 +118,20 @@ const WealthPage = () => {
         otherInvestments: false
     });
 
-    // Hide modal state
+    // Update visibility and order when settings change
+    useEffect(() => {
+        if (userSettings?.cardVisibility?.wealth) {
+            setCardVisibility(prev => ({ ...prev, ...userSettings.cardVisibility.wealth }));
+        }
+        if (userSettings?.cardOrder?.wealth) {
+            setCardOrder(userSettings.cardOrder.wealth);
+        }
+        if (userSettings?.cardOpenStates?.wealth) {
+            setOpenCards(prev => ({ ...prev, ...userSettings.cardOpenStates.wealth }));
+        }
+    }, [userSettings]);
+
+    // Hide Modal State
     const [hideModalState, setHideModalState] = useState({
         isOpen: false,
         cardKey: null,
@@ -206,7 +146,6 @@ const WealthPage = () => {
         otherInvestments: 'Other Investments'
     };
 
-    // Handle hide request
     const handleHideRequest = (key) => {
         setHideModalState({
             isOpen: true,
@@ -215,7 +154,6 @@ const WealthPage = () => {
         });
     };
 
-    // Handle confirm hide
     const handleConfirmHide = async () => {
         const { cardKey } = hideModalState;
         if (!cardKey) return;
@@ -225,204 +163,52 @@ const WealthPage = () => {
             [cardKey]: false
         };
 
-        // Update local state
-        setCardVisibility(newVisibility);
-
-        // Save to DB
-        if (currentUser?.uid) {
-            const currentSettings = await fetchUserSettings(currentUser.uid);
-            const newSettings = {
-                ...currentSettings,
-                cardVisibility: {
-                    ...currentSettings?.cardVisibility,
-                    wealth: newVisibility
-                }
-            };
-            await saveUserSettings(currentUser.uid, newSettings);
-
-            // Notify other components
-            window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: newSettings, source: 'internal' }
-            }));
-        }
+        handleUpdateSettings({
+            cardVisibility: {
+                ...userSettings?.cardVisibility,
+                wealth: newVisibility
+            }
+        });
 
         setHideModalState({ isOpen: false, cardKey: null, cardLabel: '' });
     };
 
-    // User settings (including DOB)
-    const [userSettings, setUserSettings] = useState(null);
-
-    // Load User Preferences from DB
-    const ignoreRemoteSyncUntil = useRef(0);
-
-
     const handleCurrencyChange = (newCurrency) => {
         setDisplayCurrency(newCurrency);
-        // Only update the display preference, don't overwrite the user's home currency (baseCurrency)
-        // which should be explicitly set in User Details.
     };
 
-
-    const loadSettings = useCallback((e) => {
-        if (Date.now() < ignoreRemoteSyncUntil.current && e?.detail?.source !== 'internal') {
-            return;
-        }
-
-        const processSettings = (data) => {
-            if (!data) return;
-            // SYNC SHIELD: If we recently toggled, ignore remote data during the settlement period
-            if (Date.now() < ignoreRemoteSyncUntil.current) return;
-
-            startTransition(() => {
-                setUserSettings(prev => (JSON.stringify(prev) === JSON.stringify(data) ? prev : data));
-
-                if (data.cardVisibility?.wealth) {
-                    setCardVisibility(prev => {
-                        const next = { ...prev, ...data.cardVisibility.wealth };
-                        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-                    });
-                }
-                if (data.baseCurrency) {
-                    setBaseCurrency(data.baseCurrency);
-                    // Match display currency to base currency on initial load
-                    setDisplayCurrency(data.baseCurrency);
-                }
-                if (data.cardOrder?.wealth) {
-                    setCardOrder(prev => (JSON.stringify(prev) === JSON.stringify(data.cardOrder.wealth) ? prev : data.cardOrder.wealth));
-                }
-
-                if (data.cardOpenStates?.wealth) {
-                    setOpenCards(prev => {
-                        const next = { ...prev, ...data.cardOpenStates.wealth };
-                        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-                    });
-                }
-            });
-        };
-
-        if (e?.detail?.source === 'internal') return;
-
-        if (e?.detail?.settings) {
-            processSettings(e.detail.settings);
-            return Promise.resolve();
-        } else if (currentUser?.uid) {
-            return fetchUserSettings(currentUser.uid).then(settings => {
-                // SYNC SHIELD: Catch in-flight requests that might be stale
-                if (Date.now() < ignoreRemoteSyncUntil.current) return;
-                // If settings are null (new user or empty), set to empty object to stop loading
-                processSettings(settings || {});
-            }).catch(err => {
-                console.error("Failed to fetch settings", err);
-                // On error, also unblock loading
-                processSettings({});
-                return {};
-            });
-        }
-        return Promise.resolve();
-    }, [currentUser?.uid]);
-
     const handleRefresh = useCallback(async () => {
-        // Force React to commit the loading state immediately before starting async work.
-        // Without flushSync, React 18's batching can skip the loading UI entirely.
         flushSync(() => {
             setIsRefreshing(true);
         });
-        // 1. Reset live prices to trigger refetch
-        setLivePrices({});
-        // 2. Bypass sync shield
-        ignoreRemoteSyncUntil.current = 0;
-        // 3. Force reload settings
+
         try {
-            await loadSettings();
+            await handleRefreshPrices();
         } catch (err) {
             console.error("Refresh failed:", err);
         } finally {
-            // Add a small delay so the user sees the refresh happen
             setTimeout(() => setIsRefreshing(false), 600);
         }
-    }, [loadSettings]);
+    }, [handleRefreshPrices]);
 
-    useEffect(() => {
-        loadSettings();
-
-        // Listen for internal settings updates
-        window.addEventListener('user-settings-updated', loadSettings);
-        return () => window.removeEventListener('user-settings-updated', loadSettings);
-    }, [loadSettings]);
-
-    const lastToggleTime = useRef(0);
-
-    // Toggle card expanded/collapsed
     const toggleCard = async (card, forcedState) => {
-        const now = Date.now();
-        // Ignore rapid-fire toggles (prevents Safari ghost clicks/double-toggles)
-        if (now - lastToggleTime.current < 1000) return;
-        lastToggleTime.current = now;
-
         const nextState = forcedState !== undefined ? forcedState : !openCards[card];
         if (openCards[card] === nextState) return;
-
-        // Block remote sync for 2 seconds to allow DB to update and avoid stale overwrites
-        ignoreRemoteSyncUntil.current = Date.now() + 2000;
 
         const newStates = { ...openCards, [card]: nextState };
         setOpenCards(newStates);
 
-        if (currentUser?.uid) {
-            const newSettings = {
-                ...(userSettings || {}),
-                cardOpenStates: {
-                    ...(userSettings?.cardOpenStates || {}),
-                    wealth: newStates
-                }
-            };
-            setUserSettings(newSettings);
-
-            // Broadcast for OTHER pages, but loadSettings will handle the equality check
-            window.dispatchEvent(new CustomEvent('user-settings-updated', {
-                detail: { settings: newSettings, source: 'internal' }
-            }));
-
-            try {
-                await saveUserSettings(currentUser.uid, newSettings);
-            } catch (error) {
-                console.error("Failed to save card open states", error);
+        handleUpdateSettings({
+            cardOpenStates: {
+                ...(userSettings?.cardOpenStates || {}),
+                wealth: newStates
             }
-        }
-    };
-
-    // Centralized settings update handler for child components
-    const handleUpdateSettings = async (newSettingsFragment) => {
-        if (!currentUser?.uid) return;
-
-        // 1. Optimistic Update
-        const updatedSettings = { ...userSettings, ...newSettingsFragment };
-        setUserSettings(updatedSettings);
-
-        // 2. Broadcast immediately
-        window.dispatchEvent(new CustomEvent('user-settings-updated', {
-            detail: { settings: updatedSettings, source: 'internal' }
-        }));
-
-        // 3. Save to Backend
-        try {
-            // Block remote sync briefly to avoid "flicker" from our own write echoing back
-            ignoreRemoteSyncUntil.current = Date.now() + 2000;
-
-            // We trust our local state (updatedSettings) is the most recent
-            await saveUserSettings(currentUser.uid, updatedSettings);
-        } catch (error) {
-            console.error("Failed to save settings:", error);
-        }
+        });
     };
 
 
     // Auth Protection
-    useEffect(() => {
-        if (!authLoading && !currentUser) {
-            navigate('/');
-        }
-    }, [authLoading, currentUser, navigate]);
+
 
     const handleLogout = async () => {
         try {
@@ -508,7 +294,7 @@ const WealthPage = () => {
                                     sgdToDisplayRate={sgdToDisplayRate}
                                     settings={userSettings}
                                     onUpdateSettings={handleUpdateSettings}
-                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    loading={!userSettings || isRefreshing || dataLoading || marketLoading}
                                     currentPortfolioValueUSD={totalPortfolioValue}
                                     onRefresh={handleRefresh}
                                 />
@@ -534,14 +320,17 @@ const WealthPage = () => {
                                     usdToDisplayRate={usdToDisplayRate}
                                     settings={userSettings}
                                     onUpdateSettings={handleUpdateSettings}
-                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    loading={!userSettings || isRefreshing || dataLoading || marketLoading}
                                     currentPortfolioValueUSD={totalPortfolioValue}
                                     inflationRate={inflationRate}
                                     portfolioOptions={portfolioList?.map(p => {
                                         let val = 0;
                                         (p.portfolio || []).forEach(item => {
                                             const ticker = (item.ticker || '').trim().toUpperCase();
-                                            const price = livePrices[ticker] !== undefined ? livePrices[ticker] : (Number(item.price) || 0);
+                                            const tickerData = livePrices[ticker];
+                                            const price = tickerData !== undefined
+                                                ? (typeof tickerData === 'number' ? tickerData : (tickerData?.price || 0))
+                                                : (Number(item.price) || 0);
                                             val += price * (Number(item.shares) || 0);
                                         });
                                         return { name: p.name, valueUSD: val };
@@ -569,7 +358,7 @@ const WealthPage = () => {
                                     sgdToDisplayRate={sgdToDisplayRate}
                                     settings={userSettings}
                                     onUpdateSettings={handleUpdateSettings}
-                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    loading={!userSettings || isRefreshing || dataLoading || marketLoading}
                                     inflationRate={inflationRate}
                                     onRefresh={handleRefresh}
                                 />
@@ -593,7 +382,7 @@ const WealthPage = () => {
                                     sgdToDisplayRate={sgdToDisplayRate}
                                     settings={userSettings}
                                     onUpdateSettings={handleUpdateSettings}
-                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    loading={!userSettings || isRefreshing || dataLoading || marketLoading}
                                     inflationRate={inflationRate}
                                     onRefresh={handleRefresh}
                                 />
@@ -617,7 +406,7 @@ const WealthPage = () => {
                                     usdToDisplayRate={usdToDisplayRate}
                                     settings={userSettings}
                                     onUpdateSettings={handleUpdateSettings}
-                                    loading={!userSettings || isRefreshing || pricesLoading}
+                                    loading={!userSettings || isRefreshing || dataLoading || marketLoading}
                                     inflationRate={inflationRate}
                                     onRefresh={handleRefresh}
                                 />

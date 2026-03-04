@@ -217,7 +217,9 @@ const StocksCard = ({
 
     // Auto-update initialDeposit for scenarios with autofill enabled
     useEffect(() => {
-        if (!isInitialized) return;
+        // IMPORTANT: Only autofill if we are NOT loading and have a non-zero value
+        // to prevent overwriting the database value with 0 while market data is still fetching.
+        if (!isInitialized || loading || currentPortfolioValueBase <= 0) return;
 
         setCharts(prevCharts => {
             let changed = false;
@@ -250,7 +252,7 @@ const StocksCard = ({
 
             return changed ? newCharts : prevCharts;
         });
-    }, [currentPortfolioValueBase, portfolioOptionsBase, isInitialized]);
+    }, [currentPortfolioValueBase, portfolioOptionsBase, isInitialized, loading]);
 
     const toggleScenarioVisibility = (chartId, scenarioId) => {
         setCharts(charts.map(c => {

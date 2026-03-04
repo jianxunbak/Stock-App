@@ -50,7 +50,7 @@ const SummaryCardContent = ({
                                 {m.icon}
                             </span>
                         )}
-                        <span className={styles.gridLabel}>{m.label}</span>
+                        <span className={styles.gridLabel} title={m.label}>{m.label}</span>
                     </div>
                 ))}
             </div>

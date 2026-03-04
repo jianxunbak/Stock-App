@@ -74,10 +74,14 @@
 
 .gridLabel {
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-weight: 500;
     line-height: 1.2;
     /* Small font for grid items to fit full values */
     font-size: 0.62rem;
+    width: 100%;
+    display: block;
 }
 
 /* Tablet / Large Screens - Adjust sizes */
@@ -91,10 +95,18 @@
     }
 
     .grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .gridItem {
         font-size: 0.7rem;
+    }
+
+    .gridLabel {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100%;
+        display: block;
     }
 }

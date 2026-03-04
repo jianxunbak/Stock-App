@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, query, orderBy, setDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { useGlobalData } from '../context/GlobalDataContext';
 import { withFirestoreProtection } from '../utils/firestoreUtils';
 
 // Helper to generate a unique ID
@@ -9,12 +10,11 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const usePortfolio = (portfolioId) => {
     const [portfolio, setPortfolio] = useState([]);
-    const [portfolioList, setPortfolioList] = useState([]);
+    const { portfolioList, loading: listLoading } = useGlobalData();
     const [analysis, setAnalysis] = useState('');
     const [notes, setNotes] = useState('');
     const [comparisonStocks, setComparisonStocks] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [listLoading, setListLoading] = useState(true);
     const { currentUser } = useAuth();
 
     // 2. Fetch Data for CURRENT Portfolio
@@ -125,37 +125,7 @@ export const usePortfolio = (portfolioId) => {
         migrateMainPortfolio();
     }, [currentUser]);
 
-    // 1. Fetch List of Portfolios
-    useEffect(() => {
-        if (!currentUser) {
-            setPortfolioList([]);
-            setListLoading(false);
-            return;
-        }
 
-        const q = query(
-            collection(db, 'users', currentUser.uid, 'test_portfolios'),
-            orderBy('name')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    name: data.name || doc.id,
-                    ...data
-                };
-            });
-            setPortfolioList(list);
-            setListLoading(false);
-        }, (error) => {
-            console.error("Error fetching portfolio list:", error);
-            setListLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [currentUser]);
 
 
 

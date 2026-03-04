@@ -46,7 +46,8 @@ export const TopNavActions = ({
     setShowWatchlist = () => { },
     setShowProfileModal = () => { },
     handleLogout = () => { },
-    loading = false
+    loading = false,
+    prefetchTicker = () => { }
 }) => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -62,6 +63,7 @@ export const TopNavActions = ({
                         setSearchTicker(val);
                         handleSearch(val);
                     }}
+                    onPrefetch={prefetchTicker}
                     loading={loading}
                 />
             )}

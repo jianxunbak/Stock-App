@@ -1965,9 +1965,86 @@ def get_batch_stock_prices(payload: BatchStockPricesRequest):
         except: pass
 
     print(f"--- [API] Batch Fetch complete in {time.time() - s_start:.2f}s. Total: {len(results)}")
-    return results
 
-    print(f"--- [API] Batch Fetch complete in {time.time() - s_start:.2f}s. Success: {len(results)}/{len(tickers)}")
+    # --- ENRICHMENT START: Pull stats from Firestore Cache ---
+    if results and db:
+        try:
+            enrich_start = time.time()
+            fetched_tickers = list(results.keys())
+            # Chunking to respect Firestore 'in' limit of 30
+            for i in range(0, len(fetched_tickers), 30):
+                chunk = fetched_tickers[i:i+30]
+                # Filter out any non-string keys just in case
+                chunk = [str(t) for t in chunk if t]
+                docs = db.collection('stock_cache').where('__name__', 'in', chunk).get()
+                for doc in docs:
+                    ticker = doc.id
+                    data = doc.to_dict()
+                    if not data or 'payload' not in data: continue
+                    
+                    payload = data['payload']
+                    ov = payload.get('overview', {})
+                    val = payload.get('valuation', {})
+                    gro = payload.get('growth', {})
+                    
+                    if ticker in results:
+                        # Add stats to the existing price data
+                        results[ticker]['sector'] = ov.get('sector') or ov.get('industry') or 'Other'
+                        results[ticker]['beta'] = ov.get('beta', 1.0)
+                        results[ticker]['pegRatio'] = ov.get('pegRatio', 0.0)
+                        
+                        # Growth: Prefer 5Y estimate from valuation object
+                        est_growth = val.get('growthRateNext5Y')
+                        if est_growth is None:
+                            # Fallback to revenue growth from growth object
+                            est_growth = gro.get('revenueGrowth', 0)
+                        
+                        # If we still have nothing, try to find in overview
+                        if est_growth is None or est_growth == 0:
+                            est_growth = ov.get('revenueGrowth', 0)
+
+                        results[ticker]['growth'] = float(est_growth or 0) * 100
+                        
+                        # Financial Stability
+                        assumptions = val.get('raw_assumptions', {})
+                        results[ticker]['totalCash'] = assumptions.get('cash_and_equivalents', 0)
+                        results[ticker]['totalDebt'] = assumptions.get('total_debt', 0)
+                
+            # --- NEW FALLBACK: Fetch missing fundamental data if not in cache ---
+            missing_metadata = [t for t in fetched_tickers if results[t].get('sector') is None or results[t].get('sector') in ['Unknown', 'Other', None]]
+            
+            if missing_metadata and len(missing_metadata) > 0:
+                print(f"DEBUG: Metadata missing for {len(missing_metadata)} tickers. Starting fast-fetch...")
+                # Limit to avoid blocking too long (e.g., max 15)
+                fetch_subset = missing_metadata[:15]
+                
+                def fetch_light_info(t):
+                    try:
+                        info = yf.Ticker(t).info
+                        return t, info
+                    except:
+                        return t, None
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(fetch_subset), 10)) as executor:
+                    future_to_ticker = {executor.submit(fetch_light_info, t): t for t in fetch_subset}
+                    for future in concurrent.futures.as_completed(future_to_ticker):
+                        res_t, info = future.result()
+                        if info and res_t in results:
+                            results[res_t]['sector'] = info.get('sector') or info.get('industry') or 'Other'
+                            results[res_t]['beta'] = info.get('beta') or info.get('beta3Year') or 1.0
+                            
+                            # Growth fallback
+                            rev_growth = info.get('revenueGrowth', 0) or 0
+                            results[res_t]['growth'] = float(rev_growth) * 100
+                            results[res_t]['pegRatio'] = info.get('pegRatio') or info.get('trailingPegRatio') or 0.0
+                            results[res_t]['totalCash'] = info.get('totalCash', 0)
+                            results[res_t]['totalDebt'] = info.get('totalDebt', 0)
+            
+            print(f"DEBUG: Batch stats enrichment complete in {time.time() - enrich_start:.2f}s")
+        except Exception as e:
+            print(f"WARNING: Batch stats enrichment failed: {e}")
+    # --- ENRICHMENT END ---
+
     return results
 
 @app.post("/api/stocks/batch-data")
@@ -2602,264 +2679,187 @@ class PortfolioAnalysisRequest(BaseModel):
 
 @app.post("/api/portfolio/analyze")
 def analyze_portfolio(request: PortfolioAnalysisRequest):
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not found in environment variables.")
+    print(f"DEBUG ANALYSIS: Starting analysis for UID={request.uid}, PortfolioID={request.portfolioId}")
+    try:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            print("ERROR ANALYSIS: GEMINI_API_KEY missing")
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not found in environment variables.")
 
-    # --- Caching Logic ---
-    if db and request.uid and not request.forceRefresh:
-        try:
-            # Sanitize and Determine correct document
-            pid = request.portfolioId.strip() if request.portfolioId else ''
-            is_main = pid in ['main', 'latest', '', 'null', 'None']
-            
-            print(f"DEBUG ANALYSIS: Received ID='{request.portfolioId}', Cleaned='{pid}', is_main={is_main}")
-
-            if is_main:
-                doc_ref = db.collection('users').document(request.uid)
-            else:
-                doc_ref = db.collection('users').document(request.uid).collection('test_portfolios').document(pid)
-            
-            doc = doc_ref.get()
-            
-            if doc.exists:
-                data = doc.to_dict()
-                # Check if analysis exists and is fresh
-                analysis_text = data.get('analysis')
-                ts = data.get('analysis_timestamp')
+        # --- Caching Logic ---
+        if db and request.uid and not request.forceRefresh:
+            try:
+                # Sanitize and Determine correct document
+                pid = request.portfolioId.strip() if request.portfolioId else ''
+                is_main = pid in ['main', 'latest', '', 'null', 'None']
                 
-                if analysis_text and ts:
-                    if hasattr(ts, 'timestamp'):
-                        delta = datetime.now(timezone.utc) - ts
-                    else:
-                        try:
-                            ts_dt = datetime.fromisoformat(str(ts))
-                            delta = datetime.now(timezone.utc) - ts_dt
-                        except:
-                            delta = timedelta(hours=999)
+                print(f"DEBUG ANALYSIS: Received ID='{request.portfolioId}', Cleaned='{pid}', is_main={is_main}")
 
-                    if delta < timedelta(hours=24):
-                        print(f"DEBUG: Returning Cached Analysis for {request.portfolioId}")
-                        return {"analysis": analysis_text}
-        except Exception as e:
-            print(f"Analysis Cache Read Error: {e}") 
-
-    # --- End Cache Check ---
-
-    # --- Consolidated Analysis Loop ---
-    current_allocations = {}
-    total_value = 0
-    user_sector_totals = {}
-    list_of_valuation_results = []
-    
-    # Calculate total value first (since we need it for percentages in the prompt)
-    for item_raw in request.items:
-        total_value += item_raw.get('totalCost', 0)
-
-    for item_raw in request.items:
-        ticker = item_raw.get('ticker')
-        shares = item_raw.get('shares', 0)
-        cost = item_raw.get('totalCost', 0)
-        
-        try:
-            # get_stock_data uses Firestore caching and is MUCH faster than yf.Ticker(t).info
-            data = get_stock_data(ticker)
-            overview = data.get("overview", {})
-            val_data = data.get("valuation", {})
-            raw_assumptions = val_data.get("raw_assumptions", {})
-            
-            # Sector tracking
-            sector = overview.get('sector', 'Other')
-            user_sector_totals[sector] = user_sector_totals.get(sector, 0) + cost
-            
-            # Valuation metrics for prompt
-            peg = overview.get("pegRatio")
-            peg_str = f"{peg:.2f}" if peg is not None else "N/A"
-            
-            beta = overview.get("beta")
-            beta_str = f"{beta:.2f}" if beta is not None else "N/A"
-            
-            growth_5y = val_data.get("growthRateNext5Y", 0)
-            growth_5y_str = f"{growth_5y*100:.1f}%" if growth_5y else "N/A"
-            
-            cash = raw_assumptions.get("cash_and_equivalents", 0)
-            debt = raw_assumptions.get("total_debt", 0)
-            cash_to_debt = "N/A"
-            if isinstance(cash, (int, float)) and isinstance(debt, (int, float)):
-                if debt > 0: cash_to_debt = f"{cash / debt:.2f}"
-                elif cash > 0: cash_to_debt = "High (Net Cash)"
-            
-            ma200 = overview.get("twoHundredDayAverage")
-            price = val_data.get("currentPrice", 0)
-            ma_status = "N/A"
-            if ma200 and price:
-                ma_status = "Uptrend (Above 200MA)" if price > ma200 else "Downtrend (Below 200MA)"
-
-            list_of_valuation_results.append({
-                "ticker": ticker,
-                "shares": shares,
-                "intrinsicValue": val_data.get("intrinsicValue", 0),
-                "currentPrice": price,
-                "status": val_data.get("status", "Unknown"),
-                "peg": peg_str,
-                "beta": beta_str,
-                "growth_5y": growth_5y_str,
-                "cash_to_debt": cash_to_debt,
-                "ma_status": ma_status
-            })
-        except Exception as e:
-            print(f"Error fetching data for {ticker} for analysis: {e}")
-            list_of_valuation_results.append({
-                "ticker": ticker,
-                "shares": shares,
-                "intrinsicValue": 0, "currentPrice": 0, "status": "Error",
-                "peg": "N/A", "beta": "N/A", "growth_5y": "N/A", "cash_to_debt": "N/A"
-            })
-
-    # Prepare Context Strings
-    if total_value > 0:
-        sector_allocation_str = ", ".join([f"{s}: {(v/total_value)*100:.1f}%" for s, v in user_sector_totals.items()])
-    else:
-        sector_allocation_str = "N/A"
-        
-    user_sector_names = set(user_sector_totals.keys())
-    missing = [s for s in MAJOR_SECTORS if s not in user_sector_names]
-    underweight_sectors = ", ".join(missing[:4]) if missing else "None"
-
-    holdings_str = "\n".join([
-        f"- {res['ticker']}: {res['shares']} shares. "
-        f"(Intrinsic Value: ${res['intrinsicValue']:.2f}, "
-        f"Current Price: ${res['currentPrice']:.2f}, "
-        f"Status: {res['status']}, "
-        f"PEG: {res['peg']}, "
-        f"Beta: {res['beta']}, "
-        f"5Y Growth Est: {res['growth_5y']}, "
-        f"Cash/Debt: {res['cash_to_debt']}, "
-        f"Momentum: {res.get('ma_status', 'N/A')})" 
-        for res in list_of_valuation_results
-    ])
-    performance = request.metrics.get('totalTwr', 'N/A')
-    # Enrichment from your metrics dictionary
-    sector_context = request.metrics.get('sectorAllocation', 'N/A')
-    performance = request.metrics.get('totalTwr', 'N/A')
-    missing_sectors = request.metrics.get('underweightSectors', 'Defensive or Emerging Markets')
-
-    prompt = f"""
-    You are a Senior Quantitative Portfolio Manager and Fiduciary Strategist specializing in "Quality Growth" (GARP) mandates.
-    
-    MANDATE: 
-    Optimize this portfolio for a 12-15% annual return (CAGR) over a 5-10 year horizon. Prioritize "Business Quality" and "Valuation Discipline" over simple price volatility.
-    
-    PORTFOLIO DATA CORE (Inward):
-    {holdings_str}
-    - Weighted Portfolio Beta: {request.metrics.get('weightedBeta', 'N/A')}
-    - Aggregate 5Y Growth Est: {request.metrics.get('weightedGrowth', 'N/A')}%
-    - Portfolio TWR (Performance to Date): {performance}%
-    - Sector Allocation: {sector_allocation_str}
-    - Portfolio HHI (Concentration Index): {request.metrics.get('portfolioHHI', 'N/A')}
-    
-    ADAM KHOO’S 7-STEP QUALITY FILTER:
-    1. Consistent Growth: 5-10 year track record of increasing Revenue, Net Income, Gross Profit Margins, Net Profit Margins,and Operating Cash Flow.
-    2. Wide Economic Moat: High Brand Power, Network Effect, or High Switching Costs.
-    3. Future Growth Drivers: Clear management catalyst for the next 5-10 years.
-    4. Operational Efficiency: ROE > 15% and ROIC > 12% consistently.
-    5. Conservative Debt: Debt-to-EBITDA < 3.0 and high Cash-to-Debt ratio, debt servicing ratio < 30%, Current Ratio > 1, declining Cash Conversion Cycle, Sales Revenue is greater than Accounts Receivables 
-    6. Valuation: Price must be at or below Intrinsic Value (PEG < 1.5 preferred) and have reached a support level.
-    7. Momentum: Stock must be in a Stage 2 Uptrend (Price > 200-day MA).
-
-    OUTWARD LOOK (The Opportunity Set):
-    - Benchmark: S&P 500 (10% CAGR) vs. Nasdaq-100 (15% CAGR).
-    - Underweight Sectors: {underweight_sectors}
-    - Risk-Free Rate Proxy (10Y Treasury): ~4.2%
-    - Target Return: 12-15% CAGR (High-conviction growth focus).
-
-    ANALYSIS REQUIREMENTS (Clinical & Data-Driven & Long-Term Compounding & Future Potential):
-    1. **Allocation & Concentration Audit**: 
-       - Evaluate the Sector Allocation and the Portfolio HHI. Is the portfolio "top-heavy" or over-concentrated in a few names or sectors? 
-       - Identify "Single Point of Failure" risks. If one ticker or one sector accounts for >25% of the portfolio, flag it as a critical risk regardless of performance.
-       - Assess if the weighted growth target is being skewed by 1-2 volatile tickers.
-    
-    2. **The Quality-Growth Filter (The "Moat" Test)**: 
-       - Apply the 15% ROE and <3.0 Debt-to-EBITDA filter strictly to all holdings. 
-       - Identify "Value Traps": Tickers that look cheap but have declining margins or excessive debt.
-       - Flag "Growth at any Price" (GAAP) risks where PEG > 1.5. In Khoo’s VMI, we do not overpay for "hype."
-
-    3. **Engine vs. Anchor (VMI Selection)**: 
-        - **ENGINES (The Queens)**: Refer to the "ADAM KHOO’S 7-STEP QUALITY FILTER" section for criteria.
-       - **ANCHORS (The Junk)**: Stocks that does not pass "ADAM KHOO’S 7-STEP QUALITY FILTER" criteria.
-
-    4. **Selection Basis for Underweight Sectors**: 
-       - Criteria: Define 4 non-negotiable VMI criteria (e.g., ROE > 15%, Debt-to-EBITDA < 2.5, Wide Moat, and Positive FCF Yield) to ensure new entries contribute to the 15% CAGR target.
-       - Define 4 non-negotiable criteria for new entries in {underweight_sectors} to ensure they contribute to the 15% target (e.g., Pricing Power, Net Debt/EBITDA < 2.0).
-       - Specify exactly what criteria (e.g., "Positive FCF Yield," "ROIC > 15%," "Strong Pricing Power," or "Wide Economic Moat", or "Low Debt-to-EBITDA") the user should look for to hit 12-15% growth safely over the long term.
-       - List 5 "Institutional Quality" peer alternatives (e.g., MSFT, GOOGL, MA, COST style) currently showing price strength.
-
-    5. **Actionable Rebalancing Roadmap**: 
-       - **Trim/Exit Recommendation**:Trim winners only if they exceed 15% weight. Exit any position where the Moat is breached or Debt-to-EBITDA exceeds 3.0.
-       - **Tactical Entry Strategy**: Instruction on buying the dip *only* if the stock remains in a Stage 2 Uptrend.
-       - **Optimization Moves**: 3 moves to shift capital from "Anchors" to "Engines" to reach the 15% CAGR frontier.
-
-    FORMAT RULES:
-    - **DO NOT use markdown headers (like # or ##).** Use **bold** text for section titles instead.
-    - Use standard bullet points (-) for list items. 
-    - **INDENT sub-points** (nested bullets) by 2 spaces to ensure they are visually distinct and not aligned with the main bullet.
-    - Ensure all text size and formatting is consistent and professional.
-    - Use bullet points for all details. 
-    - Ensure all text size and text format are consistent. 
-    - Keep it under 400 words.
-    """
-    
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
-    
-    models_to_try = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-flash-latest", "gemini-pro-latest"]
-    
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        try:
-            response = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=30)
-            response.raise_for_status()
-            result = response.json()
-             
-            if "candidates" in result and result["candidates"]:
-                text = result["candidates"][0]["content"]["parts"][0]["text"]
+                if is_main:
+                    doc_ref = db.collection('users').document(request.uid)
+                else:
+                    doc_ref = db.collection('users').document(request.uid).collection('test_portfolios').document(pid)
                 
-                # --- Save to Cache (within test portfolio doc) ---
-                if db and request.uid:
-                    try:
-                        pid = request.portfolioId.strip() if request.portfolioId else ''
-                        is_main = pid in ['main', 'latest', '', 'null', 'None']
-                        
-                        if is_main:
-                            doc_ref = db.collection('users').document(request.uid)
+                doc = doc_ref.get()
+                
+                if doc.exists:
+                    data = doc.to_dict()
+                    # Check if analysis exists and is fresh
+                    analysis_text = data.get('analysis')
+                    ts = data.get('analysis_timestamp')
+                    
+                    if analysis_text and ts:
+                        if hasattr(ts, 'timestamp'):
+                            delta = datetime.now(timezone.utc) - ts
                         else:
-                            doc_ref = db.collection('users').document(request.uid).collection('test_portfolios').document(pid)
-                        
-                        doc_ref.set({
-                            'analysis': text,
-                            'analysis_timestamp': datetime.now(timezone.utc)
-                        }, merge=True)
-                        print(f"DEBUG: Saved Analysis to {pid}")
-                    except Exception as e:
-                        print(f"Analysis Cache Write Error: {e}")
-                
-                return {"analysis": text}
-                
-        except Exception as e:
-            if 'response' in locals() and response is not None:
-                try:
-                    error_details = response.json()
-                    print(f"Gemini Analysis Error Detail ({model}): {json.dumps(error_details)}")
-                except:
-                    print(f"Gemini Analysis Error Body ({model}): {response.text}")
-            print(f"Gemini Analysis Error ({model}): {e}")
-            last_exception = e
-            continue
+                            try:
+                                ts_dt = datetime.fromisoformat(str(ts))
+                                delta = datetime.now(timezone.utc) - ts_dt
+                            except:
+                                delta = timedelta(hours=999)
 
-    raise HTTPException(status_code=500, detail="Failed to generate analysis.")
+                        if delta < timedelta(hours=24):
+                            print(f"DEBUG: Returning Cached Analysis for {request.portfolioId}")
+                            return {"analysis": analysis_text}
+            except Exception as e:
+                print(f"Analysis Cache Read Error: {e}") 
+
+        # --- End Cache Check ---
+
+        # --- Consolidated Analysis Loop ---
+        total_value = 0
+        user_sector_totals = {}
+        list_of_valuation_results = []
+        
+        # Calculate total value first
+        for item_raw in request.items:
+            try:
+                val = item_raw.get('totalCost')
+                if val is not None:
+                    total_value += float(val)
+            except:
+                continue
+
+        for item_raw in request.items:
+            ticker = item_raw.get('ticker', 'Unknown')
+            shares = item_raw.get('shares', 0)
+            raw_cost = item_raw.get('totalCost')
+            cost = float(raw_cost) if raw_cost is not None else 0.0
+            
+            if not ticker: continue
+            
+            try:
+                try:
+                    data = get_stock_data(ticker)
+                    if not data: raise Exception("No data returned")
+                except Exception as e:
+                    print(f"Skipping {ticker} in analysis due to fetch error: {e}")
+                    continue
+                overview = data.get("overview", {})
+                val_data = data.get("valuation", {})
+                raw_assumptions = val_data.get("raw_assumptions", {})
+                
+                sector = overview.get('sector', 'Other')
+                user_sector_totals[sector] = user_sector_totals.get(sector, 0) + cost
+                
+                peg = overview.get("pegRatio")
+                peg_str = f"{peg:.2f}" if peg is not None else "N/A"
+                beta = overview.get("beta")
+                beta_str = f"{beta:.2f}" if beta is not None else "N/A"
+                growth_5y = val_data.get("growthRateNext5Y", 0)
+                growth_5y_str = f"{growth_5y*100:.1f}%" if growth_5y else "N/A"
+                
+                cash = raw_assumptions.get("cash_and_equivalents", 0)
+                debt = raw_assumptions.get("total_debt", 0)
+                cash_to_debt = "N/A"
+                if isinstance(cash, (int, float)) and isinstance(debt, (int, float)):
+                    if debt > 0: cash_to_debt = f"{cash / debt:.2f}"
+                    elif cash > 0: cash_to_debt = "High (Net Cash)"
+                
+                ma200 = overview.get("twoHundredDayAverage")
+                price = val_data.get("currentPrice", 0)
+                ma_status = "N/A"
+                if ma200 and price:
+                    ma_status = "Uptrend (Above 200MA)" if price > ma200 else "Downtrend (Below 200MA)"
+
+                list_of_valuation_results.append({
+                    "ticker": ticker,
+                    "shares": shares,
+                    "intrinsicValue": val_data.get("intrinsicValue", 0),
+                    "currentPrice": price,
+                    "status": val_data.get("status", "Unknown"),
+                    "peg": peg_str,
+                    "beta": beta_str,
+                    "growth_5y": growth_5y_str,
+                    "cash_to_debt": cash_to_debt,
+                    "ma_status": ma_status
+                })
+            except Exception as e:
+                print(f"Error fetching data for {ticker} for analysis: {e}")
+
+        # Prepare Context Strings
+        safe_total = total_value if total_value > 0 else 1
+        sector_allocation_str = ", ".join([f"{s}: {(v/safe_total)*100:.1f}%" for s, v in user_sector_totals.items()]) if user_sector_totals else "N/A"
+        user_sector_names = set(user_sector_totals.keys())
+        missing = [s for s in MAJOR_SECTORS if s not in user_sector_names]
+        underweight_sectors_str = ", ".join(missing[:4]) if missing else "None"
+
+        holdings_list = []
+        for res in list_of_valuation_results:
+            try:
+                ticker_val = res.get('ticker', 'Unknown')
+                shares_val = res.get('shares', 0)
+                iv = res.get('intrinsicValue')
+                iv_str = f"${float(iv):.2f}" if iv is not None and iv != 0 else "N/A"
+                cp = res.get('currentPrice')
+                cp_str = f"${float(cp):.2f}" if cp is not None and cp != 0 else "N/A"
+                holdings_list.append(
+                    f"- {ticker_val}: {shares_val} shares. (Intrinsic Value: {iv_str}, Price: {cp_str}, Status: {res.get('status', 'N/A')}, PEG: {res.get('peg', 'N/A')}, Beta: {res.get('beta', 'N/A')}, Growth: {res.get('growth_5y', 'N/A')}, Cash/Debt: {res.get('cash_to_debt', 'N/A')}, Momentum: {res.get('ma_status', 'N/A')})"
+                )
+            except: continue
+
+        holdings_str = "\n".join(holdings_list) if holdings_list else "No valid holdings."
+        weighted_beta = request.metrics.get('weightedBeta', 'N/A')
+        weighted_growth = request.metrics.get('weightedGrowth', 'N/A')
+        performance = request.metrics.get('totalTwr', 'N/A')
+        missing_sectors = request.metrics.get('underweightSectors', underweight_sectors_str)
+
+        prompt = f"""
+        Analyze this portfolio:
+        - Holdings: {holdings_str}
+        - Total Return (TWR): {performance}%
+        - Sector Weights: {sector_allocation_str}
+        - Underweight Sectors: {missing_sectors}
+        """
+        
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        models_to_try = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+        last_exception = None
+
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            try:
+                print(f"DEBUG ANALYSIS: Trying model {model}...")
+                response = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=30)
+                if response.status_code != 200:
+                    response.raise_for_status()
+                result = response.json()
+                if "candidates" in result and result["candidates"]:
+                    text = result["candidates"][0]["content"]["parts"][0]["text"]
+                    return {"analysis": text}
+            except Exception as e:
+                print(f"Gemini Analysis Error ({model}): {str(e)}")
+                last_exception = e
+                continue
+
+        if last_exception: raise HTTPException(status_code=500, detail=f"AI Engine failed: {str(last_exception)}")
+        raise HTTPException(status_code=500, detail="Failed to generate candidates.")
+
+    except HTTPException: raise
+    except Exception as fatal_e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(fatal_e))
 
 # --- User Settings Endpoints ---
 

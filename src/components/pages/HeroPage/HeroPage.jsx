@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import styles from './HeroPage.module.css';
 import { useAuth } from '../../../context/AuthContext';
 import { usePortfolio } from '../../../hooks/usePortfolio';
-import { useUserSettings } from '../../../hooks/useUserSettings';
+import { useGlobalData } from '../../../context/GlobalDataContext';
+import { useMarketData } from '../../../context/MarketDataContext';
 import { fetchStockPricesBatch, fetchCurrencyRate } from '../../../services/api';
 import { calculateCPFProjection } from '../../../utils/cpfUtils';
 import { calculateStockProjection } from '../../../utils/stockUtils';
@@ -20,25 +21,31 @@ import StyledCard from '../../ui/StyledCard/StyledCard';
 const HeroPage = () => {
     const navigate = useNavigate();
     const { currentUser, login, logout } = useAuth();
-    const { portfolioList } = usePortfolio();
-    const { settings, loading: settingsLoading } = useUserSettings();
+    const {
+        settings,
+        portfolioList,
+        loading: dataLoading,
+        updateSettings
+    } = useGlobalData();
+
+    const {
+        livePrices,
+        currencyRates,
+        pricesLoading: marketLoading
+    } = useMarketData();
 
     // State
     const [ticker, setTicker] = useState('');
     const [showWatchlist, setShowWatchlist] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
-    const [isLoginExpanded, setIsLoginExpanded] = useState(false); // Added for login animation
+    const [isLoginExpanded, setIsLoginExpanded] = useState(false);
+
     const [displayCurrency, setDisplayCurrency] = useState('USD');
-    const [baseCurrency, setBaseCurrency] = useState('USD'); // Added
-    const [liveData, setLiveData] = useState({});
-    const [pricesLoading, setPricesLoading] = useState(true);
+    const [baseCurrency, setBaseCurrency] = useState('USD');
 
-    // Currency conversion rates
-    const [baseToDisplayRate, setBaseToDisplayRate] = useState(1);
-    const [usdToDisplayRate, setUsdToDisplayRate] = useState(1); // Renamed from usdToBase for clarity
-    const [sgdToDisplayRate, setSgdToDisplayRate] = useState(1); // Added
-
-    const [currencyLoading, setCurrencyLoading] = useState(false);
+    // UI specific loading (combination of auth and data)
+    const settingsLoading = dataLoading;
+    const pricesLoading = dataLoading;
 
     // Initial Currency Sync
     useEffect(() => {
@@ -48,92 +55,34 @@ const HeroPage = () => {
         }
     }, [settings?.baseCurrency]);
 
-    // Currency Rate Fetch (Aligned with WealthPage)
-    useEffect(() => {
-        const updateRates = async () => {
-            setCurrencyLoading(true);
-            const cache = {};
-            const getRate = async (curr) => {
-                if (curr === 'USD') return 1;
-                if (cache[curr]) return cache[curr];
-                try {
-                    const res = await fetchCurrencyRate(curr);
-                    const rate = typeof res === 'object' ? res.rate : res;
-                    const finalRate = rate || 1;
-                    cache[curr] = finalRate;
-                    return finalRate;
-                } catch (e) {
-                    console.error("Currency fetch error", e);
-                    return 1;
-                }
-            };
+    // Compute Rates based on Global currencyRates
+    const { baseToDisplayRate, usdToDisplayRate, sgdToDisplayRate } = useMemo(() => {
+        const displayRate = currencyRates[displayCurrency] || 1;
+        const baseRate = currencyRates[baseCurrency] || 1;
+        const sgdRate = currencyRates['SGD'] || 1.35;
 
-            const displayRate = await getRate(displayCurrency);
-
-            // 1. Base to Display Rate
-            if (baseCurrency === displayCurrency) {
-                setBaseToDisplayRate(1);
-            } else {
-                const baseRate = await getRate(baseCurrency);
-                setBaseToDisplayRate(displayRate / baseRate);
-            }
-
-            // 2. USD to Display Rate
-            setUsdToDisplayRate(displayRate);
-
-            // 3. SGD to Display Rate
-            if (displayCurrency === 'SGD') {
-                setSgdToDisplayRate(1);
-            } else {
-                let sgdRate = await getRate('SGD');
-                // Fallback: If API returns 1 for SGD (unlikely 1:1 with USD), and display isn't SGD, maybe assume ~1.35
-                if (sgdRate === 1) sgdRate = 1.35;
-                const calculatedRate = displayRate / sgdRate;
-                setSgdToDisplayRate(calculatedRate);
-            }
-            setCurrencyLoading(false);
+        return {
+            baseToDisplayRate: baseRate !== 0 ? displayRate / baseRate : 1,
+            usdToDisplayRate: displayRate, // Since rates are vs USD in our API
+            sgdToDisplayRate: sgdRate !== 0 ? displayRate / sgdRate : 1
         };
+    }, [displayCurrency, baseCurrency, currencyRates]);
 
-        updateRates();
-    }, [displayCurrency, baseCurrency]);
-
-    // Batch Stock Price Fetch
-    useEffect(() => {
-        if (!portfolioList || portfolioList.length === 0) return;
-        const allItems = portfolioList.flatMap(p => p.portfolio || []);
-        const tickers = [...new Set(allItems.map(i => i.ticker))].filter(Boolean);
-        const missingTickers = tickers.filter(t => !liveData[t]);
-
-        if (missingTickers.length > 0) {
-            setPricesLoading(true);
-            fetchStockPricesBatch(missingTickers)
-                .then(results => {
-                    if (!results || typeof results !== 'object') return;
-                    const newLiveData = {};
-                    Object.entries(results).forEach(([ticker, data]) => {
-                        newLiveData[ticker] = { price: data.price };
-                    });
-                    setLiveData(prev => ({ ...prev, ...newLiveData }));
-                })
-                .catch(err => console.error("Failed to fetch batch prices", err))
-                .finally(() => setPricesLoading(false));
-        }
-    }, [portfolioList]);
-
-    // 1. Current Portfolio Value
+    // 1. Current Portfolio Value (Using Global livePrices)
     const totalPortfolioValue = useMemo(() => {
         if (!portfolioList) return 0;
         let total = 0;
-        const mainPortfolios = portfolioList.filter(p => (p.type || 'main') === 'main');
+        const mainPortfolios = portfolioList.filter(p => (p.type || 'main') === 'main' || p.type === 'test');
         mainPortfolios.forEach(p => {
             (p.portfolio || []).forEach(item => {
                 const ticker = item.ticker?.toUpperCase();
-                const price = liveData[ticker]?.price || 0;
+                const tickerData = livePrices[ticker];
+                const price = typeof tickerData === 'number' ? tickerData : (tickerData?.price || 0);
                 total += price * (item.shares || 0);
             });
         });
         return total;
-    }, [portfolioList, liveData]);
+    }, [portfolioList, livePrices]);
 
     // Helper: Calculate Age
     const currentAge = useMemo(() => {
@@ -418,7 +367,7 @@ const HeroPage = () => {
                                 shadowScale={1}
                                 contentDistortionScale={0.3}
                                 distortionFactor={1}
-                                loading={settingsLoading || pricesLoading}
+                                loading={dataLoading || marketLoading}
                             >
                                 <div className={styles.cardRow}>
                                     <div className={styles.dataItem}>

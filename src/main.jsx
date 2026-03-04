@@ -5,6 +5,8 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { WatchlistProvider } from './context/WatchlistContext.jsx'
+import { GlobalDataProvider } from './context/GlobalDataContext.jsx'
+import { MarketDataProvider } from './context/MarketDataContext.jsx'
 import { checkAndMarkQuotaError } from './utils/firestoreUtils';
 
 // Console suppression logic
@@ -52,11 +54,15 @@ if (import.meta.env.PROD) {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <ThemeProvider>
-        <WatchlistProvider>
-          <App />
-        </WatchlistProvider>
-      </ThemeProvider>
+      <GlobalDataProvider>
+        <MarketDataProvider>
+          <ThemeProvider>
+            <WatchlistProvider>
+              <App />
+            </WatchlistProvider>
+          </ThemeProvider>
+        </MarketDataProvider>
+      </GlobalDataProvider>
     </AuthProvider>
   </StrictMode>,
 )

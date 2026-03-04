@@ -1,10 +1,10 @@
 import React from 'react';
-
 import { CardAnimator } from '../Animator';
 import Button from '../Button';
 import { X } from 'lucide-react';
 import Menu from '../Menu';
 import InlineSpinner from '../InlineSpinner/InlineSpinner';
+import Skeleton from '../Skeleton/Skeleton';
 import { useResizeObserver } from '../../../hooks/useResizeObserver';
 import './StyledCard.css';
 
@@ -25,6 +25,7 @@ const StyledCard = React.memo(({
     containerStyle = {},
     distortionFactor = 1,
     loading = false,
+    skeleton = null,
     isOpen, // Ignore
     onClose, // Ignore - we use it via props.onClose inside but don't want it on DOM
     contentDistortionScale = 1,
@@ -154,10 +155,22 @@ const StyledCard = React.memo(({
             {...props}
         >
             {renderContent()}
-            {/* Spinner rendered as direct sibling of blurred content, never blurred itself */}
+
+            {/* Skeleton / Loading Overlay */}
             {loading && (
                 <div className="expandable-card-loading-overlay">
-                    <InlineSpinner size="32px" />
+                    {skeleton ? skeleton : (
+                        <div style={{ width: '100%', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <Skeleton width="40%" height="1.2rem" />
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <Skeleton width="30%" height="3rem" />
+                                <Skeleton width="30%" height="3rem" />
+                                <Skeleton width="30%" height="3rem" />
+                            </div>
+                            <Skeleton width="90%" height="1rem" />
+                            <Skeleton width="70%" height="1rem" />
+                        </div>
+                    )}
                 </div>
             )}
         </CardAnimator>
